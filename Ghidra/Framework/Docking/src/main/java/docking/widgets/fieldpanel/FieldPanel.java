@@ -23,15 +23,19 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.List;
 
+import javax.accessibility.*;
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.text.AttributeSet;
 
 import docking.DockingUtils;
 import docking.util.GraphicsUtils;
+import docking.widgets.CursorPosition;
 import docking.widgets.EventTrigger;
 import docking.widgets.fieldpanel.field.Field;
+import docking.widgets.fieldpanel.field.TextField;
 import docking.widgets.fieldpanel.internal.*;
 import docking.widgets.fieldpanel.internal.PaintContext;
 import docking.widgets.fieldpanel.listener.*;
@@ -1335,7 +1339,14 @@ public class FieldPanel extends JPanel
 		}
 	}
 
-//==================================================================================================
+	public AccessibleContext getAccessibleContext() {
+		if (accessibleContext == null) {
+				accessibleContext = new AccessibleFieldPanel();
+		}
+		return accessibleContext;
+}
+	
+// ==================================================================================================
 // Inner Classes
 //==================================================================================================
 
@@ -2199,5 +2210,299 @@ public class FieldPanel extends JPanel
 				}
 			}
 		}
+	}
+	public class  AccessibleFieldPanel extends AccessibleJComponent
+	implements AccessibleText, AccessibleExtendedText,
+	AccessibleEditableText
+	{
+		@Override
+		public void setTextContents(String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void insertTextAtIndex(int index, String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void delete(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void cut(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void paste(int startIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void replaceText(int startIndex, int endIndex, String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void selectText(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void setAttributes(int startIndex, int endIndex, AttributeSet as) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public AccessibleRole getAccessibleRole() {
+			return AccessibleRole.TEXT;
+		}
+
+		@Override
+		public AccessibleText getAccessibleText() {
+			return (AccessibleText) this;			
+		}
+
+		@Override
+		public AccessibleEditableText getAccessibleEditableText() {
+					return (AccessibleEditableText) this;
+		}
+
+		public int getIndexAtPoint(Point p) {
+			// TODO Auto-generated method stub
+			return 0;
+		}
+
+		@Override
+		public Rectangle getCharacterBounds(int i) {
+			AnchoredLayout layout = findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout == null)
+				return null;
+			Field field = layout.getField(fieldNumFromSimulatedOffset(i));
+			if (field != null)
+			{
+				Rectangle bounds = field.getCursorBounds(rowFromSimulatedOffset(i),colFromSimulatedOffset(i));
+				if (bounds != null)
+					bounds.y += layout.getYPos();
+				return bounds;
+			}
+			return null;
+		}
+
+		@Override
+		public int getCharCount() {
+			return 512000;
+		}
+
+		@Override
+		public int getCaretPosition() {
+			return toSimulatedOffset(cursorPosition.getFieldNum(),cursorPosition.getRow(),cursorPosition.getCol());
+		}
+
+		@Override
+		public String getAtIndex(int part, int index) {
+			AccessibleTextSequence sequence = getTextSequenceAt(part, index);
+			return (sequence == null)?null:sequence.text;
+		}
+
+		@Override
+		public String getAfterIndex(int part, int index) {
+			AccessibleTextSequence sequence = getTextSequenceAfter(part, index);
+			return (sequence == null)?null:sequence.text;
+		}
+
+		@Override
+		public String getBeforeIndex(int part, int index) {
+			AccessibleTextSequence sequence = getTextSequenceBefore(part, index);
+			return (sequence == null)?null:sequence.text;
+		}
+
+		@Override
+		public AttributeSet getCharacterAttribute(int i) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public int getSelectionStart() {
+			return getCaretPosition();
+		}
+
+		@Override
+		public int getSelectionEnd() {
+			return getCaretPosition();
+		}
+
+		@Override
+		public String getSelectedText() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public String  getTextRange(int startIndex, int endIndex) {
+			AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex()); 
+			if (layout == null) return null;
+			String text = "";
+			int startFieldNum = fieldNumFromSimulatedOffset(startIndex);
+			int startRow = rowFromSimulatedOffset(startIndex);
+			int startCol = colFromSimulatedOffset(startIndex);
+			int endFieldNum = fieldNumFromSimulatedOffset(endIndex);
+			int endRow = rowFromSimulatedOffset(endIndex);
+			int endCol = colFromSimulatedOffset(endIndex);
+			//System.out.printf("get text range %d/%d/%d, %d/%d/%d\n",startFieldNum,startRow,startCol,endFieldNum,endRow,endCol);
+			boolean justOneField =startFieldNum == endFieldNum;
+			for ( int fieldNum = startFieldNum;fieldNum <= endFieldNum;fieldNum++) {
+				Field field = layout .getField(fieldNum);
+				if (field == null) continue;
+				String fieldText = field.getText();
+				if (fieldText == null)
+					continue;
+				int startOffset = 0;
+				if (fieldNum == startFieldNum)
+					startOffset = field.screenLocationToTextOffset(startRow,startCol);
+				else
+					startOffset = field.screenLocationToTextOffset(startRow,0);					
+				
+				int endOffset = Math.min(fieldText.length(),field.screenLocationToTextOffset(startRow,field.getNumCols(startRow)));
+				if  (fieldNum == endFieldNum)
+					if (endCol == 0)
+						break;
+					else
+						endOffset = Math.min(fieldText.length(),field.screenLocationToTextOffset(startRow,endCol));
+				text +=fieldText.substring(startOffset, endOffset);
+				text += " ";
+			}
+			return text;
+		}
+
+		@Override
+		public AccessibleTextSequence getTextSequenceAt(int part, int index) {
+			Field field = getCurrentField();
+			if (field == null) 
+				return null;
+			var text = field.getText();
+			if (text == null && part != AccessibleExtendedText.LINE)
+				return null;
+
+			switch (part) {
+			case AccessibleText.CHARACTER:
+			{
+				int offset = field.screenLocationToTextOffset(cursorPosition.row,cursorPosition.col);
+				if (offset >= text.length())
+					return null;
+				//System.out.printf("char sequence: %d %d/%d, %s\n",cursorPosition.fieldNum,cursorPosition.row,cursorPosition.col,text.substring(offset,offset+1));
+				int simulatedOffset = toSimulatedOffset(cursorPosition.fieldNum,cursorPosition.row,cursorPosition.col);
+				return new AccessibleTextSequence(simulatedOffset,simulatedOffset+1,text.substring(offset,offset+1));
+			}
+			
+			case AccessibleText.WORD:
+			{
+				int simulatedStartOffset = toSimulatedOffset(cursorPosition.fieldNum,cursorPosition.row,0);
+				int simulatedEndOffset = simulatedStartOffset+field.getNumCols(cursorPosition.row);
+				return new AccessibleTextSequence(simulatedStartOffset,simulatedEndOffset,text);
+			}
+			case AccessibleExtendedText.LINE:
+			{
+				AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex());
+				if (layout ==null)
+						return null;;
+				int firstFieldNum = layout.getBeginRowFieldNum(cursorPosition.fieldNum);
+				Field firstField =  layout.getField(firstFieldNum);
+
+				int lastFieldNum = layout.getEndRowFieldNum(firstFieldNum);
+				//System.out.printf("get line Sequence for line %d, field %d, %d, %d\n",cursorPosition.getIndex(),cursorPosition.fieldNum,firstFieldNum,lastFieldNum);
+				
+				if (firstFieldNum == lastFieldNum)
+					return null;
+				Field lastField = null;
+				while (lastFieldNum > firstFieldNum)
+				{
+					Field testField =  layout.getField(lastFieldNum-1);
+					if (cursorPosition.row < testField.getNumRows()) {
+						lastField = testField;
+						break;
+					}
+
+					lastFieldNum--;
+					//System.out.printf("reducing last field num to %d\n",lastFieldNum);				
+					}
+				if (lastField == null)
+					return null;
+				//System.out.printf("last field cols %d, %s\n",lastField.getNumCols(cursorPosition.row),lastField.getText());
+				int simulatedStart = toSimulatedOffset(firstFieldNum, cursorPosition.row,0);
+				int simulatedEnd =toSimulatedOffset(lastFieldNum-1, cursorPosition.row,lastField.getNumCols(cursorPosition.row));
+				return new AccessibleTextSequence(simulatedStart,simulatedEnd,"dummy");
+			}
+			default:
+				break;
+			}
+			return null; 
+		}
+
+		@Override
+			public AccessibleTextSequence getTextSequenceAfter(int part, int index) {
+			AccessibleTextSequence sequence = getTextSequenceAt(part,index);
+			if (sequence == null)
+				return null;
+			int fieldNum = fieldNumFromSimulatedOffset(sequence.startIndex);
+			int row = rowFromSimulatedOffset(sequence.startIndex);
+			int col = colFromSimulatedOffset(sequence.startIndex);
+			switch (part) {
+			case AccessibleText.WORD:
+			{
+				fieldNum++;
+				int simulatedOffset = toSimulatedOffset(fieldNum,row,0);
+				return new AccessibleTextSequence(simulatedOffset,simulatedOffset+1,"");
+			}
+			case AccessibleText.CHARACTER:
+				return new AccessibleTextSequence(sequence.startIndex+1,sequence.startIndex+2,"dummy");
+			default:
+				break;
+			}
+			
+			return null;
+		}
+
+		@Override
+		public 
+		AccessibleTextSequence getTextSequenceBefore(int part, int index) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public Rectangle getTextBounds(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+		int toSimulatedOffset(int fieldNum,int row, int col)
+		{
+			fieldNum <<= 16;
+			row <<= 8;
+			return fieldNum | row|col;
+		}
+		int fieldNumFromSimulatedOffset(int offset)
+		{
+			return (offset & 0xff0000) >> 16;
+		}
+		int rowFromSimulatedOffset(int offset)
+		{
+			return (offset & 0xff00) >>8;
+		}
+		int colFromSimulatedOffset(int offset)
+		{
+	return (offset & 0xff);
+		}
+
 	}
 }
