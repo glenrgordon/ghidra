@@ -21,9 +21,13 @@ import static java.awt.event.InputEvent.*;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.AWTKeyStroke;
+import java.awt.KeyboardFocusManager;
 import java.io.File;
 import java.util.*;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.*;
 import javax.swing.event.*;
@@ -413,6 +417,7 @@ public class GTable extends JTable {
 
 		setAutoEditEnabled(false); // clients can turn this on as needed
 		installEditKeyBinding();
+		preventTabKeyFromNavigatingWithinTable();
 
 		initDefaultRenderers();
 
@@ -1377,6 +1382,20 @@ public class GTable extends JTable {
 		toolActions.addGlobalAction(exportColumnsAction);
 		toolActions.addGlobalAction(selectAllAction);
 	}
+
+	void preventTabKeyFromNavigatingWithinTable()
+	{
+		Set<AWTKeyStroke> forward = new HashSet<AWTKeyStroke>(
+				getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS));
+		forward.add(KeyStroke.getKeyStroke("TAB"));
+		setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, forward);
+		Set<AWTKeyStroke> backward = new HashSet<AWTKeyStroke>(
+				getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS));
+		backward.add(KeyStroke.getKeyStroke("shift TAB"));
+		setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, backward);
+	}
+
+
 
 //==================================================================================================
 // Inner Classes
