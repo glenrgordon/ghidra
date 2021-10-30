@@ -38,6 +38,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 	private static final int BYTE_SEPARATOR_THICKNESS = 2;
 	private static final int SCROLLBAR_THICKNESS = 15;
 	private static final int MY_HEIGHT = (2 * CELL_HEIGHT) + (3 * BYTE_SEPARATOR_THICKNESS);
+	private static final int BYTE_ROW_HEIGHT = CELL_HEIGHT + (2 * BYTE_SEPARATOR_THICKNESS);
 
 	private static final int LENEND_BOX_SIZE = 16;
 
@@ -66,6 +67,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 	private EditMode editMode = EditMode.NONE;
 	private int editOrdinal = -1;
 	private DataTypeComponent editComponent;
+	private boolean showOffsetsInHex = false;
 
 	public static class BitFieldLegend extends JPanel {
 
@@ -155,10 +157,22 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 		}
 		allocationByteOffset = 0;
 		allocationByteSize = 1;
-		if (!editUseEnabled) {
+		if (!editUseEnabled && composite != null) {
 			allocationByteSize = composite.getLength();
 		}
 		init(null);
+	}
+
+	public void setShowOffsetsInHex(boolean useHex) {
+		this.showOffsetsInHex = useHex;
+		if (bitFieldAllocation != null) {
+			bitFieldAllocation.refresh(true);
+			repaint();
+		}
+	}
+
+	public boolean isShowOffsetsInHex() {
+		return showOffsetsInHex;
 	}
 
 	@Override
@@ -246,6 +260,15 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 	 */
 	public int getPreferredHeight() {
 		return MY_HEIGHT + SCROLLBAR_THICKNESS;
+	}
+
+	/**
+	 * Determine if specified point is within bit cell region
+	 * @param p point within this component's bounds
+	 * @return true if p is within bit cell region
+	 */
+	public boolean isWithinBitCell(Point p) {
+		return p.y < MY_HEIGHT && p.y > BYTE_ROW_HEIGHT;
 	}
 
 	private int getPreferredWidth() {
@@ -347,7 +370,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 
 	void init(DataTypeComponent editDtc) {
 
-		if (editDtc == null || editDtc.isFlexibleArrayComponent()) {
+		if (editDtc == null) {
 			editMode = EditMode.NONE;
 			editOrdinal = -1;
 			this.editComponent = null;
@@ -378,6 +401,12 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			return false;
 		}
 		return bitFieldAllocation.hasConflict;
+
+		// TODO: Improve conflict detection with zero-length components.  
+		// Zero-length components can share common offset, although 
+		// zero-length components should have a lower ordinal than a 
+		// sized component at the same offset.
+
 	}
 
 	/**
@@ -433,7 +462,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			composite.delete(editOrdinal);
 
 			int sizeChange = initialLength - composite.getLength();
-			if (!composite.isInternallyAligned() && editOrdinal < composite.getNumComponents()) {
+			if (!composite.isPackingEnabled() && editOrdinal < composite.getNumComponents()) {
 				// deletions cause shift which is bad - pad with defaults
 				for (int i = 0; i < sizeChange; i++) {
 					composite.insert(editOrdinal, DataType.DEFAULT);
@@ -580,7 +609,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			String conflictTip = "'" + conflict.getDataType().getDisplayName() +
 				(conflictName != null ? (" " + conflictName) : "") + "' at offset " +
 				conflict.getOffset();
-			conflictMsg += "<div style=\"color: red;font-style: italic\">conflict with " +
+			conflictMsg += "<div style=\"color: red;font-style: italic\">overlaps " +
 				HTMLUtilities.escapeHTML(conflictTip) + "</div>";
 		}
 		return "<HTML><div style=\"text-align:center\">" + HTMLUtilities.escapeHTML(tip) +
@@ -658,7 +687,13 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 
 		g.setColor(TEXT_COLOR);
 
-		String offsetStr = Integer.toString(offset);
+		String offsetStr;
+		if (showOffsetsInHex) {
+			offsetStr = "0x" + Integer.toHexString(offset);
+		}
+		else {
+			offsetStr = Integer.toString(offset);
+		}
 		FontMetrics fontMetrics = g.getFontMetrics();
 		int textY = y + (CELL_HEIGHT + fontMetrics.getMaxAscent() - BYTE_SEPARATOR_THICKNESS) / 2;
 		int textX = x + (width - BYTE_SEPARATOR_THICKNESS - fontMetrics.stringWidth(offsetStr)) / 2;
@@ -813,26 +848,30 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 
 		BitFieldPlacement(DataTypeComponent component) {
 			int startOffset = component.getOffset();
+			int componentLength = component.getLength();
 			int offsetAdjBytes = startOffset - allocationByteOffset;
 			if (!bigEndian) {
-				offsetAdjBytes = allocationByteSize - offsetAdjBytes - component.getLength();
+				offsetAdjBytes = allocationByteSize - offsetAdjBytes - componentLength;
 			}
 			int leftAdj = 8 * offsetAdjBytes;
-			if (component.isBitFieldComponent()) {
+			if (componentLength == 0) {
+				// treat all zero-length fields the same
+				zeroBitField = true;
+				rightBit = leftAdj - 8;
+				if (!isBigEndian()) {
+					rightBit += 7;
+				}
+				leftBit = rightBit;
+			}
+			else if (component.isBitFieldComponent()) {
 				BitFieldDataType bitfield = (BitFieldDataType) component.getDataType();
 				int storageSize = 8 * bitfield.getStorageSize();
 				rightBit = leftAdj + storageSize - bitfield.getBitOffset() - 1;
-				// Use effective bit-size since unaligned uses are only concerned with actual 
+				// Use effective bit-size since non-packed uses are only concerned with actual 
 				// bits stored (NOTE: this may cause a transition from declared to effective
 				// bit-size when editing a bitfield where the these bit-sizes differ).
 				int bitSize = bitfield.getBitSize();
-				if (bitSize == 0) {
-					zeroBitField = true;
-					leftBit = rightBit;
-				}
-				else {
-					leftBit = rightBit - bitSize + 1;
-				}
+				leftBit = rightBit - bitSize + 1;
 			}
 			else {
 				int componentSize = 8 * component.getLength();
@@ -1046,7 +1085,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			int allocationEndOffset = offset + allocationBytes - 1;
 
 			int numComponents = struct.getNumComponents();
-			DataTypeComponent component = struct.getComponentAt(offset);
+			DataTypeComponent component = struct.getDefinedComponentAtOrAfterOffset(offset);
 			while (component != null) {
 				if (component.getOffset() > allocationEndOffset) {
 					break;
@@ -1120,7 +1159,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			// determine placement attribute index within allocationBytes which
 			// may have been reduced from allocationByteSize based upon visibility.
 
-			int index = bitIndex - (8 * rightChopBytes);
+			int index = bitIndex - (8 * leftChopBytes);
 			if (index >= 0 && index < bitAttributes.length) {
 				bitAttributes[index] = new BitAttributes(dtc, bitAttributes[index]);
 			}
@@ -1216,11 +1255,11 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 
 		private DataTypeComponent getConflict() {
 			BitAttributes c = conflict;
-			while (c != null && c.dtc.isZeroBitFieldComponent()) {
+			while (c != null && c.dtc.getLength() == 0 && c.conflict != null) {
 				// TODO: improve conflict detection
-				// Zero-length bitfield could be conflict if placement is
+				// Zero-length components could be conflict if placement is
 				// offcut with another component (currently ignored)
-				c = conflict.conflict;
+				c = c.conflict;
 			}
 			// NOTE: DEFAULT undefined datatype can be ignored as conflict
 			return c != null && c.dtc.getDataType() != DataType.DEFAULT ? c.dtc : null;
@@ -1272,7 +1311,7 @@ public class BitFieldPlacementComponent extends JPanel implements Scrollable {
 			}
 			else {
 				g.fillRect(rectangle.x, rectangle.y, bitWidth, CELL_HEIGHT);
-				if (conflict != null && conflict.dtc.isZeroBitFieldComponent()) {
+				if (conflict != null && conflict.dtc.getLength() == 0) {
 					conflict.paint(g, null, false);
 				}
 			}

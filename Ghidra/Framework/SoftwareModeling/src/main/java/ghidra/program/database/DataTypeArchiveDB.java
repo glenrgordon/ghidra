@@ -45,9 +45,8 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 	 * database schema associated with any of the managers.
 	 * 18-Sep-2008 - version 1 - added fields for synchronizing program data types with project archives.
 	 * 03-Dec-2009 - version 2 - Added source archive updating (consolidating windows.gdt, clib.gdt, ntddk.gdt)
-	 * 14-Nov-2019 - version 3 - Corrected fixed length indexing implementation causing
-	 *                            change in index table low-level storage for newly
-	 *                            created tables. 
+	 * 14-Nov-2019 - version 3 - Corrected fixed length indexing implementation causing change
+	 *                           in index table low-level storage for newly created tables. 
 	 */
 	static final int DB_VERSION = 3;
 
@@ -201,7 +200,9 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 	@Override
 	protected void close() {
 		super.close();
-		dataTypeManager.dispose();
+		if (dataTypeManager != null) {
+			dataTypeManager.dispose();
+		}
 	}
 
 	@Override
@@ -283,11 +284,15 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 	 * notification the a data type has changed
 	 * @param dataTypeID the id of the data type that changed.
 	 * @param type the type of the change (moved, renamed, etc.)
+	 * @param isAutoResponseChange true if change is an auto-response change caused by 
+	 * another datatype's change (e.g., size, alignment), else false in which case this
+	 * change will be added to archive change-set to aid merge conflict detection.
 	 * @param oldValue the old data type.
 	 * @param newValue the new data type.
 	 */
-	public void dataTypeChanged(long dataTypeID, int type, Object oldValue, Object newValue) {
-		if (recordChanges) {
+	public void dataTypeChanged(long dataTypeID, int type, boolean isAutoResponseChange,
+			Object oldValue, Object newValue) {
+		if (recordChanges && !isAutoResponseChange) {
 			((DataTypeArchiveDBChangeSet) changeSet).dataTypeChanged(dataTypeID);
 		}
 		changed = true;
@@ -384,7 +389,7 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 	private void createDatabase() throws IOException {
 		table = dbh.createTable(TABLE_NAME, SCHEMA);
 
-		Record record = SCHEMA.createRecord(new StringField(ARCHIVE_DB_VERSION));
+		DBRecord record = SCHEMA.createRecord(new StringField(ARCHIVE_DB_VERSION));
 		record.setString(0, Integer.toString(DB_VERSION));
 		table.putRecord(record);
 	}
@@ -429,14 +434,15 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 	}
 
 	private void upgradeDatabase() throws IOException {
+
 		table = dbh.getTable(TABLE_NAME);
-		Record record = SCHEMA.createRecord(new StringField(ARCHIVE_DB_VERSION));
+		DBRecord record = SCHEMA.createRecord(new StringField(ARCHIVE_DB_VERSION));
 		record.setString(0, Integer.toString(DB_VERSION));
 		table.putRecord(record);
 	}
 
 	private int getStoredVersion() throws IOException {
-		Record record = table.getRecord(new StringField(ARCHIVE_DB_VERSION));
+		DBRecord record = table.getRecord(new StringField(ARCHIVE_DB_VERSION));
 
 		// DB Version
 		// if record does not exist return 1;
@@ -497,7 +503,8 @@ public class DataTypeArchiveDB extends DomainObjectAdapterDB
 		return versionExc;
 	}
 
-	private void initManagers(int openMode, TaskMonitor monitor) throws CancelledException {
+	private void initManagers(int openMode, TaskMonitor monitor)
+			throws IOException, CancelledException {
 		monitor.checkCanceled();
 		dataTypeManager.setDataTypeArchive(this);
 		dataTypeManager.archiveReady(openMode, monitor);

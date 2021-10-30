@@ -24,7 +24,6 @@ import ghidra.app.decompiler.ClangToken;
 import ghidra.app.decompiler.ClangVariableToken;
 import ghidra.app.decompiler.component.ClangTextField;
 import ghidra.app.plugin.core.hover.AbstractScalarOperandHover;
-import ghidra.framework.options.Options;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.data.AbstractIntegerDataType;
@@ -37,10 +36,17 @@ import ghidra.program.util.ProgramLocation;
 public class ScalarValueDecompilerHover extends AbstractScalarOperandHover
 		implements DecompilerHoverService {
 
-	private static final int PRIORITY = 20;
+	// note: this is relative to other DecompilerHovers; a higher priority gets called first
+	// Use high value so this hover gets called first.  The method for determining what the user
+	// is hovering in the Decompiler is less then perfect.  We choose to allow the more precise
+	// hovers to get a chance to process the request first.
+	// We want this hover to go before the data type hovers, due to how that hover decides when it
+	// can show a popup, it decides to work when over a scalar.   Having this hover get called
+	// first prevents that.
+	private static final int PRIORITY = 30;
 
-	protected static final String NAME = "Scalar Operand Display";
-	protected static final String DESCRIPTION =
+	private static final String NAME = "Scalar Operand Display";
+	private static final String DESCRIPTION =
 		"Scalars are shown as 1-, 2-, 4-, and 8-byte values, each in decimal, hexadecimal, and " +
 			"as ASCII character sequences.";
 
@@ -49,18 +55,18 @@ public class ScalarValueDecompilerHover extends AbstractScalarOperandHover
 	}
 
 	@Override
-	public void initializeOptions() {
-		options = tool.getOptions(GhidraOptions.CATEGORY_DECOMPILER_POPUPS);
-		options.registerOption(NAME, true, null, DESCRIPTION);
-		setOptions(options, NAME);
-		options.addOptionsChangeListener(this);
+	protected String getName() {
+		return NAME;
 	}
 
 	@Override
-	public void setOptions(Options options, String optionName) {
-		if (optionName.equals(NAME)) {
-			enabled = options.getBoolean(NAME, true);
-		}
+	protected String getDescription() {
+		return DESCRIPTION;
+	}
+
+	@Override
+	protected String getOptionsCategory() {
+		return GhidraOptions.CATEGORY_DECOMPILER_POPUPS;
 	}
 
 	@Override

@@ -27,7 +27,7 @@
 vector<ArchitectureCapability *> ArchitectureCapability::thelist;
 
 const uint4 ArchitectureCapability::majorversion = 4;
-const uint4 ArchitectureCapability::minorversion = 0;
+const uint4 ArchitectureCapability::minorversion = 1;
 
 /// This builds a list of just the ArchitectureCapability extensions
 void ArchitectureCapability::initialize(void)
@@ -60,6 +60,20 @@ ArchitectureCapability *ArchitectureCapability::findCapability(Document *doc)
     ArchitectureCapability *capa = thelist[i];
     if (capa->isXmlMatch(doc))
       return capa;
+  }
+  return (ArchitectureCapability *)0;
+}
+
+/// Return the ArchitectureCapability object with the matching name
+/// \param name is the name to match
+/// \return the ArchitectureCapability or null if no match is found
+ArchitectureCapability *ArchitectureCapability::getCapability(const string &name)
+
+{
+  for(int4 i=0;i<thelist.size();++i) {
+    ArchitectureCapability *res = thelist[i];
+    if (res->getName() == name)
+      return res;
   }
   return (ArchitectureCapability *)0;
 }
@@ -215,7 +229,6 @@ AddrSpace *Architecture::getSpaceBySpacebase(const Address &loc,int4 size) const
     }
   }
   throw LowlevelError("Unable to find entry for spacebase register");
-  return (AddrSpace *)0;
 }
 
 /// Look-up the laned register record associated with a specific storage location. Currently, the
@@ -272,7 +285,6 @@ void Architecture::clearAnalysis(Funcdata *fd)
   fd->clear();			// Clear stuff internal to function
   // Clear out any analysis generated comments
   commentdb->clearType(fd->getAddress(),Comment::warning|Comment::warningheader);
-  stringManager->clear();
 }
 
 /// Symbols do not necessarily need to be available for the decompiler.
@@ -1066,7 +1078,7 @@ void Architecture::parsePreferSplit(const Element *el)
   List::const_iterator iter;
 
   for(iter=list.begin();iter!=list.end();++iter) {
-    splitrecords.push_back(PreferSplitRecord());
+    splitrecords.emplace_back();
     PreferSplitRecord &record( splitrecords.back() );
     record.storage.restoreXml( *iter, this );
     record.splitoffset = record.storage.size/2;
@@ -1204,6 +1216,26 @@ void Architecture::parseCompilerConfig(DocumentStorage &store)
     else if (elname == "inferptrbounds")
       parseInferPtrBounds(*iter);
   }
+
+  el = store.getTag("specextensions");		// Look for any user-defined configuration document
+  if (el != (const Element *)0) {
+    const List &userlist(el->getChildren());
+    for(iter=userlist.begin();iter!=userlist.end();++iter) {
+      const string &elname( (*iter)->getName() );
+      if (elname == "prototype")
+        parseProto(*iter);
+     else if (elname == "callfixup") {
+        pcodeinjectlib->restoreXmlInject(archid+" : compiler spec", (*iter)->getAttributeValue("name"),
+					 InjectPayload::CALLFIXUP_TYPE, *iter);
+      }
+      else if (elname == "callotherfixup") {
+        userops.parseCallOtherFixup(*iter,this);
+      }
+      else if (elname == "global")
+        globaltags.push_back(*iter);
+    }
+  }
+
   // <global> tags instantiate the base symbol table
   // They need to know about all spaces, so it must come
   // after parsing of <stackpointer> and <spacebase>
@@ -1301,6 +1333,7 @@ void Architecture::resetDefaultsInternal(void)
   flowoptions = FlowInfo::error_toomanyinstructions;
   max_instructions = 100000;
   infer_pointers = true;
+  analyze_for_loops = true;
   readonlypropagate = false;
   alias_block_level = 2;	// Block structs and arrays by default
 }
@@ -1328,8 +1361,8 @@ Address SegmentedResolver::resolve(uintb val,int4 sz,const Address &point,uintb 
       uintb base = glb->context->getTrackedValue(segop->getResolve(),point);
       fullEncoding = (base << 8 * innersz) + (val & calc_mask(innersz));
       vector<uintb> seginput;
-      seginput.push_back(val);
       seginput.push_back(base);
+      seginput.push_back(val);
       val = segop->execute(seginput);
       return Address(spc,AddrSpace::addressToByte(val,spc->getWordSize()));
     }
@@ -1340,8 +1373,8 @@ Address SegmentedResolver::resolve(uintb val,int4 sz,const Address &point,uintb 
     uintb base = (val >> 8*innersz) & calc_mask(outersz);
     val = val & calc_mask(innersz);
     vector<uintb> seginput;
-    seginput.push_back(val);
     seginput.push_back(base);
+    seginput.push_back(val);
     val = segop->execute(seginput);
     return Address(spc,AddrSpace::addressToByte(val,spc->getWordSize()));
   }

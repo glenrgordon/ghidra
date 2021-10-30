@@ -51,7 +51,7 @@ public class StructureEditorLockedCellEditTest extends AbstractStructureEditorTe
 		try {
 			DataTypeManager dataTypeManager = cat.getDataTypeManager();
 			if (dt.getDataTypeManager() != dataTypeManager) {
-				dt = (Structure) dt.clone(dataTypeManager);
+				dt = dt.clone(dataTypeManager);
 			}
 
 			CategoryPath categoryPath = cat.getCategoryPath();
@@ -523,7 +523,7 @@ public class StructureEditorLockedCellEditTest extends AbstractStructureEditorTe
 	public void testEditDataTypeNotSelf() throws Exception {
 
 		Structure testStruct = new StructureDataType("testStruct", 20);
-		testStruct.setInternallyAligned(false);
+		testStruct.setPackingEnabled(false);
 
 		DataTypeManager dtm = program.getDataTypeManager();
 		txId = program.startTransaction("Add testStruct");

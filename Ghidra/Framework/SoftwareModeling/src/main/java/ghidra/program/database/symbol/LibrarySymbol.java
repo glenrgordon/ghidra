@@ -15,7 +15,7 @@
  */
 package ghidra.program.database.symbol;
 
-import db.Record;
+import db.DBRecord;
 import ghidra.program.database.DBObjectCache;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.CircularDependencyException;
@@ -31,8 +31,7 @@ import ghidra.util.exception.InvalidInputException;
  * Class for library symbols.
  * 
  * Symbol data usage:
- *   int data2 - set to 0 (not used) 
- *   String data3 - associated program project file path
+ *   String stringData - associated program project file path
  */
 
 public class LibrarySymbol extends SymbolDB {
@@ -47,7 +46,7 @@ public class LibrarySymbol extends SymbolDB {
 	 * @param record the record for this symbol
 	 */
 	public LibrarySymbol(SymbolManager symbolMgr, DBObjectCache<SymbolDB> cache, Address address,
-			Record record) {
+			DBRecord record) {
 		super(symbolMgr, cache, address, record);
 
 	}
@@ -64,8 +63,9 @@ public class LibrarySymbol extends SymbolDB {
 		super.setName(newName, source);
 
 		if (!oldName.equals(getName())) {
-			symbolMgr.getProgram().setObjChanged(ChangeManager.DOCR_EXTERNAL_NAME_CHANGED,
-				(Address) null, null, oldName, newName);
+			symbolMgr.getProgram()
+					.setObjChanged(ChangeManager.DOCR_EXTERNAL_NAME_CHANGED,
+						(Address) null, null, oldName, newName);
 		}
 	}
 
@@ -77,19 +77,21 @@ public class LibrarySymbol extends SymbolDB {
 		super.setNameAndNamespace(newName, newNamespace, source);
 
 		if (!oldName.equals(getName())) {
-			symbolMgr.getProgram().setObjChanged(ChangeManager.DOCR_EXTERNAL_NAME_CHANGED,
-				(Address) null, null, oldName, newName);
+			symbolMgr.getProgram()
+					.setObjChanged(ChangeManager.DOCR_EXTERNAL_NAME_CHANGED,
+						(Address) null, null, oldName, newName);
 		}
 	}
 
 	@Override
-	public void setSymbolData3(String newPath) {
-		String oldPath = getSymbolData3();
+	public void setSymbolStringData(String newPath) {
+		String oldPath = getSymbolStringData();
 
-		super.setSymbolData3(newPath);
+		super.setSymbolStringData(newPath);
 
-		symbolMgr.getProgram().setObjChanged(ChangeManager.DOCR_EXTERNAL_PATH_CHANGED, getName(),
-			oldPath, newPath);
+		symbolMgr.getProgram()
+				.setObjChanged(ChangeManager.DOCR_EXTERNAL_PATH_CHANGED, getName(),
+					oldPath, newPath);
 	}
 
 	public SymbolType getSymbolType() {

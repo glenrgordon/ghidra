@@ -152,10 +152,11 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		addLocalAction(new DeleteArchiveAction(plugin));
 		addLocalAction(new RenameAction(plugin));
 		addLocalAction(new EditAction(plugin));
-		addLocalAction(new AlignDataTypeAction(plugin));
+		// NOTE: it make very little sense to blindly enable packing
+//		  addLocalAction(new PackDataTypeAction(plugin));
 //        addLocalAction( new PackDataTypeAction( plugin ));
 //        addLocalAction( new PackSizeDataTypeAction( plugin ));
-		addLocalAction(new AlignAllDataTypesAction(plugin));
+//		  addLocalAction(new PackAllDataTypesAction(plugin));
 //        addLocalAction( new DefineDataTypeAlignmentAction( plugin ));
 		addLocalAction(new CreateEnumFromSelectionAction(plugin));
 
@@ -176,9 +177,14 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		addLocalAction(new ExpandAllAction(plugin)); // Tree
 
 		// VeryLast group
-		addLocalAction(getIncludeDataMembersInSearchAction()); // Common
-		addLocalAction(new FindDataTypesAction(plugin)); // Common
-		addLocalAction(new FindDataTypesBySizeAction(plugin)); // Common
+		addLocalAction(new FindDataTypesByNameAction(plugin, "1"));
+		addLocalAction(new FindDataTypesBySizeAction(plugin, "2"));
+		addLocalAction(new FindStructuresByOffsetAction(plugin, "3"));
+		addLocalAction(new FindStructuresBySizeAction(plugin, "4"));
+		includeDataMembersInSearchAction =
+			new IncludeDataTypesInFilterAction(plugin, this, "5");
+		addLocalAction(includeDataMembersInSearchAction);
+
 		addLocalAction(new ApplyFunctionDataTypesAction(plugin)); // Tree
 		addLocalAction(new CaptureFunctionDataTypesAction(plugin)); // Tree
 		addLocalAction(new SetFavoriteDataTypeAction(plugin)); // Data Type
@@ -188,10 +194,10 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		// ZVeryLast group
 		addLocalAction(new FindReferencesToDataTypeAction(plugin)); // DataType
 		addLocalAction(new FindReferencesToFieldAction(plugin)); // DataType
-//    	addLocalAction( new FindDataTypesContainingAction(plugin) ); // DataType
 		addLocalAction(new FindBaseDataTypeAction(plugin)); // DataType
+		addLocalAction(new DisplayTypeAsGraphAction(plugin));
 
-		// toolbar actions		
+		// toolbar actions
 		previousAction = new NextPreviousDataTypeAction(this, plugin.getName(), false);
 		addLocalAction(previousAction);
 		nextAction = new NextPreviousDataTypeAction(this, plugin.getName(), true);
@@ -208,7 +214,6 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		addLocalAction(new OpenProjectArchiveAction(plugin));
 		addLocalAction(new CreateArchiveAction(plugin));
 		addLocalAction(new CreateProjectArchiveAction(plugin));
-		addLocalAction(new RefreshAction(plugin));
 		ToggleDockingAction previewAction = getPreviewWindowAction();
 		addLocalAction(previewAction);
 
@@ -320,13 +325,6 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		return previewWindowAction;
 	}
 
-	private ToggleDockingAction getIncludeDataMembersInSearchAction() {
-		if (includeDataMembersInSearchAction == null) {
-			includeDataMembersInSearchAction = new IncludeDataTypesInFilterAction(plugin, this);
-		}
-		return includeDataMembersInSearchAction;
-	}
-
 	@Override
 	public ActionContext getActionContext(MouseEvent event) {
 		GTreeNode clickedNode = null;
@@ -343,8 +341,8 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 			isToolbarAction = false;
 		}
 
-		return new DataTypesActionContext(this, plugin.getProgram(), archiveGTree,
-			clickedNode, isToolbarAction);
+		return new DataTypesActionContext(this, plugin.getProgram(), archiveGTree, clickedNode,
+			isToolbarAction);
 	}
 
 	@Override // overridden to handle special logic in plugin
@@ -528,7 +526,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 			return;
 		}
 
-		String toolTipText = ToolTipUtils.getToolTipText(dataType);
+		String toolTipText = ToolTipUtils.getFullToolTipText(dataType);
 		String updated = HTMLUtilities.convertLinkPlaceholdersToHyperlinks(toolTipText);
 		previewPane.setText(updated);
 		previewPane.setCaretPosition(0);
@@ -562,6 +560,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 			return false;
 		}
 		tree.restoreTreeState(state);
+
 		return true;
 	}
 
@@ -638,7 +637,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		getPreviewWindowAction().setSelected(previewWindowVisible);
 
 		boolean dataMembersInSearch = saveState.getBoolean(INCLUDE_DATA_MEMBERS_IN_SEARCH, false);
-		getIncludeDataMembersInSearchAction().setSelected(dataMembersInSearch);
+		includeDataMembersInSearchAction.setSelected(dataMembersInSearch);
 	}
 
 	void save(SaveState saveState) {
@@ -648,7 +647,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 			getConflictHandlerModesAction().getCurrentUserData().toString());
 		saveState.putBoolean(PREVIEW_WINDOW_STATE, getPreviewWindowAction().isSelected());
 		saveState.putBoolean(INCLUDE_DATA_MEMBERS_IN_SEARCH,
-			getIncludeDataMembersInSearchAction().isSelected());
+			includeDataMembersInSearchAction.isSelected());
 	}
 
 	public DataTypeArchiveGTree getGTree() {
@@ -785,7 +784,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		archiveGTree.setIncludeDataTypeMembersInSearch(includeDataMembersInFilter);
 
 		// make sure the action is in sync
-		ToggleDockingAction action = getIncludeDataMembersInSearchAction();
+		ToggleDockingAction action = includeDataMembersInSearchAction;
 		boolean selected = action.isSelected();
 		if (selected != includeDataMembersInFilter) {
 			action.setSelected(includeDataMembersInFilter);
@@ -829,6 +828,31 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 
 	void programClosed() {
 		archiveGTree.cancelWork();
+	}
+
+	void archiveClosed(DataTypeManager dtm) {
+		dataTypeManagerChanged(dtm);
+	}
+
+	void archiveChanged(Archive archive) {
+		DataTypeManager dtm = archive.getDataTypeManager();
+		dataTypeManagerChanged(dtm);
+	}
+
+	private void dataTypeManagerChanged(DataTypeManager dtm) {
+
+		if (lastPreviewNode == null || !(lastPreviewNode instanceof DataTypeNode)) {
+			return;
+		}
+
+		DataTypeNode dtNode = (DataTypeNode) lastPreviewNode;
+		DataType dt = dtNode.getDataType();
+		DataTypeManager dtManager = dt.getDataTypeManager();
+
+		// note: compare using name; an equality check will fail if the manager is reloaded
+		if (dtm.getName().equals(dtManager.getName())) {
+			lastPreviewNode = null;
+		}
 	}
 
 	void programRenamed() {

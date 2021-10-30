@@ -52,8 +52,7 @@ public class DefaultGraphDisplayProvider implements GraphDisplayProvider {
 	}
 
 	@Override
-	public GraphDisplay getGraphDisplay(boolean reuseGraph,
-			TaskMonitor monitor) {
+	public GraphDisplay getGraphDisplay(boolean reuseGraph, TaskMonitor monitor) {
 
 		if (reuseGraph && !displays.isEmpty()) {
 			DefaultGraphDisplay visibleGraph = getVisibleGraph();

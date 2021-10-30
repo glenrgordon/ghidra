@@ -604,7 +604,7 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 
 		executeMerge();
 
-		chooseOption(DataTypeMergeManager.OPTION_MY);// choose My Bar
+		chooseOption(DataTypeMergeManager.OPTION_MY);// choose My Bar // TODO: I see no reason for a conflict !
 
 		setErrorsExpected(true);
 
@@ -1097,7 +1097,7 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 					Structure s1 =
 						(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"),
 							"Structure_1");
-					s1.setFlexibleArrayComponent(td, null, null);
+					s1.add(new ArrayDataType(td, 0, -1), 0, null, null);
 				}
 				finally {
 					program.endTransaction(transactionID, true);
@@ -1112,7 +1112,7 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 					Structure s1 =
 						(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"),
 							"Structure_1");
-					s1.setFlexibleArrayComponent(IntegerDataType.dataType, "flex1", "cmt1");
+					s1.add(new ArrayDataType(IntegerDataType.dataType, 0, -1), "flex1", "cmt1");
 				}
 				finally {
 					program.endTransaction(transactionID, true);
@@ -1134,11 +1134,15 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 			(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"), "Structure_1");
 		assertNotNull(s1);
 		DataTypeComponent[] dtcs = s1.getComponents();
-		assertEquals(4, dtcs.length);
+		assertEquals(5, dtcs.length);
 
-		DataTypeComponent flexDtc = s1.getFlexibleArrayComponent();
-		assertNotNull(flexDtc);
-		assertTrue(IntegerDataType.class == flexDtc.getDataType().getClass());
+		DataTypeComponent flexDtc = s1.getComponent(4);
+		assertEquals(0, flexDtc.getLength());
+		DataType dt = flexDtc.getDataType();
+		assertTrue(dt instanceof Array);
+		Array a = (Array) dt;
+		assertEquals(0, a.getNumElements());
+		assertTrue(a.getDataType() instanceof IntegerDataType);
 		assertEquals("flex1", flexDtc.getFieldName());
 		assertEquals("cmt1", flexDtc.getComment());
 	}
@@ -1159,7 +1163,7 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 					Structure s1 =
 						(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"),
 							"Structure_1");
-					s1.setFlexibleArrayComponent(IntegerDataType.dataType, null, null);
+					s1.add(new ArrayDataType(IntegerDataType.dataType, 0, -1), 0, null, null);
 				}
 				finally {
 					program.endTransaction(transactionID, true);
@@ -1174,7 +1178,9 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 					Structure s1 =
 						(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"),
 							"Structure_1");
-					s1.setFlexibleArrayComponent(td, "flex1", "cmt1");
+					// last component is flex array to be replaced
+					s1.replace(s1.getNumComponents() - 1, new ArrayDataType(td, 0, -1), 0, "flex1",
+						"cmt1");
 				}
 				finally {
 					program.endTransaction(transactionID, true);
@@ -1189,9 +1195,9 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 					Structure s1 =
 						(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"),
 							"Structure_1");
+					s1.deleteAtOffset(s1.getLength());
 					s1.insertBitFieldAt(3, 2, 6, td, 2, "bf1", "my bf1");
 					s1.insertBitFieldAt(3, 2, 4, td, 2, "bf2", "my bf2");
-					s1.clearFlexibleArrayComponent();
 				}
 				catch (InvalidDataTypeException e) {
 					e.printStackTrace();
@@ -1217,8 +1223,9 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 			(Structure) dtm.getDataType(new CategoryPath("/Category1/Category2"), "Structure_1");
 		assertNotNull(s1);
 
-		DataTypeComponent flexDtc = s1.getFlexibleArrayComponent();
-		assertNull(flexDtc);
+		for (DataTypeComponent dtc : s1.getComponents()) {
+			assertNotEquals(0, dtc.getLength());
+		}
 
 		DataTypeComponent[] dtcs = s1.getComponents();
 		assertEquals(7, dtcs.length);
@@ -1245,6 +1252,119 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 		assertEquals(2, bfDt.getDeclaredBitSize());
 		assertEquals(4, bfDt.getBitOffset());
 
+	}
+
+//	TODO   See GP-585 for design issue preventing this test from passing
+//	@Test
+	public void testEditStructureWithReplacementAndRemoval() throws Exception {
+
+		mtf.initialize("notepad", new OriginalProgramModifierListener() {
+
+			@Override
+			public void modifyPrivate(ProgramDB program) throws Exception {
+				boolean commit = false;
+				DataTypeManager dtm = program.getDataTypeManager();
+				int transactionID = program.startTransaction("test");
+				try {
+					Structure s = (Structure) dtm.getDataType("/Category5/Test");
+					DataType td = dtm.getDataType("/MISC/FooTypedef");
+					s.replaceAtOffset(s.getLength(), new ArrayDataType(td, 0, -1), 0, "foo", null);
+					commit = true;
+				}
+				finally {
+					program.endTransaction(transactionID, commit);
+				}
+			}
+
+			@Override
+			public void modifyLatest(ProgramDB program) throws Exception {
+				boolean commit = false;
+				DataTypeManager dtm = program.getDataTypeManager();
+				int transactionID = program.startTransaction("test");
+				try {
+					TypeDef td = (TypeDef) dtm.getDataType("/BF");
+					//
+					// NOTE: Merge does not handle datatype replacements as one might hope
+					// If latest version has defined data/components based upon a type which has
+					// been replaced in private, the replaced datatype will be treated as removed
+					//
+					dtm.replaceDataType(td, new TypedefDataType("NewBF", IntegerDataType.dataType),
+						true);
+					DataType dt = dtm.getDataType("/MISC/FooTypedef");
+					dtm.remove(dt, TaskMonitor.DUMMY);
+					commit = true;
+				}
+				finally {
+					program.endTransaction(transactionID, commit);
+				}
+
+				DataType dt1 = dtm.getDataType("/BF");
+				assertNull(dt1);
+			}
+
+			@Override
+			public void modifyOriginal(ProgramDB program) throws Exception {
+				boolean commit = false;
+				DataTypeManager dtm = program.getDataTypeManager();
+				int transactionID = program.startTransaction("test");
+				try {
+					TypeDef td = new TypedefDataType("BF", IntegerDataType.dataType);
+
+					Structure struct = new StructureDataType(new CategoryPath("/Category5"), "Test",
+						0, program.getDataTypeManager());
+					struct.add(td);
+					struct.insertBitFieldAt(3, 2, 6, td, 2, "bf1", null);
+					struct.insertBitFieldAt(3, 2, 4, td, 2, "bf2", null);
+					struct.add(new WordDataType());
+					struct.add(new QWordDataType());
+					struct.add(new ArrayDataType(td, 0, -1), 0, "flex", "my flex");
+
+					dtm.addDataType(struct, null);
+					commit = true;
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+					Assert.fail(e.toString());
+				}
+				finally {
+					program.endTransaction(transactionID, commit);
+				}
+			}
+		});
+
+		executeMerge(DataTypeMergeManager.OPTION_MY);
+
+		DataTypeManager dtm = resultProgram.getDataTypeManager();
+
+		DataType dt = dtm.getDataType("/Category5/Test");
+		assertTrue(dt instanceof Structure);
+		Structure s = (Structure) dt;
+		/** Current Result for /Category5/Test
+		 * 
+				Unaligned
+				Structure Test {
+				   4   int:2(6)   1   bf1   ""
+				   4   int:2(4)   1   bf2   ""
+				   5   word   2   null   ""
+				   7   qword   8   null   ""
+				}
+				Size = 15   Actual Alignment = 1
+		 *	
+		 * See assertion below for preferred result
+		 */
+		//@formatter:off
+		assertEquals("/Category5/Test\n" + 
+			"Unaligned\n" + 
+			"Structure Test {\n" + 
+			"   0   NewBF   4   null   \"\"\n" + 
+			"   4   NewBF:2(6)   1   bf1   \"\"\n" + 
+			"   4   NewBF:2(4)   1   bf2   \"\"\n" + 
+			"   5   word   2   null   \"\"\n" + 
+			"   7   qword   8   null   \"\"\n" + 
+			"   Undefined1[0]   0   foo   \"\"\n" +  // reflects removal of /MISC/FooTypedef
+			"}\n" + 
+			"Size = 15   Actual Alignment = 1\n", s.toString());
+		//@formatter:on
 	}
 
 	@Test
@@ -2087,7 +2207,7 @@ public class DataTypeMerge3Test extends AbstractDataTypeMergeTest {
 			(Union) dtm.getDataType(new CategoryPath("/Category1/Category2"), "CoolUnion");
 		//@formatter:off
 		assertEquals("/Category1/Category2/CoolUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union CoolUnion {\n" + 
 			"   0   qword   8   null   \"\"\n" + 
 			"   0   byte:4(4)   1   BF1   \"my bf1\"\n" + 

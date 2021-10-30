@@ -1,3 +1,18 @@
+## ###
+#  IP: GHIDRA
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  
+#       http://www.apache.org/licenses/LICENSE-2.0
+#  
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+##
 import os
 import shutil
 import subprocess
@@ -97,10 +112,8 @@ class BuildUtil(object):
         try:
             if not os.path.isdir(dname):
                 self.makedirs(dname)
-            if os.path.isfile(fname):
+            else:
                 self.copy(fname, dname, verbose=True)
-            elif os.path.isdir(fname):
-                self.copy(fname, dname, dir=True, verbose=True)
         except IOError as e:
             self.log_err('Error occurred exporting %s to %s' % (fname, dname))
             self.log_err("Unexpected error: %s" % str(e))
@@ -114,9 +127,9 @@ class BuildUtil(object):
         try: os.makedirs(dir)
         except: pass
 
-    # copy a file to a directory
-    def copy(self, fname, dname, verbose=True, dir=False):
-        if not dir:
+    # copy a file/directory to a directory
+    def copy(self, fname, dname, verbose=True):
+        if not os.path.isdir(fname):
             if verbose: self.log_info('cp -av %s %s' % (fname, dname))
             shutil.copy(fname, dname)
         else:

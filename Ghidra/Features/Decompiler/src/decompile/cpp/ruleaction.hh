@@ -1027,7 +1027,7 @@ public:
   virtual int4 applyOp(PcodeOp *op,Funcdata &data);
 };
 class RulePtrArith : public Rule {
-  static bool verifyAddTreeBottom(PcodeOp *op,int4 slot);
+  static bool verifyPreferredPointer(PcodeOp *op,int4 slot);
 public:
   RulePtrArith(const string &g) : Rule(g, 0, "ptrarith") {}	///< Constructor
   virtual Rule *clone(const ActionGroupList &grouplist) const {
@@ -1036,6 +1036,7 @@ public:
   }
   virtual void getOpList(vector<uint4> &oplist) const;
   virtual int4 applyOp(PcodeOp *op,Funcdata &data);
+  static int4 evaluatePointerExpression(PcodeOp *op,int4 slot);
 };
 class RuleStructOffset0 : public Rule {
 public:
@@ -1048,6 +1049,8 @@ public:
   virtual int4 applyOp(PcodeOp *op,Funcdata &data);
 };
 class RulePushPtr : public Rule {
+  static Varnode *buildVarnodeOut(Varnode *vn,PcodeOp *op,Funcdata &data);
+  static void collectDuplicateNeeds(vector<PcodeOp *> &reslist,Varnode *vn);
 public:
   RulePushPtr(const string &g) : Rule(g, 0, "pushptr") {}	///< Constructor
   virtual Rule *clone(const ActionGroupList &grouplist) const {
@@ -1056,6 +1059,7 @@ public:
   }
   virtual void getOpList(vector<uint4> &oplist) const;
   virtual int4 applyOp(PcodeOp *op,Funcdata &data);
+  static void duplicateNeed(PcodeOp *op,Funcdata &data);
 };
 class RulePtraddUndo : public Rule {
 public:
@@ -1130,6 +1134,17 @@ public:
   virtual Rule *clone(const ActionGroupList &grouplist) const {
     if (!grouplist.contains(getGroup())) return (Rule *)0;
     return new RulePtrsubCharConstant(getGroup());
+  }
+  virtual void getOpList(vector<uint4> &oplist) const;
+  virtual int4 applyOp(PcodeOp *op,Funcdata &data);
+};
+
+class RuleExtensionPush : public Rule {
+public:
+  RuleExtensionPush(const string &g) : Rule( g, 0, "extensionpush") {}		///< Constructor
+  virtual Rule *clone(const ActionGroupList &grouplist) const {
+    if (!grouplist.contains(getGroup())) return (Rule *)0;
+    return new RuleExtensionPush(getGroup());
   }
   virtual void getOpList(vector<uint4> &oplist) const;
   virtual int4 applyOp(PcodeOp *op,Funcdata &data);

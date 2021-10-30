@@ -16,7 +16,6 @@
 package ghidra.file.formats.ios.dyldcache;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.*;
 
 import ghidra.app.util.bin.BinaryReader;
@@ -50,26 +49,15 @@ public class DyldCacheFileSystem extends GFileSystemBase {
 	}
 
 	@Override
-	protected InputStream getData(GFile file, TaskMonitor monitor) throws IOException {
+	public ByteProvider getByteProvider(GFile file, TaskMonitor monitor) throws IOException {
 		DyldCacheImageInfo data = map.get(file);
 		if (data == null) {
 			return null;
 		}
 		long machHeaderStartIndexInProvider = data.getAddress() - header.getBaseAddress();
 		try {
-			/*
-			 * //check to make sure mach-o header is valid MachHeader header =
-			 * MachHeader.createMachHeader( RethrowContinuesFactory.INSTANCE,
-			 * provider, machHeaderStartIndexInProvider, false );
-			 * header.parse();
-			 *
-			 * return new ByteProviderInputStream( provider,
-			 * machHeaderStartIndexInProvider, provider.length() -
-			 * machHeaderStartIndexInProvider );
-			 */
-
-			FixupMacho32bitArmOffsets fixer = new FixupMacho32bitArmOffsets();
-			return fixer.fix(file, machHeaderStartIndexInProvider, provider, monitor);
+			return DyldCacheDylibExtractor.extractDylib(machHeaderStartIndexInProvider, provider,
+				file.getFSRL(), monitor);
 		}
 		catch (MachException e) {
 			throw new IOException("Invalid Mach-O header detected at 0x" +
@@ -164,11 +152,8 @@ public class DyldCacheFileSystem extends GFileSystemBase {
 
 			monitor.incrementProgress(1);
 
-			GFileImpl file = GFileImpl.fromPathString(this, root, data.getPath(), null, false,
-				0/*TODO compute length?*/ );
+			GFileImpl file = GFileImpl.fromPathString(this, root, data.getPath(), null, false, -1);
 			storeFile(file, data);
-
-			file.setLength(provider.length() - (data.getAddress() - header.getBaseAddress()));
 		}
 	}
 

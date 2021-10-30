@@ -15,6 +15,9 @@
  */
 package ghidra.program.model.data;
 
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+
 import ghidra.docking.settings.Settings;
 import ghidra.docking.settings.SettingsDefinition;
 import ghidra.program.model.mem.MemBuffer;
@@ -23,9 +26,7 @@ import ghidra.util.StringUtilities;
 
 public class WideChar16DataType extends BuiltIn implements ArrayStringable, DataTypeWithCharset {
 
-	private final static long serialVersionUID = 1;
-
-	/** A statically defined WideCharDataType instance.*/
+	/** A statically defined WideCharDataType instance. */
 	public final static WideChar16DataType dataType = new WideChar16DataType();
 
 	public WideChar16DataType() {
@@ -39,11 +40,6 @@ public class WideChar16DataType extends BuiltIn implements ArrayStringable, Data
 	@Override
 	public int getLength() {
 		return 2;
-	}
-
-	@Override
-	public boolean isDynamicallySized() {
-		return false;
 	}
 
 	@Override
@@ -83,6 +79,23 @@ public class WideChar16DataType extends BuiltIn implements ArrayStringable, Data
 			// ignore
 		}
 		return null;
+	}
+
+	@Override
+	public boolean isEncodable() {
+		return true;
+	}
+
+	@Override
+	public byte[] encodeValue(Object value, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		return encodeCharacterValue(value, buf, settings);
+	}
+
+	@Override
+	public byte[] encodeRepresentation(String repr, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		return encodeCharacterRepresentation(repr, buf, settings);
 	}
 
 	@Override

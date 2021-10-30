@@ -578,6 +578,10 @@ public class FGProvider extends VisualGraphComponentProvider<FGVertex, FGEdge, F
 		}
 	}
 
+	public void optionsChanged() {
+		controller.optionsChanged();
+	}
+
 	@Override
 	public void domainObjectChanged(DomainObjectChangedEvent ev) {
 		if (!isVisible()) {
@@ -760,23 +764,12 @@ public class FGProvider extends VisualGraphComponentProvider<FGVertex, FGEdge, F
 		SymbolTable symbolTable = currentProgram.getSymbolTable();
 		AddressSetView vertexAddresses = destinationVertex.getAddresses();
 		Address minAddress = vertexAddresses.getMinAddress();
-		Symbol[] symbols = symbolTable.getSymbols(minAddress);
-		if (symbols.length > 1) {
-			return; // real user symbols
-		}
-		else if (symbols.length == 1) {
-			if (!symbols[0].isDynamic()) {
-				return; // real user symbol
-			}
-		}
 
-		ReferenceManager referenceManager = currentProgram.getReferenceManager();
-		ReferenceIterator references = referenceManager.getReferencesTo(minAddress);
-		if (references.hasNext()) {
-			return; // other references to this vertex entry point
+		Symbol primary = symbolTable.getPrimarySymbol(minAddress);
+		// if there is a symbol, then the block should not be merged
+		if (primary == null) {
+			controller.mergeVertexWithParent(destinationVertex);
 		}
-
-		controller.mergeVertexWithParent(destinationVertex);
 	}
 
 	private void handleReferenceAdded(DomainObjectChangeRecord record) {
@@ -1187,6 +1180,22 @@ public class FGProvider extends VisualGraphComponentProvider<FGVertex, FGEdge, F
 		AddressSetView functionBody = function.getBody();
 		AddressSet intersection = currentProgramHighlight.intersect(functionBody);
 		return new ProgramSelection(intersection);
+	}
+
+	@Override
+	public String getTextSelection() {
+
+		FGData currentData = controller.getFunctionGraphData();
+		if (!currentData.hasResults()) {
+			return null;
+		}
+
+		FGVertex focusedVertex = controller.getFocusedVertex();
+		if (focusedVertex == null) {
+			return null;
+		}
+
+		return focusedVertex.getTextSelection();
 	}
 
 	@Override

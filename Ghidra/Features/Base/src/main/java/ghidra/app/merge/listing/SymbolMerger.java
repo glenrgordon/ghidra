@@ -526,7 +526,7 @@ class SymbolMerger extends AbstractListingMerger {
 				renamed = true;
 			}
 //			boolean commentChanged =
-//				!SystemUtilities.isEqual(newSym.getSymbolData3(), oldSym.getSymbolData3());
+//				!SystemUtilities.isEqual(newSym.getSymbolStringData(), oldSym.getSymbolStringData());
 			boolean sourceChanged = newSym.getSource() != oldSym.getSource();
 //			if (commentChanged) {
 //				commentChanges.add(id);
@@ -920,12 +920,12 @@ class SymbolMerger extends AbstractListingMerger {
 //			if (commentChangedInMy) {
 //				if (!commentChangedInLatest) {
 //					if (resultSym != null) {
-//						resultSym.setSymbolData3(mySym.getSymbolData3());
+//						resultSym.setSymbolStringData(mySym.getSymbolStringData());
 //					}
 //				}
 //				else {
 //					Symbol latestSym = latestSymTab.getSymbol(id);
-//					if (!SystemUtilities.isEqual(latestSym.getSymbolData3(), mySym.getSymbolData3())) {
+//					if (!SystemUtilities.isEqual(latestSym.getSymbolStringData(), mySym.getSymbolStringData())) {
 //						saveCommentConflict(id);
 //					}
 //				}
@@ -934,9 +934,21 @@ class SymbolMerger extends AbstractListingMerger {
 		monitor.setProgress(len);
 	}
 
+	private static boolean isDefaultThunk(Symbol s) {
+		if (s.getSource() != SourceType.DEFAULT || s.getSymbolType() != SymbolType.FUNCTION) {
+			return false;
+		}
+		Function f = (Function) s.getObject();
+		return f.isThunk();
+	}
+
 	private void processModifiedFunctionNamespace(long id, Symbol mySym, Symbol resultSym) {
-		Namespace myNs = mySym.getParentNamespace();
-		Namespace resultNs = resultSym.getParentNamespace();
+		Namespace myNs = // default thunks may lie about their namespace
+			isDefaultThunk(mySym) ? mySym.getProgram().getGlobalNamespace()
+					: mySym.getParentNamespace();
+		Namespace resultNs = // default thunks may lie about their namespace
+			isDefaultThunk(resultSym) ? resultSym.getProgram().getGlobalNamespace()
+					: resultSym.getParentNamespace();
 		try {
 			Namespace desiredNs = resolveNamespace(myPgm, myNs);
 			// Is the result namespace the one we actually want it to be?
@@ -996,11 +1008,11 @@ class SymbolMerger extends AbstractListingMerger {
 //		if (commentChangedInMy) {
 //			if (!commentChangedInLatest) {
 //				// Use My version's comment since Latest didn't change it.
-//				resultSym.setSymbolData3(mySym.getSymbolData3());
+//				resultSym.setSymbolStringData(mySym.getSymbolStringData());
 //			}
 //			else {
 //				Symbol latestSym = latestSymTab.getSymbol(id);
-//				if (!SystemUtilities.isEqual(latestSym.getSymbolData3(), mySym.getSymbolData3())) {
+//				if (!SystemUtilities.isEqual(latestSym.getSymbolStringData(), mySym.getSymbolStringData())) {
 //					saveFunctionCommentConflict(id); // My & Latest changed comment differently.
 //				}
 //			}
@@ -1169,11 +1181,11 @@ class SymbolMerger extends AbstractListingMerger {
 			// Handle Symbol comments.
 //			if (commentChangedInMy) {
 //				if (!commentChangedInLatest) {
-//					resultSym.setSymbolData3(mySym.getSymbolData3()); // Use My version's comment since Latest didn't change it.
+//					resultSym.setSymbolStringData(mySym.getSymbolStringData()); // Use My version's comment since Latest didn't change it.
 //				}
 //				else {
 //					Symbol latestSym = latestSymTab.getSymbol(id);
-//					if (!SystemUtilities.isEqual(latestSym.getSymbolData3(), mySym.getSymbolData3())) {
+//					if (!SystemUtilities.isEqual(latestSym.getSymbolStringData(), mySym.getSymbolStringData())) {
 //						saveAddFunctionCommentConflict(id); // My & Latest changed comment differently.
 //					}
 //				}
@@ -1360,8 +1372,8 @@ class SymbolMerger extends AbstractListingMerger {
 
 //	private void processAddedSymbolComment(Symbol resultSym, Symbol mySym) {
 //		// My version added a symbol that matches on in the result version.
-//		String resultComment = resultSym.getSymbolData3();
-//		String myComment = mySym.getSymbolData3();
+//		String resultComment = resultSym.getSymbolStringData();
+//		String myComment = mySym.getSymbolStringData();
 //		if (SystemUtilities.isEqual(resultComment, myComment)) {
 //			return; // Already has My symbol comment.
 //		}
@@ -1369,7 +1381,7 @@ class SymbolMerger extends AbstractListingMerger {
 //			return; // My version isn't setting a symbol comment.
 //		}
 //		if (resultComment == null) {
-//			resultSym.setSymbolData3(myComment); // Latest didn't set a comment, but My did so use My symbol comment.
+//			resultSym.setSymbolStringData(myComment); // Latest didn't set a comment, but My did so use My symbol comment.
 //		}
 //		else if (!myComment.equals(resultComment)) {
 //			saveAddCommentConflict(mySym.getID()); // Both set a different symbol comment, so conflict
@@ -1699,7 +1711,7 @@ class SymbolMerger extends AbstractListingMerger {
 //				currentAddress = addr;
 //				currentSymbol = mySym;
 //				Symbol resultSym = getResultSymbolFromMySymbol(mySym);
-//				currentSymbolComment = (resultSym != null) ? resultSym.getSymbolData3() : "";
+//				currentSymbolComment = (resultSym != null) ? resultSym.getSymbolStringData() : "";
 //				currentBackgroundSet = new AddressSet(resultAddressFactory, addr, addr);
 //				if (askUser && mergeManager != null) {
 //					boolean useForAll = (symbolAddCommentChoice != ASK_USER);
@@ -1900,10 +1912,10 @@ class SymbolMerger extends AbstractListingMerger {
 //			return;
 //		}
 //		if ((chosenConflictOption & KEEP_LATEST) != 0) {
-//			result.setSymbolData3(latest.getSymbolData3());
+//			result.setSymbolStringData(latest.getSymbolStringData());
 //		}
 //		else if ((chosenConflictOption & KEEP_MY) != 0) {
-//			result.setSymbolData3(my.getSymbolData3());
+//			result.setSymbolStringData(my.getSymbolStringData());
 //		}
 //	}
 
@@ -1921,10 +1933,10 @@ class SymbolMerger extends AbstractListingMerger {
 //			return;
 //		}
 //		if ((chosenConflictOption & KEEP_RESULT) != 0) {
-//			result.setSymbolData3(currentSymbolComment);
+//			result.setSymbolStringData(currentSymbolComment);
 //		}
 //		else if ((chosenConflictOption & KEEP_MY) != 0) {
-//			result.setSymbolData3(my.getSymbolData3());
+//			result.setSymbolStringData(my.getSymbolStringData());
 //		}
 //	}
 
@@ -2241,7 +2253,7 @@ class SymbolMerger extends AbstractListingMerger {
 			Symbol newSymbol)
 			throws DuplicateNameException, InvalidInputException, CircularDependencyException {
 		renameSymbol(oldProgram, oldSymbol, newProgram, newSymbol);
-//		oldSymbol.setSymbolData3(newSymbol.getSymbolData3());
+//		oldSymbol.setSymbolStringData(newSymbol.getSymbolStringData());
 		// Handle primary.
 		if (newSymbol.isPrimary() && !oldSymbol.isPrimary()) {
 			oldSymbol.setPrimary();
@@ -2434,7 +2446,7 @@ class SymbolMerger extends AbstractListingMerger {
 	private Symbol createSymbol(String name, SymbolType type, Address resultAddr,
 			Namespace resultParentNs, Program srcPgm, long srcSymID, SourceType source)
 			throws DuplicateNameException, InvalidInputException {
-//		String comment = srcSymbol.getSymbolData3();
+//		String comment = srcSymbol.getSymbolStringData();
 		Symbol symbol = null;
 		if (type == SymbolType.LABEL) {
 			symbol = resultSymTab.createLabel(resultAddr, name, resultParentNs, source);
@@ -2456,7 +2468,7 @@ class SymbolMerger extends AbstractListingMerger {
 			symbol = resultSymTab.getLibrarySymbol(name);
 		}
 		if (symbol != null) {
-//			symbol.setSymbolData3(comment);
+//			symbol.setSymbolStringData(comment);
 			if (symbol.getParentNamespace().equals(resultParentNs)) {
 				long resolveSymID = symbol.getID();
 				updateResolveIDs(srcPgm, srcSymID, resolveSymID);
@@ -2659,7 +2671,7 @@ class SymbolMerger extends AbstractListingMerger {
 			String symbolName, ChangeListener listener) {
 		Symbol latest =
 			latestSymTab.getNamespace(symbolName, DiffUtility.getNamespace(myNamespace, latestPgm))
-				.getSymbol();
+					.getSymbol();
 		Symbol my = mySymTab.getNamespace(symbolName, myNamespace).getSymbol();
 		String text = "Namespace Conflict";
 		conflictPanel.clear();
@@ -2852,7 +2864,7 @@ class SymbolMerger extends AbstractListingMerger {
 //		info[1] = s.getName(false);
 //		info[2] = s.getParentNamespace().getSymbol().getName();
 //		info[3] = s.getSymbolType().toString();
-//		info[4] = ConflictUtility.getTruncatedHTMLString(s.getSymbolData3(), TRUNCATE_LENGTH);
+//		info[4] = ConflictUtility.getTruncatedHTMLString(s.getSymbolStringData(), TRUNCATE_LENGTH);
 //		return info;
 //	}
 

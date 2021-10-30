@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.data;
 
 import java.io.IOException;
@@ -64,7 +61,7 @@ class BuiltinDBAdapterV0 extends BuiltinDBAdapter {
 	}
 
 	@Override
-	public Record getRecord(long dataTypeID) throws IOException {
+	public DBRecord getRecord(long dataTypeID) throws IOException {
 		return table.getRecord(dataTypeID);
 	}
 
@@ -74,7 +71,7 @@ class BuiltinDBAdapterV0 extends BuiltinDBAdapter {
 	}
 
 	@Override
-	public void updateRecord(Record record) throws IOException {
+	public void updateRecord(DBRecord record) throws IOException {
 		table.putRecord(record);
 	}
 
@@ -84,7 +81,7 @@ class BuiltinDBAdapterV0 extends BuiltinDBAdapter {
 	}
 
 	@Override
-	public Record createRecord(String name, String className, long categoryID) throws IOException {
+	public DBRecord createRecord(String name, String className, long categoryID) throws IOException {
 
 		long tableKey = table.getKey();
 		if (tableKey <= 100) {
@@ -92,7 +89,7 @@ class BuiltinDBAdapterV0 extends BuiltinDBAdapter {
 		}
 		long key = DataTypeManagerDB.createKey(DataTypeManagerDB.BUILT_IN, tableKey);
 
-		Record record = V0_SCHEMA.createRecord(key);
+		DBRecord record = V0_SCHEMA.createRecord(key);
 		record.setString(V0_BUILT_IN_NAME_COL, name);
 		record.setString(V0_BUILT_IN_CLASSNAME_COL, className);
 		record.setLongValue(V0_BUILT_IN_CAT_COL, categoryID);

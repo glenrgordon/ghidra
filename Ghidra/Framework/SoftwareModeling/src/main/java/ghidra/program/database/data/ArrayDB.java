@@ -17,7 +17,7 @@ package ghidra.program.database.data;
 
 import java.io.IOException;
 
-import db.Record;
+import db.DBRecord;
 import ghidra.docking.settings.Settings;
 import ghidra.docking.settings.SettingsDefinition;
 import ghidra.program.database.DBObjectCache;
@@ -45,7 +45,7 @@ class ArrayDB extends DataTypeDB implements Array {
 	 * @param record
 	 */
 	public ArrayDB(DataTypeManagerDB dataMgr, DBObjectCache<DataTypeDB> cache,
-			ArrayDBAdapter adapter, Record record) {
+			ArrayDBAdapter adapter, DBRecord record) {
 		super(dataMgr, cache, record);
 		this.adapter = adapter;
 	}
@@ -74,7 +74,7 @@ class ArrayDB extends DataTypeDB implements Array {
 	@Override
 	protected boolean refresh() {
 		try {
-			Record rec = adapter.getRecord(key);
+			DBRecord rec = adapter.getRecord(key);
 			if (rec != null) {
 				record = rec;
 				return super.refresh();
@@ -111,13 +111,21 @@ class ArrayDB extends DataTypeDB implements Array {
 	}
 
 	@Override
-	public boolean isDynamicallySized() {
-		return getDataType().isDynamicallySized();
+	public boolean hasLanguageDependantLength() {
+		return getDataType().hasLanguageDependantLength();
+	}
+
+	@Override
+	public boolean isZeroLength() {
+		return getNumElements() == 0;
 	}
 
 	@Override
 	public int getLength() {
-		checkIsValid();
+		validate(lock);
+		if (getNumElements() == 0) {
+			return 1; // 0-length datatype instance not supported
+		}
 		return getNumElements() * getElementLength();
 	}
 
@@ -154,19 +162,17 @@ class ArrayDB extends DataTypeDB implements Array {
 		DataType dt = getDataType();
 		int elementLen;
 		if (dt instanceof Dynamic) {
-			elementLen = record.getIntValue(ArrayDBAdapter.ARRAY_LENGTH_COL);
+			elementLen = record.getIntValue(ArrayDBAdapter.ARRAY_ELEMENT_LENGTH_COL);
 		}
 		else {
 			elementLen = dt.getLength();
-		}
-		if (elementLen <= 0) {
-			elementLen = 1;
 		}
 		return elementLen;
 	}
 
 	@Override
 	public int getNumElements() {
+		validate(lock);
 		return record.getIntValue(ArrayDBAdapter.ARRAY_DIM_COL);
 	}
 
@@ -216,23 +222,27 @@ class ArrayDB extends DataTypeDB implements Array {
 	public void dataTypeReplaced(DataType oldDt, DataType newDt) {
 		lock.acquire();
 		try {
-			String myOldName = getOldName();
 			checkIsValid();
 			if (newDt == this || newDt.getLength() < 0) {
 				newDt = DataType.DEFAULT;
 			}
 
 			if (oldDt == getDataType()) {
+
 				oldDt.removeParent(this);
 				newDt.addParent(this);
 
+				String myOldName = getOldName();
 				int oldLength = getLength();
+				int oldAlignment = getAlignment();
+				int oldElementLength = getElementLength();
+
 				record.setLongValue(ArrayDBAdapter.ARRAY_DT_ID_COL, dataMgr.getResolvedID(newDt));
 				if (newDt instanceof Dynamic || newDt instanceof FactoryDataType) {
 					newDt = DataType.DEFAULT;
 				}
-				// can only handle fixed-length replacements
-				record.setIntValue(ArrayDBAdapter.ARRAY_LENGTH_COL, -1);
+				int elementLength = newDt.getLength() < 0 ? oldElementLength : -1;
+				record.setIntValue(ArrayDBAdapter.ARRAY_ELEMENT_LENGTH_COL, elementLength);
 				try {
 					adapter.updateRecord(record);
 				}
@@ -243,11 +253,14 @@ class ArrayDB extends DataTypeDB implements Array {
 				if (!getName().equals(myOldName)) {
 					notifyNameChanged(myOldName);
 				}
-				if (getLength() != oldLength) {
-					notifySizeChanged();
+				if (getLength() != oldLength || oldElementLength != getElementLength()) {
+					notifySizeChanged(false);
+				}
+				else if (getAlignment() != oldAlignment) {
+					notifyAlignmentChanged(false);
 				}
 				else {
-					dataMgr.dataTypeChanged(this);
+					dataMgr.dataTypeChanged(this, false);
 				}
 			}
 		}
@@ -265,10 +278,21 @@ class ArrayDB extends DataTypeDB implements Array {
 	public void dataTypeSizeChanged(DataType dt) {
 		lock.acquire();
 		try {
-			checkIsValid();
+			if (checkIsValid() && dt == getDataType()) {
+				notifySizeChanged(true);
+			}
+		}
+		finally {
+			lock.release();
+		}
+	}
 
-			if (dt == getDataType()) {
-				notifySizeChanged();
+	@Override
+	public void dataTypeAlignmentChanged(DataType dt) {
+		lock.acquire();
+		try {
+			if (checkIsValid() && dt == getDataType()) {
+				notifyAlignmentChanged(true);
 			}
 		}
 		finally {

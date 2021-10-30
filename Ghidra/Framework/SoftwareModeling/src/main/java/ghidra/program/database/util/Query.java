@@ -1,6 +1,5 @@
 /* ###
  * IP: GHIDRA
- * REVIEWED: YES
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.util;
 
-import db.Record;
+import db.DBRecord;
 
 /**
  * Query interface used to test a record for some condition.  
@@ -29,5 +25,5 @@ public interface Query {
 	 * Returns true if the given record matches the querys condition.
 	 * @param record the record to test for compliance.
 	 */
-	boolean matches(Record record);
+	boolean matches(DBRecord record);
 }

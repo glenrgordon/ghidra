@@ -56,7 +56,7 @@ abstract class FunctionDefinitionDBAdapter {
 	static final int GENERIC_CALLING_CONVENTION_FLAG_SHIFT = 1;
 
 	/**
-	 * Gets an adapter for working with the function definition data type database table. The adapter is based 
+	 * Gets an adapter for working with the function definition data type database table. The adapter is based
 	 * on the version of the database associated with the specified database handle and the openMode.
 	 * @param handle handle to the database to be accessed.
 	 * @param openMode the mode this adapter is to be opened for (CREATE, UPDATE, READ_ONLY, UPGRADE).
@@ -124,7 +124,7 @@ abstract class FunctionDefinitionDBAdapter {
 			tmpAdapter = new FunctionDefinitionDBAdapterV1(tmpHandle, true);
 			RecordIterator it = oldAdapter.getRecords();
 			while (it.hasNext()) {
-				Record rec = it.next();
+				DBRecord rec = it.next();
 				tmpAdapter.updateRecord(rec, false);
 			}
 			oldAdapter.deleteTable(handle);
@@ -132,7 +132,7 @@ abstract class FunctionDefinitionDBAdapter {
 				new FunctionDefinitionDBAdapterV1(handle, true);
 			it = tmpAdapter.getRecords();
 			while (it.hasNext()) {
-				Record rec = it.next();
+				DBRecord rec = it.next();
 				newAdapter.updateRecord(rec, false);
 			}
 			return newAdapter;
@@ -157,7 +157,7 @@ abstract class FunctionDefinitionDBAdapter {
 	 * @return the database record for this data type.
 	 * @throws IOException if the database can't be accessed.
 	 */
-	abstract Record createRecord(String name, String comments, long categoryID, long returnDtID,
+	abstract DBRecord createRecord(String name, String comments, long categoryID, long returnDtID,
 			boolean hasVarArgs, GenericCallingConvention genericCallingConvention,
 			long sourceArchiveID, long sourceDataTypeID, long lastChangeTime) throws IOException;
 
@@ -167,7 +167,7 @@ abstract class FunctionDefinitionDBAdapter {
 	 * @return the record for the function definition data type.
 	 * @throws IOException if the database can't be accessed.
 	 */
-	abstract Record getRecord(long functionDefID) throws IOException;
+	abstract DBRecord getRecord(long functionDefID) throws IOException;
 
 	/**
 	 * Gets an iterator over all function signature definition data type records.
@@ -187,11 +187,11 @@ abstract class FunctionDefinitionDBAdapter {
 	/**
 	 * Updates the function definition data type table with the provided record.
 	 * @param record the new record
-	 * @param setLastChangedTime true means change the last change time in the record to the 
+	 * @param setLastChangeTime true means change the last change time in the record to the
 	 * current time before putting the record in the database.
 	 * @throws IOException if the database can't be accessed.
 	 */
-	abstract void updateRecord(Record record, boolean setLastChangeTime) throws IOException;
+	abstract void updateRecord(DBRecord record, boolean setLastChangeTime) throws IOException;
 
 	/**
 	 * Deletes the function definition data type table from the database with the specified database handle.
@@ -218,13 +218,13 @@ abstract class FunctionDefinitionDBAdapter {
 	abstract Field[] getRecordIdsForSourceArchive(long archiveID) throws IOException;
 
 	/**
-	 * Get function definition record whoose sourceID and datatypeID match the specified Universal IDs.
+	 * Get function definition record whose sourceID and datatypeID match the specified Universal IDs.
 	 * @param sourceID universal source archive ID
 	 * @param datatypeID universal datatype ID
 	 * @return function definition record found or null
 	 * @throws IOException if IO error occurs
 	 */
-	abstract Record getRecordWithIDs(UniversalID sourceID, UniversalID datatypeID)
+	abstract DBRecord getRecordWithIDs(UniversalID sourceID, UniversalID datatypeID)
 			throws IOException;
 
 }

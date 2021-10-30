@@ -17,6 +17,8 @@ package ghidra.app.util;
 
 import java.util.*;
 
+import org.apache.commons.lang3.StringUtils;
+
 import docking.widgets.fieldpanel.support.RowColLocation;
 import ghidra.program.model.address.*;
 import ghidra.program.model.data.*;
@@ -25,6 +27,7 @@ import ghidra.program.model.mem.*;
 import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.*;
 import ghidra.program.util.*;
+import ghidra.util.StringUtilities;
 
 /**
  * Utility class with methods to get comment information that can be displayed in the
@@ -36,7 +39,6 @@ import ghidra.program.util.*;
  */
 public class DisplayableEol {
 
-	private static final String VAR_ARGS = "...";
 	private static final String POINTER_ARROW = "-> ";
 
 	public static final int MY_EOLS = 0;
@@ -48,19 +50,16 @@ public class DisplayableEol {
 	private boolean alwaysShowRepeatable = false;
 	private boolean alwaysShowRefRepeats = false;
 	private boolean alwaysShowAutomatic = false;
+	private boolean showAutomaticFunctions;
 	private boolean operandsFollowPointerRefs = false;
 	private int maxDisplayLines;
 	private int totalCommentsFound;
 
 	private boolean useAbbreviatedAutomatic;
 
-	/**
-	 * Construct a new DisplayableEol.
-	 * @param cu code unit that may have end of line or repeatable comments.
-	 */
 	public DisplayableEol(CodeUnit cu, boolean alwaysShowRepeatable, boolean alwaysShowRefRepeats,
 			boolean alwaysShowAutomatic, boolean operandsFollowPointerRefs, int maxDisplayLines,
-			boolean useAbbreviatedAutomatic) {
+			boolean useAbbreviatedAutomatic, boolean showAutomaticFunctions) {
 		this.codeUnit = cu;
 		this.alwaysShowRepeatable = alwaysShowRepeatable;
 		this.alwaysShowRefRepeats = alwaysShowRefRepeats;
@@ -68,6 +67,7 @@ public class DisplayableEol {
 		this.operandsFollowPointerRefs = operandsFollowPointerRefs;
 		this.maxDisplayLines = maxDisplayLines;
 		this.useAbbreviatedAutomatic = useAbbreviatedAutomatic;
+		this.showAutomaticFunctions = showAutomaticFunctions;
 
 		initComments();
 	}
@@ -118,7 +118,8 @@ public class DisplayableEol {
 	}
 
 	/**
-	 * Return whether the associated code unit has an end of line comment.
+	 * Return whether the associated code unit has an end of line comment
+	 * @return whether the associated code unit has an end of line comment
 	 */
 	public boolean hasEOL() {
 		return (displayCommentArrays[MY_EOLS] != null) &&
@@ -126,7 +127,8 @@ public class DisplayableEol {
 	}
 
 	/**
-	 * Return whether the associated code unit has a repeatable comment.
+	 * Return whether the associated code unit has a repeatable comment
+	 * @return whether the associated code unit has a repeatable comment
 	 */
 	public boolean hasRepeatable() {
 		return (displayCommentArrays[MY_REPEATABLES] != null) &&
@@ -135,7 +137,9 @@ public class DisplayableEol {
 
 	/**
 	 * Return whether any memory reference from this code unit has a repeatable
-	 * comment at the reference's to address.
+	 * comment at the reference's to address
+	 * @return whether any memory reference from this code unit has a repeatable
+	 * comment at the reference's to address
 	 */
 	public boolean hasReferencedRepeatable() {
 		return (displayCommentArrays[REF_REPEATABLES] != null) &&
@@ -143,10 +147,10 @@ public class DisplayableEol {
 	}
 
 	/**
-	 * Return whether this code unit has an automatic comment.
-	 * (i.e. any memory reference from this code unit has a
-	 * function defined at the reference's to address, or if the to
-	 * address is a pointer.)
+	 * Return whether this code unit has an automatic comment.  For example, a memory reference
+	 * from this code unit has a function defined at the reference's to address, or if the to
+	 * address is a pointer.
+	 * @return whether this code unit has an automatic comment
 	 */
 	public boolean hasAutomatic() {
 		return (displayCommentArrays[MY_AUTOMATIC] != null) &&
@@ -239,7 +243,10 @@ public class DisplayableEol {
 			}
 		}
 
-		set.add("= " + getDataValueRepresentation(dataAccessAddress, data));
+		String dataRepresentation = getDataValueRepresentation(dataAccessAddress, data);
+		if (!StringUtils.isBlank(dataRepresentation)) {
+			set.add("= " + dataRepresentation);
+		}
 	}
 
 	private String getDataValueRepresentation(Address dataAccessAddress, Data data) {
@@ -248,8 +255,7 @@ public class DisplayableEol {
 		}
 
 		if (isOffcut(dataAccessAddress, data)) {
-			String offcut = getOffcutDataString(dataAccessAddress, data);
-			return offcut;
+			return getOffcutDataString(dataAccessAddress, data);
 		}
 
 		return data.getDefaultValueRepresentation();
@@ -366,6 +372,10 @@ public class DisplayableEol {
 
 	private boolean handleDirectFlow(Set<String> set, Reference reference, Program program,
 			Address toAddr) {
+
+		if (!showAutomaticFunctions) {
+			return false;
+		}
 
 		RefType type = reference.getReferenceType();
 		if (!type.isFlow()) {
@@ -511,22 +521,7 @@ public class DisplayableEol {
 			}
 
 			Address address = memRefs[i].getToAddress();
-			CodeUnit cu = listing.getCodeUnitAt(address);
-			if (cu == null) {
-				continue;
-			}
-
-			String[] comment = new String[0];
-
-			Function func = listing.getFunctionAt(address);
-			if (func != null) {
-				comment = func.getRepeatableCommentAsArray();
-			}
-
-			if (comment.length == 0) {
-				comment = cu.getCommentAsArray(CodeUnit.REPEATABLE_COMMENT);
-			}
-
+			String[] comment = getComment(listing, address);
 			if (comment != null && comment.length > 0) {
 				set.add(new RefRepeatComment(address, comment));
 				totalCommentsFound++;
@@ -536,8 +531,30 @@ public class DisplayableEol {
 		return set.toArray(new RefRepeatComment[set.size()]);
 	}
 
+	private String[] getComment(Listing listing, Address address) {
+
+		// prefer listing comments first since there may not be a code unit at this address
+		String repeatableComment = listing.getComment(CodeUnit.REPEATABLE_COMMENT, address);
+		if (repeatableComment != null) {
+			return StringUtilities.toLines(repeatableComment);
+		}
+
+		CodeUnit cu = listing.getCodeUnitAt(address);
+		if (cu == null) {
+			return null;
+		}
+
+		Function func = listing.getFunctionAt(address);
+		if (func != null) {
+			return func.getRepeatableCommentAsArray();
+		}
+
+		return cu.getCommentAsArray(CodeUnit.REPEATABLE_COMMENT);
+	}
+
 	/**
-	 * Return all the comments (End of Line, Repeatable, Referenced Repeatables, and Referenced Data).
+	 * Return all the comments
+	 * @return the comments
 	 */
 	public String[] getComments() {
 		ArrayList<String> list = new ArrayList<>();
@@ -635,6 +652,33 @@ public class DisplayableEol {
 	 */
 	public String[] getAutomaticComment() {
 		return (String[]) displayCommentArrays[MY_AUTOMATIC];
+	}
+
+	@Override
+	public String toString() {
+
+		StringBuilder buffy = new StringBuilder();
+		String[] eols = (String[]) displayCommentArrays[MY_EOLS];
+		if (eols.length != 0) {
+			buffy.append("EOLs: ").append(Arrays.toString(eols));
+		}
+
+		String[] myRepeatables = (String[]) displayCommentArrays[MY_REPEATABLES];
+		if (myRepeatables.length != 0) {
+			buffy.append("My Repeatables: ").append(Arrays.toString(myRepeatables));
+		}
+
+		Object[] refRepeatables = displayCommentArrays[REF_REPEATABLES];
+		if (refRepeatables.length != 0) {
+			buffy.append("Ref Repeatables: ").append(Arrays.toString(refRepeatables));
+		}
+
+		String[] myAutomatic = (String[]) displayCommentArrays[MY_AUTOMATIC];
+		if (myAutomatic.length != 0) {
+			buffy.append("My Automatic: ").append(Arrays.toString(myAutomatic));
+		}
+
+		return buffy.toString();
 	}
 
 	public int getCommentLineCount(int subType) {

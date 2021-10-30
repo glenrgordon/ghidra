@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.code;
 
-import db.Record;
+import db.DBRecord;
 import ghidra.program.database.DBObjectCache;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.data.*;
@@ -87,7 +84,7 @@ class DataComponent extends DataDB {
 	}
 
 	@Override
-	protected boolean hasBeenDeleted(Record rec) {
+	protected boolean hasBeenDeleted(DBRecord rec) {
 		// Records do not apply to data components which
 		// are derived from parent data type
 		if (parent.hasBeenDeleted(null)) {
@@ -152,14 +149,6 @@ class DataComponent extends DataDB {
 			}
 		}
 		return path;
-	}
-
-	/**
-	 * @see ghidra.program.model.listing.CodeUnit#getLength()
-	 */
-	@Override
-	public int getLength() {
-		return length;
 	}
 
 	/**

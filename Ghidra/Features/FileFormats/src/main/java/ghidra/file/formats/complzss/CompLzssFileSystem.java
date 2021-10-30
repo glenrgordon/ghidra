@@ -15,72 +15,86 @@
  */
 package ghidra.file.formats.complzss;
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 import ghidra.app.util.bin.ByteProvider;
+import ghidra.app.util.bin.ByteProviderWrapper;
 import ghidra.file.formats.lzss.LzssCodec;
 import ghidra.file.formats.lzss.LzssConstants;
 import ghidra.formats.gfilesystem.*;
 import ghidra.formats.gfilesystem.annotations.FileSystemInfo;
-import ghidra.formats.gfilesystem.factory.GFileSystemBaseFactory;
 import ghidra.util.exception.CancelledException;
-import ghidra.util.exception.CryptoException;
 import ghidra.util.task.TaskMonitor;
 
-@FileSystemInfo(type = "lzss", description = "LZSS Compression", factory = GFileSystemBaseFactory.class)
-public class CompLzssFileSystem extends GFileSystemBase {
+@FileSystemInfo(type = "lzss", description = "LZSS Compression", factory = CompLzssFileSystemFactory.class)
+public class CompLzssFileSystem implements GFileSystem {
+	private FSRLRoot fsFSRL;
+	private SingleFileSystemIndexHelper fsIndex;
+	private FileSystemRefManager fsRefManager = new FileSystemRefManager(this);
+	private ByteProvider payloadProvider;
 
-	private static final String NAME = "lzss_decompressed";
+	public CompLzssFileSystem(FSRLRoot fsrl, ByteProvider provider, FileSystemService fsService,
+			TaskMonitor monitor) throws IOException, CancelledException {
+		monitor.setMessage("Decompressing LZSS...");
 
-	private GFileImpl decompressedFile;
-	private byte[] decompressedBytes;
+		try (ByteProvider tmpBP = new ByteProviderWrapper(provider, LzssConstants.HEADER_LENGTH,
+			provider.length() - LzssConstants.HEADER_LENGTH);
+				InputStream tmpIS = tmpBP.getInputStream(0);) {
 
-	public CompLzssFileSystem(String fileSystemName, ByteProvider provider) {
-		super(fileSystemName, provider);
+			this.payloadProvider = fsService.getDerivedByteProviderPush(provider.getFSRL(), null,
+				"decompressed lzss", -1, (os) -> LzssCodec.decompress(os, tmpIS), monitor);
+			this.fsIndex = new SingleFileSystemIndexHelper(this, fsFSRL, "lzss_decompressed",
+				payloadProvider.length(), payloadProvider.getFSRL().getMD5());
+		}
+	}
+
+	@Override
+	public FSRLRoot getFSRL() {
+		return fsFSRL;
+	}
+
+	@Override
+	public String getName() {
+		return fsFSRL.getContainer().getName();
+	}
+
+	@Override
+	public FileSystemRefManager getRefManager() {
+		return fsRefManager;
+	}
+
+	@Override
+	public boolean isClosed() {
+		return payloadProvider == null;
 	}
 
 	@Override
 	public void close() throws IOException {
-		decompressedFile = null;
-		decompressedBytes = null;
+		fsRefManager.onClose();
+		if (payloadProvider != null) {
+			payloadProvider.close();
+			payloadProvider = null;
+		}
+		fsIndex.clear();
 	}
 
 	@Override
-	protected InputStream getData(GFile file, TaskMonitor monitor)
-			throws IOException, CancelledException, CryptoException {
-		if (file != null && file.equals(decompressedFile)) {
-			return new ByteArrayInputStream(decompressedBytes);
-		}
-		return null;
+	public ByteProvider getByteProvider(GFile file, TaskMonitor monitor) throws IOException {
+		return fsIndex.isPayloadFile(file)
+				? new ByteProviderWrapper(payloadProvider, file.getFSRL())
+				: null;
 	}
 
 	@Override
 	public List<GFile> getListing(GFile directory) throws IOException {
-		return (directory == null || directory.equals(root)) ? Arrays.asList(decompressedFile)
-				: Collections.emptyList();
+		return fsIndex.getListing(directory);
 	}
 
 	@Override
-	public boolean isValid(TaskMonitor monitor) throws IOException {
-		byte[] compressionBytes = provider.readBytes(0, 4);
-		byte[] lzssBytes = provider.readBytes(4, 4);
-
-		return Arrays.equals(compressionBytes, LzssConstants.SIGNATURE_COMPRESSION_BYTES) &&
-			Arrays.equals(lzssBytes, LzssConstants.SIGNATURE_LZSS_BYTES);
-	}
-
-	@Override
-	public void open(TaskMonitor monitor) throws IOException, CryptoException, CancelledException {
-		monitor.setMessage("Decompressing LZSS...");
-		byte[] compressedBytes = provider.readBytes(LzssConstants.HEADER_LENGTH,
-			provider.length() - LzssConstants.HEADER_LENGTH);
-		ByteArrayOutputStream decompressedBOS = new ByteArrayOutputStream();
-		LzssCodec.decompress(decompressedBOS, new ByteArrayInputStream(compressedBytes));
-		decompressedBytes = decompressedBOS.toByteArray();
-		decompressedFile =
-			GFileImpl.fromFilename(this, root, NAME, false, decompressedBytes.length, null);
-		debug(decompressedBytes, NAME);
+	public GFile lookup(String path) throws IOException {
+		return fsIndex.lookup(path);
 	}
 
 }

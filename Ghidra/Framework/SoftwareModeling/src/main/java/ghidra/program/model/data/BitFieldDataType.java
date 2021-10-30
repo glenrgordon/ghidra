@@ -92,12 +92,9 @@ public class BitFieldDataType extends AbstractDataType {
 	protected BitFieldDataType(DataType baseDataType, int bitSize) throws InvalidDataTypeException {
 		this(baseDataType, bitSize, 0);
 	}
-
-	/**
-	 * Determine if this bit-field has a zero length (i.e., alignment field)
-	 * @return true if this bit-field has a zero length 
-	 */
-	public boolean isZeroLengthField() {
+	
+	@Override
+	public boolean isZeroLength() {
 		return bitSize == 0;
 	}
 
@@ -355,18 +352,19 @@ public class BitFieldDataType extends AbstractDataType {
 		if (effectiveBitSize == 0) {
 			return new Scalar(0, 0);
 		}
-		BigInteger big = getBigIntegerValue(buf, settings);
+		AbstractIntegerDataType primitiveBaseDataType = getPrimitiveBaseDataType();
+		boolean isSigned = primitiveBaseDataType.isSigned();
+		BigInteger big = getBigIntegerValue(buf, isSigned, settings);
 		if (big == null) {
 			return null;
 		}
 		if (effectiveBitSize <= 64) {
-			return new Scalar(effectiveBitSize, big.longValue(),
-				getPrimitiveBaseDataType().isSigned());
+			return new Scalar(effectiveBitSize, big.longValue(), isSigned);
 		}
 		return big;
 	}
 
-	private BigInteger getBigIntegerValue(MemBuffer buf, Settings settings) {
+	private BigInteger getBigIntegerValue(MemBuffer buf, boolean isSigned, Settings settings) {
 		if (effectiveBitSize == 0) {
 			return BigInteger.ZERO;
 		}
@@ -385,7 +383,7 @@ public class BitFieldDataType extends AbstractDataType {
 			BigInteger pow = BigInteger.valueOf(2).pow(effectiveBitSize);
 			BigInteger mask = pow.subtract(BigInteger.ONE);
 			big = big.shiftRight(bitOffset).and(mask);
-			if (big.testBit(effectiveBitSize - 1)) {
+			if (isSigned && big.testBit(effectiveBitSize - 1)) {
 				big = big.subtract(pow);
 			}
 			return big;
@@ -406,7 +404,9 @@ public class BitFieldDataType extends AbstractDataType {
 		if (bitSize == 0) {
 			return "";
 		}
-		BigInteger big = getBigIntegerValue(buf, settings);
+		AbstractIntegerDataType primitiveBaseDataType = getPrimitiveBaseDataType();
+		boolean isSigned = primitiveBaseDataType.isSigned();
+		BigInteger big = getBigIntegerValue(buf, isSigned, settings);
 		if (big == null) {
 			return "??";
 		}

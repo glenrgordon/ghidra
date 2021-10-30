@@ -1,3 +1,18 @@
+/* ###
+ * IP: GHIDRA
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /*****************************************************************************************
 	This file is a "mix-in" gradle script that individual gradle projects should include if they 
 	have content for the Ghidra help system. A gradle project can include help support by adding
@@ -44,8 +59,8 @@ sourceSets {
 }
 
 dependencies {
-	helpIndexCompile "javax.help:javahelp:2.0.05"
-	helpIndexCompile project(path: ':Help', configuration: 'archives')
+	helpIndexImplementation "javax.help:javahelp:2.0.05"
+	helpIndexImplementation project(':Help')
 }
 
 // Task for calling the java help indexer, which creates a searchable index of the 
@@ -66,7 +81,7 @@ task indexHelp(type: JavaExec) {
 	
 	classpath = sourceSets.helpIndex.runtimeClasspath
 	
-	main = 'com.sun.java.help.search.Indexer'		
+	mainClass = 'com.sun.java.help.search.Indexer'
 
 	// tell the indexer where send its output	
 	args '-db', outputFile.absolutePath
@@ -116,7 +131,7 @@ task buildHelp(type: JavaExec, dependsOn: indexHelp) {
 	inputs.dir helpRootDir
 	outputs.dir outputDir
 
-	main = 'help.GHelpBuilder'		
+	mainClass = 'help.GHelpBuilder'
 	
 	args '-n', "${project.name}"	 		// use the module's name for the help file name
 	
@@ -154,7 +169,7 @@ task findUnusedHelp(type: JavaExec) {
 
 	inputs.dir helpRootDir
 
-	main = 'help.validator.UnusedHelpImageFileFinder'		
+	mainClass = 'help.validator.UnusedHelpImageFileFinder'
 
 	// args '-debug' // print debug info
 
@@ -178,7 +193,8 @@ jar {
 }
 
 // build the help whenever this module's jar file is built
-jar.dependsOn buildHelp		
+processResources.dependsOn buildHelp
+jar.dependsOn buildHelp
 
 
 // make sure generated help directories exist during prepdev so that the directories are created and 

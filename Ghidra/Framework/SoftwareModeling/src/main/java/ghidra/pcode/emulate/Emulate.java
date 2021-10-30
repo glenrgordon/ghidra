@@ -101,8 +101,8 @@ public class Emulate {
 
 	@SuppressWarnings("unchecked")
 	private void initInstuctionStateModifier() {
-		String classname = language.getProperty(
-			GhidraLanguagePropertyKeys.EMULATE_INSTRUCTION_STATE_MODIFIER_CLASS);
+		String classname = language
+				.getProperty(GhidraLanguagePropertyKeys.EMULATE_INSTRUCTION_STATE_MODIFIER_CLASS);
 		if (classname == null) {
 			return;
 		}
@@ -245,7 +245,7 @@ public class Emulate {
 	 */
 	public RegisterValue getContextRegisterValue() {
 		Register contextReg = language.getContextBaseRegister();
-		if (contextReg == null) {
+		if (contextReg == Register.NO_CONTEXT) {
 			return null;
 		}
 		if (pseudoInstruction != null) {
@@ -377,6 +377,9 @@ public class Emulate {
 	/// completes.
 	public void executeInstruction(boolean stopAtBreakpoint, TaskMonitor monitor)
 			throws CancelledException, LowlevelError, InstructionDecodeException {
+		if (monitor == null) {
+			monitor = TaskMonitor.DUMMY;
+		}
 		if (executionState == EmulateExecutionState.STOPPED) {
 			if (last_execute_address == null && instructionStateModifier != null) {
 				instructionStateModifier.initialExecuteCallback(this, current_address,
@@ -475,8 +478,9 @@ public class Emulate {
 		else if (behave instanceof BinaryOpBehavior) {
 			BinaryOpBehavior binaryBehave = (BinaryOpBehavior) behave;
 			Varnode in1var = op.getInput(0);
+			Varnode in2var = op.getInput(1);
 			Varnode outvar = op.getOutput();
-			if (in1var.getSize() > 8 || outvar.getSize() > 8) {
+			if (in1var.getSize() > 8 || in2var.getSize() > 8 || outvar.getSize() > 8) {
 				BigInteger in1 = memstate.getBigInteger(op.getInput(0), false);
 				BigInteger in2 = memstate.getBigInteger(op.getInput(1), false);
 				BigInteger out = binaryBehave.evaluateBinary(outvar.getSize(),

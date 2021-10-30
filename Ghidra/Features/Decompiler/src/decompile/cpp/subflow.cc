@@ -83,7 +83,7 @@ SubvariableFlow::ReplaceVarnode *SubvariableFlow::setReplacement(Varnode *vn,uin
       if (sextval != cval)
 	return (ReplaceVarnode *)0;
     }
-    return addConstant((ReplaceOp *)0,mask,0,vn->getOffset());
+    return addConstant((ReplaceOp *)0,mask,0,vn);
   }
 
   if (vn->isFree())
@@ -158,7 +158,7 @@ SubvariableFlow::ReplaceOp *SubvariableFlow::createOp(OpCode opc,int4 numparam,R
 {
   if (outrvn->def != (ReplaceOp *)0)
     return outrvn->def;
-  oplist.push_back(ReplaceOp());
+  oplist.emplace_back();
   ReplaceOp *rop = &oplist.back();
   outrvn->def = rop;
   rop->op = outrvn->vn->getDef();
@@ -181,7 +181,7 @@ SubvariableFlow::ReplaceOp *SubvariableFlow::createOp(OpCode opc,int4 numparam,R
 SubvariableFlow::ReplaceOp *SubvariableFlow::createOpDown(OpCode opc,int4 numparam,PcodeOp *op,ReplaceVarnode *inrvn,int4 slot)
 
 {
-  oplist.push_back(ReplaceOp());
+  oplist.emplace_back();
   ReplaceOp *rop = &oplist.back();
   rop->op = op;
   rop->opc = opc;
@@ -215,7 +215,7 @@ bool SubvariableFlow::tryCallPull(PcodeOp *op,ReplaceVarnode *rvn,int4 slot)
   if (fc->isInputActive()) return false; // Don't trim while in the middle of figuring out params
   if (fc->isInputLocked() && (!fc->isDotdotdot())) return false;
 
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::parameter_patch;
   patchlist.back().patchOp = op;
   patchlist.back().in1 = rvn;
@@ -261,7 +261,7 @@ bool SubvariableFlow::tryReturnPull(PcodeOp *op,ReplaceVarnode *rvn,int4 slot)
 	worklist.push_back(rep);
       else if (retvn->isConstant() && retop != op) {
 	// Trace won't revisit this RETURN, so we need to generate patch now
-	patchlist.push_back(PatchRecord());
+	patchlist.emplace_back();
 	patchlist.back().type = PatchRecord::parameter_patch;
 	patchlist.back().patchOp = retop;
 	patchlist.back().in1 = rep;
@@ -271,7 +271,7 @@ bool SubvariableFlow::tryReturnPull(PcodeOp *op,ReplaceVarnode *rvn,int4 slot)
     }
     returnsTraversed = true;
   }
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::parameter_patch;
   patchlist.back().patchOp = op;
   patchlist.back().in1 = rvn;
@@ -319,7 +319,7 @@ bool SubvariableFlow::trySwitchPull(PcodeOp *op,ReplaceVarnode *rvn)
   if ((rvn->mask & 1) == 0) return false;	// Logical value must be justified
   if ((rvn->vn->getConsume()&~rvn->mask)!=0)	// If there's something outside the mask being consumed
     return false;				//  we can't trim
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::parameter_patch;
   patchlist.back().patchOp = op;
   patchlist.back().in1 = rvn;
@@ -628,7 +628,7 @@ bool SubvariableFlow::traceBackward(ReplaceVarnode *rvn)
     sa = doesAndClear(op,rvn->mask);
     if (sa != -1) {
       rop = createOp(CPUI_COPY,1,rvn);
-      addConstant(rop,rvn->mask,0,op->getIn(sa)->getOffset());
+      addConstant(rop,rvn->mask,0,op->getIn(sa));
     }
     else {
       rop = createOp(CPUI_INT_AND,2,rvn);
@@ -640,7 +640,7 @@ bool SubvariableFlow::traceBackward(ReplaceVarnode *rvn)
     sa = doesOrSet(op,rvn->mask);
     if (sa != -1) {
       rop = createOp(CPUI_COPY,1,rvn);
-      addConstant(rop,rvn->mask,0,op->getIn(sa)->getOffset());
+      addConstant(rop,rvn->mask,0,op->getIn(sa));
     }
     else {
       rop = createOp(CPUI_INT_OR,2,rvn);
@@ -676,7 +676,7 @@ bool SubvariableFlow::traceBackward(ReplaceVarnode *rvn)
     newmask = rvn->mask >> sa;	// What mask looks like before shift
     if (newmask == 0) {		// Subvariable filled with shifted zero
       rop = createOp(CPUI_COPY,1,rvn);
-      addConstant(rop,rvn->mask,0,(uintb)0);
+      addNewConstant(rop,0,(uintb)0);
       return true;
     }
     if ((newmask<<sa) != rvn->mask)
@@ -690,7 +690,7 @@ bool SubvariableFlow::traceBackward(ReplaceVarnode *rvn)
     newmask = (rvn->mask << sa) & calc_mask(op->getIn(0)->getSize());
     if (newmask == 0) {		// Subvariable filled with shifted zero
       rop = createOp(CPUI_COPY,1,rvn);
-      addConstant(rop,rvn->mask,0,(uintb)0);
+      addNewConstant(rop,0,(uintb)0);
       return true;
     }
     if ((newmask>>sa) != rvn->mask)
@@ -772,7 +772,7 @@ bool SubvariableFlow::traceBackward(ReplaceVarnode *rvn)
     if ((rvn->mask&1)==1) break; // Not normal variable flow
     // Variable is filled with zero
     rop = createOp(CPUI_COPY,1,rvn);
-    addConstant(rop,rvn->mask,0,(uintb)0);
+    addNewConstant(rop,0,(uintb)0);
     return true;
   default:
     break;			// Everything else we abort
@@ -825,7 +825,7 @@ bool SubvariableFlow::traceForwardSext(ReplaceVarnode *rvn)
       if (!op->getIn(1)->isConstant()) return false; // Right now we only deal with constant shifts
       rop = createOpDown(CPUI_INT_SRIGHT,2,op,rvn,0);
       if (!createLink(rop,rvn->mask,-1,outvn)) return false; // Keep the same mask size
-      addConstant(rop,calc_mask(op->getIn(1)->getSize()),1,op->getIn(1)->getOffset()); // Preserve the shift amount
+      addConstant(rop,calc_mask(op->getIn(1)->getSize()),1,op->getIn(1)); // Preserve the shift amount
       hcount += 1;
       break;
     case CPUI_SUBPIECE:
@@ -916,7 +916,7 @@ bool SubvariableFlow::traceBackwardSext(ReplaceVarnode *rvn)
     rop = createOp(CPUI_INT_SRIGHT,2,rvn);
     if (!createLink(rop,rvn->mask,0,op->getIn(0))) return false; // Keep the same mask
     if (rop->input.size()==1)
-      addConstant(rop,calc_mask(op->getIn(1)->getSize()),1,op->getIn(1)->getOffset()); // Preserve the shift amount
+      addConstant(rop,calc_mask(op->getIn(1)->getSize()),1,op->getIn(1)); // Preserve the shift amount
     return true;
   case CPUI_CALL:
   case CPUI_CALLIND:
@@ -993,23 +993,40 @@ bool SubvariableFlow::createCompareBridge(PcodeOp *op,ReplaceVarnode *inrvn,int4
 
 /// \brief Add a constant variable node to the logical subgraph
 ///
-/// Unlike other subgraph variable nodes, this one does not maintain a mirror with the original containing Varnode.
 /// \param rop is the logical operation taking the constant as input
 /// \param mask is the set of bits holding the logical value (within a bigger value)
 /// \param slot is the input slot to the operation
-/// \param val is the bigger constant value holding the logical value
+/// \param constvn is the original constant
 SubvariableFlow::ReplaceVarnode *SubvariableFlow::addConstant(ReplaceOp *rop,uintb mask,
-					      uint4 slot,uintb val)
-{ // Add a constant to the replacement tree
-  newvarlist.push_back(ReplaceVarnode());
+					      uint4 slot,Varnode *constvn)
+{
+  newvarlist.emplace_back();
   ReplaceVarnode *res = &newvarlist.back();
-  res->vn = (Varnode *)0;
+  res->vn = constvn;
   res->replacement = (Varnode *)0;
   res->mask = mask;
 
   // Calculate the actual constant value
   int4 sa = leastsigbit_set(mask);
-  res->val = (mask & val) >> sa;
+  res->val = (mask & constvn->getOffset()) >> sa;
+  res->def = (ReplaceOp *)0;
+  if (rop != (ReplaceOp *)0) {
+    while(rop->input.size() <= slot)
+      rop->input.push_back((ReplaceVarnode *)0);
+    rop->input[slot] = res;
+  }
+  return res;
+}
+
+SubvariableFlow::ReplaceVarnode *SubvariableFlow::addNewConstant(ReplaceOp *rop,uint4 slot,uintb val)
+
+{
+  newvarlist.emplace_back();
+  ReplaceVarnode *res = &newvarlist.back();
+  res->vn = (Varnode *)0;
+  res->replacement = (Varnode *)0;
+  res->mask = 0;
+  res->val = val;
   res->def = (ReplaceOp *)0;
   if (rop != (ReplaceOp *)0) {
     while(rop->input.size() <= slot)
@@ -1028,7 +1045,7 @@ SubvariableFlow::ReplaceVarnode *SubvariableFlow::addConstant(ReplaceOp *rop,uin
 void SubvariableFlow::createNewOut(ReplaceOp *rop,uintb mask)
 
 {
-  newvarlist.push_back(ReplaceVarnode());
+  newvarlist.emplace_back();
   ReplaceVarnode *res = &newvarlist.back();
   res->vn = (Varnode *)0;
   res->replacement = (Varnode *)0;
@@ -1063,7 +1080,7 @@ void SubvariableFlow::addPush(PcodeOp *pushOp,ReplaceVarnode *rvn)
 void SubvariableFlow::addTerminalPatch(PcodeOp *pullop,ReplaceVarnode *rvn)
 
 {
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::copy_patch;	// Ultimately gets converted to a COPY
   patchlist.back().patchOp = pullop;	// Operation pulling the variable out
   patchlist.back().in1 = rvn;	// Point in container flow for pull
@@ -1081,7 +1098,7 @@ void SubvariableFlow::addTerminalPatch(PcodeOp *pullop,ReplaceVarnode *rvn)
 void SubvariableFlow::addTerminalPatchSameOp(PcodeOp *pullop,ReplaceVarnode *rvn,int4 slot)
 
 {
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::parameter_patch;	// Keep the original op, just change input
   patchlist.back().patchOp = pullop;	// Operation pulling the variable out
   patchlist.back().in1 = rvn;	// Point in container flow for pull
@@ -1099,7 +1116,7 @@ void SubvariableFlow::addTerminalPatchSameOp(PcodeOp *pullop,ReplaceVarnode *rvn
 void SubvariableFlow::addBooleanPatch(PcodeOp *pullop,ReplaceVarnode *rvn,int4 slot)
 
 {
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::parameter_patch;	// Make no change to the operator, just put in the new input
   patchlist.back().patchOp = pullop;	// Operation pulling the variable out
   patchlist.back().in1 = rvn;	// Point in container flow for pull
@@ -1117,7 +1134,7 @@ void SubvariableFlow::addBooleanPatch(PcodeOp *pullop,ReplaceVarnode *rvn,int4 s
 void SubvariableFlow::addSuggestedPatch(ReplaceVarnode *rvn,PcodeOp *pushop,int4 sa)
 
 {
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::extension_patch;
   patchlist.back().in1 = rvn;
   patchlist.back().patchOp = pushop;
@@ -1137,7 +1154,7 @@ void SubvariableFlow::addSuggestedPatch(ReplaceVarnode *rvn,PcodeOp *pushop,int4
 void SubvariableFlow::addComparePatch(ReplaceVarnode *in1,ReplaceVarnode *in2,PcodeOp *op)
 
 {
-  patchlist.push_back(PatchRecord());
+  patchlist.emplace_back();
   patchlist.back().type = PatchRecord::compare_patch;
   patchlist.back().patchOp = op;
   patchlist.back().in1 = in1;
@@ -1214,12 +1231,16 @@ Varnode *SubvariableFlow::getReplaceVarnode(ReplaceVarnode *rvn)
 {
   if (rvn->replacement != (Varnode *)0)
     return rvn->replacement;
-  // Only a constant if BOTH replacement and vn fields are null
   if (rvn->vn == (Varnode *)0) {
-    if (rvn->def==(ReplaceOp *)0) // A constant
+    if (rvn->def==(ReplaceOp *)0) // A constant that did not come from an original Varnode
       return fd->newConstant(flowsize,rvn->val);
     rvn->replacement = fd->newUnique(flowsize);
     return rvn->replacement;
+  }
+  if (rvn->vn->isConstant()) {
+    Varnode *newVn = fd->newConstant(flowsize,rvn->val);
+    newVn->copySymbolIfValid(rvn->vn);
+    return newVn;
   }
 
   bool isinput = rvn->vn->isInput();
@@ -1533,6 +1554,8 @@ bool SplitFlow::traceForward(TransformVar *rvn)
       break;
     case CPUI_SUBPIECE:
     {
+      if (outvn->isPrecisLo() || outvn->isPrecisHi())
+	return false;		// Do not split if we know value comes from double precision pieces
       uintb val = op->getIn(1)->getOffset();
       if ((val==0)&&(outvn->getSize() == laneDescription.getSize(0))) {
 	TransformOp *rop = newPreexistingOp(1,CPUI_COPY,op);	// Grabs the low piece
@@ -2020,7 +2043,7 @@ TransformVar *LaneDivide::setReplacement(Varnode *vn,int4 numLanes,int4 skipLane
   vn->setMark();
   TransformVar *res = newSplit(vn, description, numLanes, skipLanes);
   if (!vn->isFree()) {
-    workList.push_back(WorkNode());
+    workList.emplace_back();
     workList.back().lanes = res;
     workList.back().numLanes = numLanes;
     workList.back().skipLanes = skipLanes;

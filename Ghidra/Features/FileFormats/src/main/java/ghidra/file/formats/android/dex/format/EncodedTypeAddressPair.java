@@ -15,17 +15,13 @@
  */
 package ghidra.file.formats.android.dex.format;
 
+import java.io.IOException;
+
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.StructConverter;
-import ghidra.file.formats.android.dex.util.Leb128;
-import ghidra.program.model.data.ArrayDataType;
-import ghidra.program.model.data.CategoryPath;
-import ghidra.program.model.data.DataType;
-import ghidra.program.model.data.Structure;
-import ghidra.program.model.data.StructureDataType;
+import ghidra.app.util.bin.format.dwarf4.LEB128;
+import ghidra.program.model.data.*;
 import ghidra.util.exception.DuplicateNameException;
-
-import java.io.IOException;
 
 public class EncodedTypeAddressPair implements StructConverter {
 
@@ -35,21 +31,21 @@ public class EncodedTypeAddressPair implements StructConverter {
 	private int typeIndexLength;// in bytes
 	private int addressLength;// in bytes
 
-	public EncodedTypeAddressPair( BinaryReader reader ) throws IOException {
-		typeIndex = Leb128.readUnsignedLeb128( reader.readByteArray( reader.getPointerIndex( ), 5 ) );
-		typeIndexLength = Leb128.unsignedLeb128Size( typeIndex );
-		reader.readNextByteArray( typeIndexLength );// consume leb...
+	public EncodedTypeAddressPair(BinaryReader reader) throws IOException {
+		LEB128 leb128 = LEB128.readUnsignedValue(reader);
+		typeIndex = leb128.asUInt32();
+		typeIndexLength = leb128.getLength();
 
-		address = Leb128.readUnsignedLeb128( reader.readByteArray( reader.getPointerIndex( ), 5 ) );
-		addressLength = Leb128.unsignedLeb128Size( address );
-		reader.readNextByteArray( addressLength );// consume leb...
+		leb128 = LEB128.readUnsignedValue(reader);
+		address = leb128.asUInt32();
+		addressLength = leb128.getLength();
 	}
 
-	public int getTypeIndex( ) {
+	public int getTypeIndex() {
 		return typeIndex;
 	}
 
-	public int getAddress( ) {
+	public int getAddress() {
 		return address;
 	}
 
@@ -62,11 +58,12 @@ public class EncodedTypeAddressPair implements StructConverter {
 	}
 
 	@Override
-	public DataType toDataType( ) throws DuplicateNameException, IOException {
-		Structure structure = new StructureDataType( "encoded_type_addr_pair_" + typeIndexLength + "_" + addressLength, 0 );
-		structure.add( new ArrayDataType( BYTE, typeIndexLength, BYTE.getLength( ) ), "type_idx", null );
-		structure.add( new ArrayDataType( BYTE, addressLength, BYTE.getLength( ) ), "addr", null );
-		structure.setCategoryPath( new CategoryPath( "/dex/encoded_type_addr_pair" ) );
+	public DataType toDataType() throws DuplicateNameException, IOException {
+		Structure structure = new StructureDataType(
+			"encoded_type_addr_pair_" + typeIndexLength + "_" + addressLength, 0);
+		structure.add(new ArrayDataType(BYTE, typeIndexLength, BYTE.getLength()), "type_idx", null);
+		structure.add(new ArrayDataType(BYTE, addressLength, BYTE.getLength()), "addr", null);
+		structure.setCategoryPath(new CategoryPath("/dex/encoded_type_addr_pair"));
 		return structure;
 	}
 }

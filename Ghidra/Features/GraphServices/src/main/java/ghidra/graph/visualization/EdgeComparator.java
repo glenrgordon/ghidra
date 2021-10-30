@@ -15,33 +15,42 @@
  */
 package ghidra.graph.visualization;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import ghidra.service.graph.AttributedEdge;
-import ghidra.service.graph.AttributedGraph;
+import ghidra.service.graph.GraphType;
 
+/**
+ * Edge comparator that compares edges based on their edge type. The default renderer will use
+ * the order in which the edge types were defined in the {@link GraphType}.
+ */
 public class EdgeComparator implements Comparator<AttributedEdge> {
-	private final Set<AttributedEdge> prioritized;
 
-	public EdgeComparator(AttributedGraph graph, String attributeName, String value) {
-		prioritized = graph.edgeSet()
-				.stream()
-				.filter(e -> Objects.equals(e.getAttribute(attributeName), value))
-				.collect(Collectors.toSet());
+	private GraphRenderer renderer;
+
+	public EdgeComparator(GraphRenderer renderer) {
+		this.renderer = renderer;
 	}
 
 	@Override
-	public int compare(AttributedEdge edgeOne, AttributedEdge edgeTwo) {
-		boolean edgeOnePriority = prioritized.contains(edgeOne);
-		boolean edgeTwoPriority = prioritized.contains(edgeTwo);
-		if (edgeOnePriority && !edgeTwoPriority) {
-			return -1;
+	public int compare(AttributedEdge edge1, AttributedEdge edge2) {
+		String edgeType1 = edge1.getEdgeType();
+		String edgeType2 = edge2.getEdgeType();
+
+		if (edgeType1 == null && edgeType2 == null) {
+			return 0;
 		}
-		else if (!edgeOnePriority && edgeTwoPriority) {
+		if (edgeType1 == null) {
 			return 1;
 		}
-		return 0;
+		if (edgeType2 == null) {
+			return -1;
+		}
+
+		Integer priority1 = renderer.getEdgePriority(edgeType1);
+		Integer priority2 = renderer.getEdgePriority(edgeType2);
+
+		return priority1.compareTo(priority2);
 	}
 
 }

@@ -20,7 +20,6 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 import ghidra.program.model.data.*;
-import ghidra.program.model.data.Composite.AlignmentType;
 
 public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
@@ -39,10 +38,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(emptyStructure.getName(), model.getCompositeName());
@@ -56,11 +53,10 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		DataType dt = pgmRootCat.getDataType(emptyStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(emptyStructure.getName(), model.getCompositeName());
@@ -76,7 +72,7 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
 		DataType dt = pgmBbCat.getDataType(simpleStructure.getName());
 		assertNotNull(dt);
-		assertFalse(dt.isNotYetDefined());
+		assertFalse(dt.isZeroLength());
 
 		assertEquals(8, model.getNumComponents());
 		assertEquals(9, model.getRowCount());
@@ -87,10 +83,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 8 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(29);
 		assertEquals(simpleStructure.getName(), model.getCompositeName());
@@ -100,6 +94,9 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertStatus("");
 
 		deleteAllComponents();
+		
+		assertTrue(model.viewComposite.isNotYetDefined());
+		assertTrue(model.viewComposite.isZeroLength());
 
 		assertEquals(0, model.getNumComponents());
 		assertEquals(1, model.getRowCount());
@@ -110,10 +107,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(simpleStructure.getName(), model.getCompositeName());
@@ -126,15 +121,15 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
 		assertTrue(simpleStructure.isEquivalent(model.viewComposite));
 		assertTrue(simpleStructure.isNotYetDefined());
+		assertTrue(simpleStructure.isZeroLength());
 
 		dt = pgmBbCat.getDataType(simpleStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(simpleStructure.getName(), model.getCompositeName());
@@ -179,7 +174,7 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
 		DataType dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
-		assertFalse(dt.isNotYetDefined());
+		assertFalse(dt.isZeroLength());
 
 		assertEquals(1, model.getNumComponents());
 		assertEquals(2, model.getRowCount());
@@ -190,10 +185,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 1 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(1);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -213,10 +206,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -230,11 +221,10 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -280,7 +270,7 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
 		DataType dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
-		assertFalse(dt.isNotYetDefined());
+		assertFalse(dt.isZeroLength());
 
 		assertEquals(1, model.getNumComponents());
 		assertEquals(2, model.getRowCount());
@@ -291,10 +281,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 1 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(1);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -314,10 +302,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -331,14 +317,14 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
 		assertTrue(innerStructure.isEquivalent(model.viewComposite));
 		assertTrue(innerStructure.isNotYetDefined());
+		assertTrue(innerStructure.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -373,13 +359,13 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		}
 		assertNotNull(innerStructure);
 		assertNotNull(innerTypedef);
-		assertTrue(!innerTypedef.isNotYetDefined());
+		assertFalse(innerTypedef.isZeroLength());
 
 		init(innerStructure, pgmTestCat, false);
 
 		DataType dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
-		assertFalse(dt.isNotYetDefined());
+		assertFalse(dt.isZeroLength());
 
 		assertEquals(1, model.getNumComponents());
 		assertEquals(2, model.getRowCount());
@@ -390,10 +376,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 1 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(1);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -413,10 +397,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -430,14 +412,14 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
 		assertTrue(innerStructure.isEquivalent(model.viewComposite));
 		assertTrue(innerStructure.isNotYetDefined());
+		assertTrue(innerStructure.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -446,7 +428,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(false, applyAction.isEnabled());
 //		assertStatus("/testCat/innerStructure is contained in /testCat/innerStructureTypedef and can't be changed to a zero size data type.");
 
-		assertTrue(innerTypedef.isNotYetDefined());
+		assertFalse(innerTypedef.isNotYetDefined()); // Typedef is always defined even if referenced type is not
+		assertTrue(innerTypedef.isZeroLength());
 		assertEquals(1, innerTypedef.getLength());
 	}
 
@@ -481,7 +464,7 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 
 		DataType dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
-		assertFalse(dt.isNotYetDefined());
+		assertFalse(dt.isZeroLength());
 
 		assertEquals(1, model.getNumComponents());
 		assertEquals(2, model.getRowCount());
@@ -492,10 +475,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 1 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(2);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -515,10 +496,8 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		assertEquals(0, model.getNumSelectedComponentRows());
 		assertEquals(1, model.getNumSelectedRows());
 		checkSelection(new int[] { 0 });
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());
@@ -532,14 +511,14 @@ public class ZeroSizeStructureTest extends AbstractStructureEditorTest {
 		dt = pgmTestCat.getDataType(innerStructure.getName());
 		assertNotNull(dt);
 		assertTrue(dt.isNotYetDefined());
+		assertTrue(dt.isZeroLength());
 
 		assertTrue(innerStructure.isEquivalent(model.viewComposite));
 		assertTrue(innerStructure.isNotYetDefined());
+		assertTrue(innerStructure.isZeroLength());
 
-		assertIsInternallyAligned(false);
-		assertPackingValue(Composite.NOT_PACKING);
-		assertMinimumAlignmentType(AlignmentType.DEFAULT_ALIGNED);
-		assertMinimumAlignmentValue(Composite.DEFAULT_ALIGNMENT_VALUE);
+		assertIsPackingEnabled(false);
+		assertIsDefaultAligned();
 		assertActualAlignment(1);
 		assertLength(0);
 		assertEquals(innerStructure.getName(), model.getCompositeName());

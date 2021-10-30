@@ -89,7 +89,9 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 			// don't care
 		}
 	};
-	private List<ListingDisplayListener> displayListeners = new ArrayList<>();
+	private List<AddressSetDisplayListener> displayListeners = new ArrayList<>();
+
+	private String currentTextSelection;
 
 	/**
 	 * Constructs a new ListingPanel using the given FormatManager and ServiceProvider.
@@ -477,12 +479,12 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 			element.setPixelMap(pixmap);
 		}
 
-		for (ListingDisplayListener listener : displayListeners) {
+		for (AddressSetDisplayListener listener : displayListeners) {
 			notifyDisplayListener(listener);
 		}
 	}
 
-	private void notifyDisplayListener(ListingDisplayListener listener) {
+	private void notifyDisplayListener(AddressSetDisplayListener listener) {
 		AddressSetView displayAddresses = pixmap.getAddressSet();
 		try {
 			listener.visibleAddressesChanged(displayAddresses);
@@ -1057,14 +1059,18 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 				if (layout != null) {
 					fieldNum1 = layout.getBeginRowFieldNum(loc1.getFieldNum());
 				}
+
 				Layout layout2 = layoutModel.getLayout(loc2.getIndex());
-				BigInteger index2 = null;
-				if (layout2 != null) {
-					index2 = loc2.getIndex().add(BigInteger.valueOf(layout2.getIndexSize()));
-				}
-				if (fieldNum1 >= 0 && index2 != null) {
+				
+				if (fieldNum1 >= 0 && layout2 != null) {
+					BigInteger index2 = loc2.getIndex();
+					int fieldNum2 = layout.getEndRowFieldNum(loc2.getFieldNum());
+					if (fieldNum2 >= layout2.getNumFields()) {
+						index2 = loc2.getIndex().add(BigInteger.valueOf(layout2.getIndexSize()));
+						fieldNum2 = 0;
+					}
 					fieldSel.addRange(new FieldLocation(loc1.getIndex(), fieldNum1, 0, 0),
-						new FieldLocation(index2, 0, 0, 0));
+						new FieldLocation(index2, fieldNum2, 0, 0));
 					fieldPanel.setSelection(fieldSel);
 					return;
 				}
@@ -1098,9 +1104,12 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 		if (stringSelectionListener != null) {
 			stringSelectionListener.setStringSelection(text);
 		}
+
+		currentTextSelection = text;
 		if (text != null) {
 			return;
 		}
+
 		if (trigger != EventTrigger.API_CALL) {
 			if (listingModel.getProgram() == null || programSelectionListener == null) {
 				return;
@@ -1110,6 +1119,15 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 				programSelectionListener.programSelectionChanged(ps);
 			}
 		}
+	}
+
+	/**
+	 * Returns the currently selected text.   The value will only be non-null for selections within
+	 * a single field. 
+	 * @return the selected text or null
+	 */
+	public String getTextSelection() {
+		return currentTextSelection;
 	}
 
 	public void enablePropertyBasedColorModel(boolean b) {
@@ -1142,11 +1160,11 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 		layoutModel.dataChanged(true);
 	}
 
-	public void addListingDisplayListener(ListingDisplayListener listener) {
+	public void addDisplayListener(AddressSetDisplayListener listener) {
 		displayListeners.add(listener);
 	}
 
-	public void removeListingDisplayListener(ListingDisplayListener listener) {
+	public void removeDisplayListener(AddressSetDisplayListener listener) {
 		displayListeners.remove(listener);
 	}
 }

@@ -1,6 +1,5 @@
 /* ###
  * IP: GHIDRA
- * REVIEWED: YES
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.util;
 
-import db.Record;
+import db.DBRecord;
 
 /**
  * Combines two queries such that this query is the logical "AND" of the two queries.  If the
@@ -40,9 +36,9 @@ public class AndQuery implements Query {
 	}
 
 	/**
-	 * @see ghidra.program.database.util.Query#matches(db.Record)
+	 * @see ghidra.program.database.util.Query#matches(db.DBRecord)
 	 */
-	public boolean matches(Record record) {
+	public boolean matches(DBRecord record) {
 		return q1.matches(record) && q2.matches(record);
 	}
 

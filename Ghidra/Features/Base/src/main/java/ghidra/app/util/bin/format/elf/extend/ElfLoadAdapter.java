@@ -127,6 +127,8 @@ public class ElfLoadAdapter {
 	/**
 	 * Get the preferred load address space for an allocated program segment.
 	 * The OTHER space is reserved and should not be returned by this method.
+	 * This method may only return a physical address space and not an overlay 
+	 * address space.
 	 * @param elfLoadHelper load helper object
 	 * @param elfProgramHeader elf program segment header
 	 * @return preferred load address space
@@ -143,7 +145,9 @@ public class ElfLoadAdapter {
 	}
 
 	/**
-	 * Get the preferred load address for a program segment
+	 * Get the preferred load address for a program segment.
+	 * This method may only return a physical address and not an overlay 
+	 * address.
 	 * @param elfLoadHelper load helper object
 	 * @param elfProgramHeader elf program segment header
 	 * @return preferred load address
@@ -182,6 +186,8 @@ public class ElfLoadAdapter {
 	/**
 	 * Get the preferred load address space for an allocated section.   The OTHER space
 	 * is reserved and should not be returned by this method.
+	 * This method may only return a physical address space and not an overlay 
+	 * address space.
 	 * @param elfLoadHelper load helper object
 	 * @param elfSectionHeader elf section header
 	 * @return preferred load address space
@@ -198,6 +204,8 @@ public class ElfLoadAdapter {
 
 	/**
 	 * Get the preferred load address for an allocated program section.  
+	 * This method may only return a physical address and not an overlay 
+	 * address.
 	 * @param elfLoadHelper load helper object
 	 * @param elfSectionHeader elf program section header
 	 * @return preferred load address
@@ -310,6 +318,22 @@ public class ElfLoadAdapter {
 	 */
 	public Address creatingFunction(ElfLoadHelper elfLoadHelper, Address functionAddress) {
 		return functionAddress;
+	}
+
+	/**
+	 * This method allows an extension to override the default address calculation for loading
+	 * a symbol.  This is generally only neccessary when symbol requires handling of processor-specific 
+	 * flags or section index.  This method should return null when default symbol processing 
+	 * is sufficient. {@link Address#NO_ADDRESS} should be returned if the symbol is external
+	 * and is not handled by default processing.
+	 * @param elfLoadHelper load helper object
+	 * @param elfSymbol elf symbol
+	 * @return symbol memory address or null to defer to default implementation
+	 * @throws NoValueException if error logged and address calculation failed
+	 */
+	public Address calculateSymbolAddress(ElfLoadHelper elfLoadHelper, ElfSymbol elfSymbol)
+			throws NoValueException {
+		return null;
 	}
 
 	/**
@@ -487,4 +511,5 @@ public class ElfLoadAdapter {
 	public Class<? extends ElfRelocation> getRelocationClass(ElfHeader elfHeader) {
 		return null;
 	}
+
 }

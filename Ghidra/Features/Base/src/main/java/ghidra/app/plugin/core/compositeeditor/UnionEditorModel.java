@@ -40,7 +40,8 @@ import docking.widgets.fieldpanel.support.FieldSelection;
 
 import ghidra.program.model.data.*;
 import ghidra.program.model.lang.InsufficientBytesException;
-import ghidra.util.exception.*;
+import ghidra.util.exception.CancelledException;
+import ghidra.util.exception.UsrException;
 import ghidra.util.task.TaskMonitor;
 
 class UnionEditorModel extends CompEditorModel {
@@ -293,7 +294,7 @@ class UnionEditorModel extends CompEditorModel {
 			if (currentIndex < 0 || currentIndex > getNumComponents()) {
 				return false;
 			}
-			checkIsAllowableDataType(dataType, true);
+			checkIsAllowableDataType(dataType);
 		}
 		catch (InvalidDataTypeException e) {
 			return false;
@@ -377,7 +378,7 @@ class UnionEditorModel extends CompEditorModel {
 	@Override
 	public DataTypeComponent insert(int rowIndex, DataType dataType, int length, String name,
 			String comment) throws InvalidDataTypeException {
-		checkIsAllowableDataType(dataType, true);
+		checkIsAllowableDataType(dataType);
 		try {
 			DataTypeComponent dtc =
 				((Union) viewComposite).insert(rowIndex, dataType, length, name, comment);
@@ -408,7 +409,7 @@ class UnionEditorModel extends CompEditorModel {
 	@Override
 	public DataTypeComponent replace(int rowIndex, DataType dataType, int length, String name,
 			String comment) throws InvalidDataTypeException {
-		checkIsAllowableDataType(dataType, true);
+		checkIsAllowableDataType(dataType);
 		try {
 			boolean isSelected = selection.containsEntirely(BigInteger.valueOf(rowIndex));
 			((Union) viewComposite).delete(rowIndex);
@@ -500,16 +501,6 @@ class UnionEditorModel extends CompEditorModel {
 				}
 			}
 		}
-	}
-
-	@Override
-	public void setAlignment(int minAlignment) throws InvalidInputException {
-		long currentViewAlignment = viewComposite.getMinimumAlignment();
-		if (currentViewAlignment == minAlignment) {
-			return;
-		}
-		viewComposite.setMinimumAlignment(minAlignment);
-		notifyCompositeChanged();
 	}
 
 	/**

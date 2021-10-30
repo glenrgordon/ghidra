@@ -27,7 +27,7 @@ import java.util.List;
  */
 public class AlignedStructurePacker {
 
-	private final Structure structure;
+	private final StructureInternal structure;
 	private final List<? extends InternalDataTypeComponent> components;
 
 	private final DataOrganization dataOrganization;
@@ -38,7 +38,7 @@ public class AlignedStructurePacker {
 	 * during packing (ordinal, offset, length and bit-field datatypes may be modified)
 	 * @param components list of mutable component
 	 */
-	protected AlignedStructurePacker(Structure structure,
+	protected AlignedStructurePacker(StructureInternal structure,
 			List<? extends InternalDataTypeComponent> components) {
 		this.structure = structure;
 		this.components = components;
@@ -75,7 +75,7 @@ public class AlignedStructurePacker {
 		int componentCount = 0;
 
 		AlignedComponentPacker packer =
-			new AlignedComponentPacker(structure.getPackingValue(), dataOrganization);
+			new AlignedComponentPacker(structure.getStoredPackingValue(), dataOrganization);
 
 		// Remove any default components from list
 		Iterator<? extends InternalDataTypeComponent> componentIterator = components.iterator();
@@ -83,7 +83,8 @@ public class AlignedStructurePacker {
 			InternalDataTypeComponent dataTypeComponent = componentIterator.next();
 			DataType componentDt = dataTypeComponent.getDataType();
 			if (DataType.DEFAULT == componentDt) {
-				componentIterator.remove(); // remove default components.
+				// transform improper DEFAULT datatype use to Undefined1
+				dataTypeComponent.setDataType(Undefined1DataType.dataType);
 				componentsChanged = true;
 			}
 			++componentCount;
@@ -95,31 +96,24 @@ public class AlignedStructurePacker {
 			packer.addComponent(dataTypeComponent, isLastComponent);
 		}
 
-		int externalAlignment = packer.getExternalAlignment();
+		int defaultAlignment = packer.getDefaultAlignment();
 
 		int length = packer.getLength();
 		componentsChanged |= packer.componentsChanged();
 
-		DataTypeComponent flexibleArrayComponent = structure.getFlexibleArrayComponent();
-		if (flexibleArrayComponent != null) {
-			// account for flexible array type and any end of structure padding required
-			int componentAlignment = CompositeAlignmentHelper.getPackedAlignment(dataOrganization,
-				structure.getPackingValue(), flexibleArrayComponent);
-			length = DataOrganizationImpl.getOffset(componentAlignment, length);
-			externalAlignment =
-				DataOrganizationImpl.getLeastCommonMultiple(externalAlignment, componentAlignment);
-		}
-
-		int alignment = structure.getMinimumAlignment();
-		if (alignment < externalAlignment) {
-			alignment = externalAlignment;
+		int alignment = defaultAlignment;
+		AlignmentType alignmentType = structure.getAlignmentType();
+		if (alignmentType != AlignmentType.DEFAULT) {
+			// Apply minimum alignment if applicable - may be reduced by explicit pack
+			// Simplified logic assumes pack and align values which are a power of 2 (1,2,4,8,16...)
+			int minAlign =
+				alignmentType == AlignmentType.MACHINE ? dataOrganization.getMachineAlignment()
+						: structure.getExplicitMinimumAlignment();
+			alignment = Math.max(defaultAlignment, minAlign);
 		}
 
 		if (length != 0) {
-			int padSize = DataOrganizationImpl.getPaddingSize(alignment, length);
-			if (padSize > 0) {
-				length += padSize;
-			}
+			length = DataOrganizationImpl.getAlignedOffset(alignment, length);
 		}
 
 		return new StructurePackResult(componentCount, length, alignment, componentsChanged);
@@ -132,10 +126,10 @@ public class AlignedStructurePacker {
 	 * returned result.  Component count is should only change if component
 	 * list includes DEFAULT members which will be ignored.
 	 * @param structure structure whose members are to be aligned/packed.
-	 * @param components structure components (excludes any trailing flexible array).
+	 * @param components structure components.
 	 * @return aligned packing result
 	 */
-	public static StructurePackResult packComponents(Structure structure,
+	public static StructurePackResult packComponents(StructureInternal structure,
 			List<? extends InternalDataTypeComponent> components) {
 		AlignedStructurePacker packer = new AlignedStructurePacker(structure, components);
 		return packer.pack();

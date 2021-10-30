@@ -16,15 +16,9 @@
 package ghidra.service.graph;
 
 import java.util.*;
-import java.util.Map.Entry;
-
-import org.apache.commons.text.StringEscapeUtils;
 
 public class Attributed {
-	/**
-	 * cache of the html rendering of the vertex attributes
-	 */
-	private String htmlString;
+	private static final String DESCRIPTION = "Description";
 
 	/**
 	 * the {@link HashMap} to contain attribute mappings
@@ -36,7 +30,7 @@ public class Attributed {
 	 * @return an unmodifiable view of the attribute map
 	 */
 
-	public Map<String, String> getAttributeMap() {
+	public Map<String, String> getAttributes() {
 		return Collections.unmodifiableMap(attributes);
 	}
 
@@ -48,7 +42,6 @@ public class Attributed {
 	 * @return the previous value of the attribute
 	 */
 	public String setAttribute(String key, String value) {
-		htmlString = null;
 		return attributes.put(key, value);
 	}
 
@@ -84,7 +77,7 @@ public class Attributed {
 
 	/**
 	 * Returns the number of attributes defined
-	 * 
+	 *
 	 * @return the number of attributes defined
 	 */
 	public int size() {
@@ -144,29 +137,23 @@ public class Attributed {
 	}
 
 	/**
-	 * parse (one time) then cache the attributes to html
-	 * @return the html string
+	 * Sets a description for this Attributed object
+	 *
+	 * @param value text that provides a description for this Attributed object. 
+	 * The text can be either a plain string or an HTML string.
+	 * @return the previously set description
 	 */
-	public String getHtmlString() {
+	public String setDescription(String value) {
+		return attributes.put(DESCRIPTION, value);
+	}
 
-		if (htmlString != null) {
-			return htmlString;
-		}
-
-		Set<Entry<String, String>> entries = entrySet();
-		if (entries.isEmpty()) {
-			return ""; // empty so tooltip clients can handle empty data
-		}
-
-		StringBuilder buf = new StringBuilder("<html>");
-		for (Map.Entry<String, String> entry : entries) {
-			buf.append(entry.getKey());
-			buf.append(":");
-			buf.append(StringEscapeUtils.escapeHtml4(entry.getValue()));
-			buf.append("<br>");
-		}
-		htmlString = buf.toString();
-		return htmlString;
+	/**
+	 * gets the description of this Attributed object.
+	 *
+	 * @return the description of this Attributed object.
+	 */
+	public String getDescription() {
+		return getAttribute(DESCRIPTION);
 	}
 
 }

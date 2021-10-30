@@ -51,19 +51,9 @@ public abstract class DynamicDataType extends BuiltIn implements Dynamic {
 	}
 
 	/**
-	 * @see ghidra.program.model.data.DataType#isDynamicallySized()
-	 */
-	@Override
-	public boolean isDynamicallySized() {
-		return true;
-	}
-
-	/**
 	 * Gets the number of component data types in this data type.
-	 * @param buf a membuffer to be used by dataTypes that change depending on
-	 * their data context.  A null value is acceptable to indicate that a memory
-	 * context is not available.  DataTypes that need a context will return -1
-	 * if the context is null.
+	 * @param buf a memory buffer to be used by dataTypes that change depending on
+	 * their data context. 
 	 * @return the number of components that make up this data prototype
 	 *   - if this is an Array, return the number of elements in the array.
 	 *   - if this datatype is a subcomponent of another datatype and it
@@ -71,10 +61,10 @@ public abstract class DynamicDataType extends BuiltIn implements Dynamic {
 	 */
 	public final int getNumComponents(MemBuffer buf) {
 		DataTypeComponent[] comps = getComps(buf);
-		if (comps != null) {
-			return comps.length;
+		if (comps == null || comps.length == 0) {
+			return -1;
 		}
-		return -1;
+		return comps.length;
 	}
 
 	protected DataTypeComponent[] getComps(MemBuffer buf) {
@@ -93,60 +83,59 @@ public abstract class DynamicDataType extends BuiltIn implements Dynamic {
 
 	/**
 	 * Returns the immediate n'th component of this data type.
-	 * @param index the components index (zero based).
-	 * @param buf a membuffer to be used by dataTypes that change depending on
-	 * their data context.  A null value is acceptable to indicate that a memory
-	 * context is not available.  DataTypes that need a context will return -1
-	 * if the context is null.
+	 * @param ordinal the components ordinal (zero based).
+	 * @param buf a memory buffer to be used by dataTypes that change depending on
+	 * their data context.
 	 * @return the component data type or null if there is no component at the 
 	 * indicated index.
+	 * @throws ArrayIndexOutOfBoundsException if index is out of bounds
 	 */
-	public final DataTypeComponent getComponent(int index, MemBuffer buf) {
+	public final DataTypeComponent getComponent(int ordinal, MemBuffer buf) {
 		DataTypeComponent[] comps = getComps(buf);
 		if (comps != null) {
-			return comps[index];
+			return comps[ordinal];
 		}
 		return null;
 	}
 
 	/**
-	 * Returns an array of DataTypes that make up this data type.
+	 * Returns an array of components that make up this data type.
 	 * Could return null if there are no subcomponents.
-	 * If this is an Array, then only one element will be returned
-	 * which is the Data Prototype for the elements in the array.
-	 * Will return null if this is a subcomponent that doesn't fit in it's
-	 * alloted space.
-	 * @param buf a membuffer to be used by dataTypes that change depending on
-	 * their data context.  A null value is acceptable to indicate that a memory
-	 * context is not available.  DataTypes that need a context will return -1
-	 * if the context is null.
+	 * @param buf a memory buffer to be used by dataTypes that change depending on
+	 * their data context.
+	 * @return datatype component array or null.
 	 */
 	public final DataTypeComponent[] getComponents(MemBuffer buf) {
 		return getComps(buf);
 	}
 
 	/**
-	 * Returns the component containing the byte at the given offset
+	 * Returns the first component containing the byte at the given offset.
+	 * It is possible with zero-length components (see {@link DataTypeComponent#isZeroLength()})
+	 * and bitfields (see @DataTypeComponent#isBitFieldComponent()} for multiple components
+	 * to share the same offset.
 	 * @param offset the offset into the dataType
-	 * @param buf the memoryBuffer containing the bytes.
-	 * @return the component containing the byte at the given offset
+	 * @param buf the memory buffer containing the bytes.
+	 * @return the first component containing the byte at the given offset or null if no
+	 * component defined.  A zero-length component may be returned.
 	 */
 	public final DataTypeComponent getComponentAt(int offset, MemBuffer buf) {
+		// TODO: This interface should be consistent with Structure
 		DataTypeComponent[] comps = getComps(buf);
 		if (comps == null) {
 			return null;
 		}
-		for (int i = 0; i < comps.length; i++) {
-			if (comps[i].getOffset() > offset) {
-				return comps[i - 1];
+		// TODO: could use binary search similar to StructureDataType
+		for (DataTypeComponent comp : comps) {
+			if (comp == null) {
+				continue;
+			}
+			if (offset >= comp.getOffset() &&
+				offset <= comp.getEndOffset()) {
+				return comp;
 			}
 		}
-		int index = comps.length - 1;
-		if (index < 0) {
-			return null;
-		}
-		return comps[index];
-
+		return null;
 	}
 
 	/**
@@ -164,10 +153,11 @@ public abstract class DynamicDataType extends BuiltIn implements Dynamic {
 			return -1;
 		}
 		DataTypeComponent last = comps[comps.length - 1];
-		if (last == null) {
-			return -1;
-		}
-		return last.getOffset() + last.getLength();
+		int lastComponentLength = last.getLength();
+		return last.getOffset() + lastComponentLength;
+		// NOTE: any trailing alignment padding must be represented with
+		// undefined components to achieve the correct length.  It may be 
+		// best to do this for all padding within the component structure.
 	}
 
 	@Override
@@ -183,4 +173,5 @@ public abstract class DynamicDataType extends BuiltIn implements Dynamic {
 	public DataType getReplacementBaseType() {
 		return ByteDataType.dataType;
 	}
+
 }

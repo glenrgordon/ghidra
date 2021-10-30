@@ -71,6 +71,7 @@ void EmitXml::endBlock(int4 id) {
 
 /// Tell the emitter that a new line is desired at the current indent level
 void EmitXml::tagLine(void) {
+  emitPending();
   *s << "<break " << highlight[(int4)no_color] << " indent=\"0x" << hex <<
     indentlevel << "\"/>";
 }
@@ -79,6 +80,7 @@ void EmitXml::tagLine(void) {
 /// is overridden only for the line, then it returns to its previous value.
 /// \param indent is the desired indent level for the new line
 void EmitXml::tagLine(int4 indent) {
+  emitPending();
   *s << "<break " << highlight[(int4)no_color] << " indent=\"0x" << hex <<
     indent << "\"/>";
 }
@@ -259,8 +261,9 @@ void EmitXml::tagField(const char *ptr,syntax_highlight hl,const Datatype *ct,in
 void EmitXml::tagComment(const char *ptr,syntax_highlight hl,
 			   const AddrSpace *spc,uintb off) {
   *s << "<comment " << highlight[(int4)hl];
-  *s << " space=\"" << spc->getName();
-  *s << "\" off=\"0x" << hex << off << "\">";
+  a_v(*s,"space",spc->getName());
+  a_v_u(*s,"off",off);
+  *s << '>';
   xml_escape(*s,ptr);
   *s << "</comment>";
 }
@@ -276,8 +279,9 @@ void EmitXml::tagComment(const char *ptr,syntax_highlight hl,
 void EmitXml::tagLabel(const char *ptr,syntax_highlight hl,
 			 const AddrSpace *spc,uintb off) {
   *s << "<label " << highlight[(int4)hl];
-  *s << " space=\"" << spc->getName();
-  *s << "\" off=\"0x" << hex << off << "\">";
+  a_v(*s,"space",spc->getName());
+  a_v_u(*s,"off",off);
+  *s << '>';
   xml_escape(*s,ptr);
   *s << "</label>";
 }
@@ -595,11 +599,21 @@ void EmitPrettyPrint::overflow(void)
     else
       break;
   }
+  int4 newspaceremain;
   if (!indentstack.empty())
-    spaceremain = indentstack.back();
+    newspaceremain = indentstack.back();
   else
-    spaceremain = maxlinesize;
+    newspaceremain = maxlinesize;
+  if (newspaceremain == spaceremain)
+    return;		// Line breaking doesn't give us any additional space
+  if (commentmode && (newspaceremain == spaceremain + commentfill.size()))
+    return;		// Line breaking doesn't give us any additional space
+  spaceremain = newspaceremain;
   lowlevel->tagLine(maxlinesize-spaceremain);
+  if (commentmode &&(commentfill.size() != 0)) {
+    lowlevel->print(commentfill.c_str(),EmitXml::comment_color);
+    spaceremain -= commentfill.size();
+  }
 }
 
 /// Content and markup is sent to the low-level emitter if appropriate. The
@@ -911,6 +925,7 @@ void EmitPrettyPrint::endBlock(int4 id)
 void EmitPrettyPrint::tagLine(void)
 
 {
+  emitPending();
   checkbreak();
   TokenSplit &tok( tokqueue.push() );
   tok.tagLine();
@@ -920,6 +935,7 @@ void EmitPrettyPrint::tagLine(void)
 void EmitPrettyPrint::tagLine(int4 indent)
 
 {
+  emitPending();
   checkbreak();
   TokenSplit &tok( tokqueue.push() );
   tok.tagLine(indent);

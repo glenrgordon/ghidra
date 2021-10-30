@@ -15,9 +15,17 @@
  */
 package ghidra.graph.viewer.options;
 
+import java.awt.Color;
+
 import docking.DockingUtils;
+import ghidra.framework.options.Options;
+import ghidra.util.HelpLocation;
 
 public class VisualGraphOptions {
+
+	public static final String GRAPH_BACKGROUND_COLOR_KEY = "Graph Background Color";
+	public static final String GRAPH_BACKGROUND_COLOR_DESCRPTION =
+		"The graph display background color";
 
 	public static final String SHOW_ANIMATION_OPTIONS_KEY = "Use Animation";
 	public static final String SHOW_ANIMATION_DESCRIPTION = "Signals to the Function Graph to " +
@@ -48,6 +56,9 @@ public class VisualGraphOptions {
 		"new graphs and already rendered graphs are zoomed and positioned.  See the help for " +
 		"more details.";
 
+	public static final Color DEFAULT_GRAPH_BACKGROUND_COLOR = Color.WHITE;
+	protected Color graphBackgroundColor = DEFAULT_GRAPH_BACKGROUND_COLOR;
+
 	protected boolean useAnimation = true;
 	protected boolean scrollWheelPans = false;
 
@@ -58,6 +69,10 @@ public class VisualGraphOptions {
 	protected boolean useCondensedLayout = true;
 
 	protected ViewRestoreOption viewRestoreOption = ViewRestoreOption.START_FULLY_ZOOMED_OUT;
+
+	public Color getGraphBackgroundColor() {
+		return graphBackgroundColor;
+	}
 
 	public boolean getScrollWheelPans() {
 		return scrollWheelPans;
@@ -83,4 +98,44 @@ public class VisualGraphOptions {
 		return useCondensedLayout;
 	}
 
+	public void registerOptions(Options options, HelpLocation help) {
+
+		options.setOptionsHelpLocation(help);
+
+		options.registerOption(SHOW_ANIMATION_OPTIONS_KEY, useAnimation(), help,
+			SHOW_ANIMATION_DESCRIPTION);
+
+		options.registerOption(USE_MOUSE_RELATIVE_ZOOM_KEY, useMouseRelativeZoom(), help,
+			USE_MOUSE_RELATIVE_ZOOM_DESCRIPTION);
+
+		options.registerOption(USE_CONDENSED_LAYOUT_KEY, useCondensedLayout(), help,
+			USE_CONDENSED_LAYOUT_DESCRIPTION);
+
+		options.registerOption(VIEW_RESTORE_OPTIONS_KEY, ViewRestoreOption.START_FULLY_ZOOMED_OUT,
+			help, VIEW_RESTORE_OPTIONS_DESCRIPTION);
+
+		options.registerOption(SCROLL_WHEEL_PANS_KEY, getScrollWheelPans(), help,
+			SCROLL_WHEEL_PANS_DESCRIPTION);
+
+		options.registerOption(GRAPH_BACKGROUND_COLOR_KEY, DEFAULT_GRAPH_BACKGROUND_COLOR, help,
+			GRAPH_BACKGROUND_COLOR_DESCRPTION);
+	}
+
+	public void loadOptions(Options options) {
+
+		useAnimation = options.getBoolean(SHOW_ANIMATION_OPTIONS_KEY, useAnimation);
+
+		useMouseRelativeZoom =
+			options.getBoolean(USE_MOUSE_RELATIVE_ZOOM_KEY, useMouseRelativeZoom);
+
+		useCondensedLayout = options.getBoolean(USE_CONDENSED_LAYOUT_KEY, useCondensedLayout);
+
+		viewRestoreOption =
+			options.getEnum(VIEW_RESTORE_OPTIONS_KEY, ViewRestoreOption.START_FULLY_ZOOMED_OUT);
+
+		scrollWheelPans = options.getBoolean(SCROLL_WHEEL_PANS_KEY, scrollWheelPans);
+
+		graphBackgroundColor =
+			options.getColor(GRAPH_BACKGROUND_COLOR_KEY, DEFAULT_GRAPH_BACKGROUND_COLOR);
+	}
 }

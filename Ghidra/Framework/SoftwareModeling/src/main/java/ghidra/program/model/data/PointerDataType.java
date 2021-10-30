@@ -31,8 +31,6 @@ import ghidra.util.DataConverter;
  */
 public class PointerDataType extends BuiltIn implements Pointer {
 
-	private final static long serialVersionUID = 1;
-
 	public final static PointerDataType dataType = new PointerDataType();
 
 	public final static int MAX_POINTER_SIZE_BYTES = 8;
@@ -156,7 +154,7 @@ public class PointerDataType extends BuiltIn implements Pointer {
 	}
 
 	@Override
-	public boolean isDynamicallySized() {
+	public boolean hasLanguageDependantLength() {
 		return length <= 0;
 	}
 
@@ -403,11 +401,12 @@ public class PointerDataType extends BuiltIn implements Pointer {
 		try {
 			switch (dataLen) {
 				case 2: // near pointer
-					offset = (int) buf.getVarLengthUnsignedInt(0, dataLen);
+					offset = buf.getUnsignedShort(0);
 					break;
 				case 4: // far pointer
-					segment = buf.getUnsignedShort(0);
-					offset = buf.getUnsignedShort(2);
+					long value = buf.getUnsignedInt(0);
+					segment = (int) (value >> 16);
+					offset = (int) (value & 0xffff);
 					break;
 				default:
 					return null;
@@ -459,10 +458,10 @@ public class PointerDataType extends BuiltIn implements Pointer {
 
 		Pointer p = (Pointer) dt;
 		DataType otherDataType = p.getDataType();
-		if (isDynamicallySized() != p.isDynamicallySized()) {
+		if (hasLanguageDependantLength() != p.hasLanguageDependantLength()) {
 			return false;
 		}
-		if (!isDynamicallySized() && (getLength() != p.getLength())) {
+		if (!hasLanguageDependantLength() && (getLength() != p.getLength())) {
 			return false;
 		}
 		if (referencedDataType == null) {

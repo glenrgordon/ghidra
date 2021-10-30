@@ -25,6 +25,7 @@ import ghidra.program.model.mem.MemBuffer;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.SymbolUtilities;
 import ghidra.util.InvalidNameException;
+import ghidra.util.SystemUtilities;
 import ghidra.util.exception.AssertException;
 import ghidra.util.exception.InvalidInputException;
 
@@ -68,8 +69,7 @@ public class StackFrameDataType extends BiDirectionDataType {
 		this.returnAddressOffset = stackDt.returnAddressOffset;
 		this.stack = stackDt.stack;
 		this.defaultSettings = stackDt.defaultSettings;
-		for (int i = 0; i < stackDt.components.size(); i++) {
-			DataTypeComponent dtc = stackDt.components.get(i);
+		for (DataTypeComponentImpl dtc : stackDt.components) {
 			replaceAtOffset(dtc.getOffset(), dtc.getDataType(), dtc.getLength(), dtc.getFieldName(),
 				dtc.getComment());
 		}
@@ -216,7 +216,7 @@ public class StackFrameDataType extends BiDirectionDataType {
 	 * @see ghidra.program.model.listing.StackFrame#getFrameSize()
 	 */
 	public int getFrameSize() {
-		return structLength;
+		return getLength();
 	}
 
 	/* (non-Javadoc)
@@ -261,8 +261,9 @@ public class StackFrameDataType extends BiDirectionDataType {
 	}
 
 	private boolean adjustStackFrameSize(int newSize, int oldSize, boolean isNegative) {
-		if (newSize < 0)
+		if (newSize < 0) {
 			return false;
+		}
 
 		int delta = newSize - oldSize;
 		if (delta == 0) {
@@ -410,22 +411,22 @@ public class StackFrameDataType extends BiDirectionDataType {
 	 * 
 	 * @param ordinal the ordinal
 	 * @param name the new name. Null indicates the default name.
+	 * @return true if name change was successful, else false
 	 */
 	public boolean setName(int ordinal, String name) {
 		validateName(ordinal, name);
 		DataTypeComponent comp = getComponent(ordinal);
 		String fieldName = comp.getFieldName();
-		if ((name != null) && ((name.length() == 0) || (isDefaultName(name)))) {
-			name = null;
-		}
-		if (name == null) {
-			if (fieldName == null) {
-				return false;
+		if (name != null) {
+			name = name.trim();
+			if (name.length() == 0 || isDefaultName(name)) {
+				name = null;
 			}
 		}
-		else if (name.equals(fieldName)) {
+		if (SystemUtilities.isEqual(name, fieldName)) {
 			return false;
 		}
+
 		DataType dt = comp.getDataType();
 		int length = comp.getLength();
 		String comment = comp.getComment();

@@ -16,6 +16,7 @@
 package ghidra.app.util.html;
 
 import java.awt.Color;
+import java.util.Objects;
 
 import ghidra.program.model.data.DataType;
 import ghidra.util.StringUtilities;
@@ -28,7 +29,6 @@ public class DataTypeLine implements ValidatableLine {
 	private String name;
 	private String comment;
 	private DataType dataType;
-	private boolean isFlexibleArray;
 
 	private Color typeColor;
 	private Color nameColor;
@@ -36,33 +36,20 @@ public class DataTypeLine implements ValidatableLine {
 
 	private ValidatableLine validationLine;
 
-	DataTypeLine(String name, String type, String comment, DataType dt, boolean isFlexibleArray) {
+	DataTypeLine(String name, String type, String comment, DataType dt) {
 		this.dataType = dt;
-		this.isFlexibleArray = isFlexibleArray;
 		if (name == null) {
 			name = "";
 		}
 
-		if (type == null) {
-			throw new NullPointerException("Type of data type cannot be null");
-		}
-
 		this.name = name;
-		this.type = type;
+		this.type = Objects.requireNonNull(type, "Type of data type cannot be null");
 		this.comment = comment == null ? "" : comment;
-	}
-
-	/**
-	 * Determine if data type should be treated as flexible array
-	 * @return true if data type should be treated as flexible array
-	 */
-	public boolean isFlexibleArray() {
-		return isFlexibleArray;
 	}
 
 	@Override
 	public ValidatableLine copy() {
-		return new DataTypeLine(name, type, comment, dataType, isFlexibleArray);
+		return new DataTypeLine(name, type, comment, dataType);
 	}
 
 	@Override

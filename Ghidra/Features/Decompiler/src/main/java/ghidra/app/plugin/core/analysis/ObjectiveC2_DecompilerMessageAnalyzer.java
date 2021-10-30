@@ -500,7 +500,13 @@ public class ObjectiveC2_DecompilerMessageAnalyzer extends AbstractAnalyzer {
 			}
 			else if (dataValue instanceof Address) {
 				offset = ((Address) dataValue).getOffset();
-				name = getNameFromOffset(program, offset, input, isClass, isMethod);
+				if (offset == address.getOffset()) {
+					// Self-referencing pointer
+					name = null;
+				}
+				else {
+					name = getNameFromOffset(program, offset, input, isClass, isMethod);
+				}
 			}
 			else {
 				name = getClassName(program, address);
@@ -665,23 +671,18 @@ public class ObjectiveC2_DecompilerMessageAnalyzer extends AbstractAnalyzer {
 	}
 
 	private String getLabelFromUndefinedData(Program program, Address address) {
-		Symbol[] symbols = program.getSymbolTable().getSymbols(address);
-		if (symbols.length == 0) {
+		Symbol primary = program.getSymbolTable().getPrimarySymbol(address);
+		if (primary == null) {
 			return null;
 		}
-		for (Symbol symbol : symbols) {
-			if (symbol.isPrimary()) {
-				String symbolName = symbol.getName();
-				if (symbolName.contains("_OBJC_CLASS_$_")) {
-					symbolName = symbolName.substring("_OBJC_CLASS_$_".length());
-				}
-				else if (symbolName.contains("_objc_msgSend")) {
-					return null;
-				}
-				return symbolName;
-			}
+		String symbolName = primary.getName();
+		if (symbolName.contains("_OBJC_CLASS_$_")) {
+			symbolName = symbolName.substring("_OBJC_CLASS_$_".length());
 		}
-		return null;
+		else if (symbolName.contains("_objc_msgSend")) {
+			return null;
+		}
+		return symbolName;
 	}
 
 	private String getClassName(Program program, Address toAddress) {

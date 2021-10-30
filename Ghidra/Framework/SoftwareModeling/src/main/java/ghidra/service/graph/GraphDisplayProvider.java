@@ -41,8 +41,8 @@ public interface GraphDisplayProvider extends ExtensionPoint {
 	 * @return A GraphDisplay that can be used to display (or otherwise consume - e.g. export) the graph
 	 * @throws GraphException thrown if there is a problem creating a GraphDisplay
 	 */
-	public GraphDisplay getGraphDisplay(boolean reuseGraph,
-			TaskMonitor monitor) throws GraphException;
+	public GraphDisplay getGraphDisplay(boolean reuseGraph,	TaskMonitor monitor) throws GraphException;
+
 
 	/**
 	 * Provides an opportunity for this provider to register and read tool options

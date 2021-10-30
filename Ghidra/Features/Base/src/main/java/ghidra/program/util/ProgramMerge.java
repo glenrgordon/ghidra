@@ -474,14 +474,14 @@ public class ProgramMerge implements PropertyVisitor {
 			Address max = range.getMaxAddress();
 			Instruction instr = listing.getInstructionContaining(min);
 			if (instr != null) {
-				instructionSet.add(
-					new AddressRangeImpl(instr.getMinAddress(), instr.getMaxAddress()));
+				instructionSet
+						.add(new AddressRangeImpl(instr.getMinAddress(), instr.getMaxAddress()));
 			}
 			InstructionIterator instIter = listing.getInstructions(new AddressSet(min, max), true);
 			while (instIter.hasNext()) {
 				instr = instIter.next();
-				instructionSet.add(
-					new AddressRangeImpl(instr.getMinAddress(), instr.getMaxAddress()));
+				instructionSet
+						.add(new AddressRangeImpl(instr.getMinAddress(), instr.getMaxAddress()));
 			}
 		}
 		return instructionSet;
@@ -563,8 +563,8 @@ public class ProgramMerge implements PropertyVisitor {
 					resultRange.getMaxAddress(), false);
 
 				try {
-					if (resultContextReg != null) {
-						if (originContextReg != null) {
+					if (resultContextReg != Register.NO_CONTEXT) {
+						if (originContextReg != Register.NO_CONTEXT) {
 							// Copy context register value
 							mergeProgramContext(resultContext, originContext,
 								originContext.getBaseContextRegister(), newOriginRange, resultRange,
@@ -759,15 +759,16 @@ public class ProgramMerge implements PropertyVisitor {
 		DisassemblerContextImpl context = new DisassemblerContextImpl(program.getProgramContext());
 		context.flowStart(addr);
 		try {
-			InstructionPrototype proto = program.getLanguage().parse(
-				new DumbMemBufferImpl(program.getMemory(), addr), context, false);
+			InstructionPrototype proto = program.getLanguage()
+					.parse(new DumbMemBufferImpl(program.getMemory(), addr), context, false);
 			return resultListing.createInstruction(addr, proto,
 				new DumbMemBufferImpl(program.getMemory(), addr),
 				new ProgramProcessorContext(program.getProgramContext(), addr));
 		}
 		catch (Exception e) {
-			program.getBookmarkManager().setBookmark(addr, BookmarkType.ERROR,
-				Disassembler.ERROR_BOOKMARK_CATEGORY, "Diff/Merge applied bad instruction");
+			program.getBookmarkManager()
+					.setBookmark(addr, BookmarkType.ERROR, Disassembler.ERROR_BOOKMARK_CATEGORY,
+						"Diff/Merge applied bad instruction");
 		}
 		return null;
 	}
@@ -1251,8 +1252,8 @@ public class ProgramMerge implements PropertyVisitor {
 		}
 		ReferenceManager resultRM = resultProgram.getReferenceManager();
 		Reference[] resultRefs = resultRM.getReferencesFrom(resultCu.getMinAddress(), opIndex);
-		Reference[] originRefs = originProgram.getReferenceManager().getReferencesFrom(
-			originCu.getMinAddress(), opIndex);
+		Reference[] originRefs = originProgram.getReferenceManager()
+				.getReferencesFrom(originCu.getMinAddress(), opIndex);
 		HashMap<Reference, Reference> resultsToKeep = new HashMap<>(); // key=OriginRef, value=ResultRef
 		// Determine the result references to keep that match the origin references.
 		for (Reference originRef : originRefs) {
@@ -2836,7 +2837,9 @@ public class ProgramMerge implements PropertyVisitor {
 			return resultFunction;
 		}
 
+		boolean isDefaultThunk = false;
 		if (originFunction.isThunk()) {
+			isDefaultThunk = originFunction.getSymbol().getSource() == SourceType.DEFAULT;
 			Function thunkedFunction = originFunction.getThunkedFunction(false);
 			Address thunkedEntryPoint = thunkedFunction.getEntryPoint();
 			Address resultThunkedEntryPoint =
@@ -2869,15 +2872,17 @@ public class ProgramMerge implements PropertyVisitor {
 //        VariableReference[] restoreRefs = new VariableReference[0];
 		String originName = originFunction.getName();
 		Namespace desiredToNamespace = resultProgram.getGlobalNamespace();
-		try {
-			desiredToNamespace = symbolMerge.resolveNamespace(originFunction.getParentNamespace(),
-				conflictSymbolIDMap);
-		}
-		catch (DuplicateNameException e1) {
-			Msg.error(this, "Unexpected Exception: " + e1.getMessage(), e1);
-		}
-		catch (InvalidInputException e1) {
-			Msg.error(this, "Unexpected Exception: " + e1.getMessage(), e1);
+		if (!isDefaultThunk) {
+			try {
+				desiredToNamespace = symbolMerge
+						.resolveNamespace(originFunction.getParentNamespace(), conflictSymbolIDMap);
+			}
+			catch (DuplicateNameException e1) {
+				Msg.error(this, "Unexpected Exception: " + e1.getMessage(), e1);
+			}
+			catch (InvalidInputException e1) {
+				Msg.error(this, "Unexpected Exception: " + e1.getMessage(), e1);
+			}
 		}
 
 		AddressSetView oldResultBody = (resultFunction == null) ? null : resultFunction.getBody();

@@ -357,12 +357,13 @@ public class SymbolicPropogator {
 		Address destination;
 		boolean continueAfterHittingFlow;
 
-		public SavedFlowState(Address source, Address destination,
+		public SavedFlowState(VarnodeContext vContext, Address source, Address destination,
 				boolean continueAfterHittingFlow) {
 			super();
 			this.source = source;
 			this.destination = destination;
 			this.continueAfterHittingFlow = continueAfterHittingFlow;
+			vContext.pushMemState();
 		}
 
 		public Address getSource() {
@@ -375,6 +376,10 @@ public class SymbolicPropogator {
 
 		public boolean isContinueAfterHittingFlow() {
 			return continueAfterHittingFlow;
+		}
+
+		public void restoreState(VarnodeContext vContext) {
+			vContext.popMemState();
 		}
 	}
 
@@ -401,12 +406,13 @@ public class SymbolicPropogator {
 
 		// prime the context stack with the entry point address
 		Stack<SavedFlowState> contextStack = new Stack<>();
-		contextStack.push(new SavedFlowState(fromAddr, startAddr, true));
+		contextStack.push(new SavedFlowState(vContext, fromAddr, startAddr, true));
 		canceled = false;
 
 		// only stop flowing on unknown bad calls when the stack depth could be unknown
-		boolean callCouldCauseBadStackDepth =
-			program.getCompilerSpec().getDefaultCallingConvention().getExtrapop() == PrototypeModel.UNKNOWN_EXTRAPOP;
+		boolean callCouldCauseBadStackDepth = program.getCompilerSpec()
+				.getDefaultCallingConvention()
+				.getExtrapop() == PrototypeModel.UNKNOWN_EXTRAPOP;
 
 		while (!contextStack.isEmpty()) {
 			monitor.checkCanceled();
@@ -423,6 +429,7 @@ public class SymbolicPropogator {
 			Address nextAddr = nextFlow.getDestination();
 			Address flowFromAddr = nextFlow.getSource();
 			boolean continueAfterHittingFlow = nextFlow.isContinueAfterHittingFlow();
+			nextFlow.restoreState(vContext);
 
 			// already done it!
 			if (body.contains(nextAddr)) {
@@ -537,8 +544,8 @@ public class SymbolicPropogator {
 						}
 						if (!instrFlow.isCall()) {
 							for (Address flow : flows) {
-								contextStack.push(new SavedFlowState(instr.getMinAddress(), flow,
-									continueAfterHittingFlow));
+								contextStack.push(new SavedFlowState(vContext,
+									instr.getMinAddress(), flow, continueAfterHittingFlow));
 							}
 						}
 						else if (flows.length > 1) {
@@ -547,8 +554,9 @@ public class SymbolicPropogator {
 							for (Reference flowRef : flowRefs) {
 								RefType referenceType = flowRef.getReferenceType();
 								if (referenceType.isComputed() && referenceType.isJump()) {
-									contextStack.push(new SavedFlowState(instr.getMinAddress(),
-										flowRef.getToAddress(), continueAfterHittingFlow));
+									contextStack.push(
+										new SavedFlowState(vContext, instr.getMinAddress(),
+											flowRef.getToAddress(), continueAfterHittingFlow));
 								}
 							}
 						}
@@ -583,7 +591,7 @@ public class SymbolicPropogator {
 				Address fallThru = instr.getFallThrough();
 				nextAddr = null;
 				if (retAddr != null) {
-					contextStack.push(new SavedFlowState(instr.getMinAddress(), retAddr,
+					contextStack.push(new SavedFlowState(vContext, instr.getMinAddress(), retAddr,
 						continueAfterHittingFlow));
 					fallThru = null;
 				}
@@ -591,14 +599,14 @@ public class SymbolicPropogator {
 				if (fallThru != null) {
 					if (doFallThruLast) {
 						// put it lowest on the stack to do later!
-						contextStack.add(0, new SavedFlowState(instr.getMinAddress(), fallThru,
-							!callCouldCauseBadStackDepth));
+						contextStack.push(new SavedFlowState(vContext, instr.getMinAddress(),
+							fallThru, !callCouldCauseBadStackDepth));
 					}
 					else if (fallThru.compareTo(maxAddr) < 0) {
 						// this isn't a normal fallthru, must break it up
 						//   don't continue flowing if something else is hit, this is an odd case
-						contextStack.add(0,
-							new SavedFlowState(instr.getMinAddress(), fallThru, false));
+						contextStack.push(
+							new SavedFlowState(vContext, instr.getMinAddress(), fallThru, false));
 					}
 					else {
 						nextAddr = fallThru;
@@ -834,8 +842,8 @@ public class SymbolicPropogator {
 						try {
 							val1 = vContext.getValue(in[0], evaluator);
 							lval1 = vContext.getConstant(val1, evaluator);
-							vt = vContext.getVarnode(
-								minInstrAddress.getAddressSpace().getSpaceID(), lval1, 0);
+							vt = vContext.getVarnode(minInstrAddress.getAddressSpace().getSpaceID(),
+								lval1, 0);
 							makeReference(vContext, instruction, ptype, -1, vt,
 								instruction.getFlowType(), monitor);
 						}
@@ -873,8 +881,8 @@ public class SymbolicPropogator {
 
 								if (val1.isConstant()) {
 									// indirect target - assume single code space (same as instruction)
-									target = instruction.getAddress().getNewTruncatedAddress(
-										val1.getOffset(), true);
+									target = instruction.getAddress()
+											.getNewTruncatedAddress(val1.getOffset(), true);
 								}
 								else if (val1.isAddress()) {
 									// TODO: could this also occur if a memory location was copied ??
@@ -957,8 +965,8 @@ public class SymbolicPropogator {
 					case PcodeOp.CALLOTHER:
 						// HACK ALERT!
 						// if this is a segment op, emulate the segmenting for now.
-						String opName = this.program.getLanguage().getUserDefinedOpName(
-							(int) in[0].getOffset());
+						String opName = this.program.getLanguage()
+								.getUserDefinedOpName((int) in[0].getOffset());
 						if (opName.equals("segment") && in.length > 2) {
 							checkSegmented(out, in[1], in[2], mustClearAll);
 						}
@@ -1074,8 +1082,8 @@ public class SymbolicPropogator {
 							}
 							else if (!evaluator.followFalseConditionalBranches()) {
 								// pcode addresses are raw addresses, make sure address is in same instruction space
-								nextAddr = minInstrAddress.getAddressSpace().getOverlayAddress(
-									in[0].getAddress());
+								nextAddr = minInstrAddress.getAddressSpace()
+										.getOverlayAddress(in[0].getAddress());
 								pcodeIndex = ops.length; // break out of the processing
 							}
 						}
@@ -1202,8 +1210,8 @@ public class SymbolicPropogator {
 					case PcodeOp.INT_RIGHT:
 						val1 = vContext.getValue(in[0], false, evaluator);
 						val2 = vContext.getValue(in[1], false, evaluator);
-						lresult = vContext.getConstant(val1,
-							evaluator) >> vContext.getConstant(val2, evaluator);
+						lresult = vContext.getConstant(val1, evaluator) >> vContext
+								.getConstant(val2, evaluator);
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1211,8 +1219,8 @@ public class SymbolicPropogator {
 					case PcodeOp.INT_SRIGHT:
 						val1 = vContext.getValue(in[0], true, evaluator);
 						val2 = vContext.getValue(in[1], false, evaluator);
-						lresult = vContext.getConstant(val1,
-							evaluator) >>> vContext.getConstant(val2, evaluator);
+						lresult = vContext.getConstant(val1, evaluator) >>> vContext
+								.getConstant(val2, evaluator);
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1315,8 +1323,8 @@ public class SymbolicPropogator {
 						val2 = vContext.getValue(in[1], true, evaluator);
 						lval1 = vContext.getConstant(val1, evaluator);
 						lval2 = vContext.getConstant(val2, evaluator);
-						lresult = (vContext.getConstant(val1,
-							evaluator) < vContext.getConstant(val2, evaluator)) ? 1 : 0;
+						lresult = (vContext.getConstant(val1, evaluator) < vContext
+								.getConstant(val2, evaluator)) ? 1 : 0;
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1334,8 +1342,8 @@ public class SymbolicPropogator {
 					case PcodeOp.INT_SLESSEQUAL:
 						val1 = vContext.getValue(in[0], true, evaluator);
 						val2 = vContext.getValue(in[1], true, evaluator);
-						lresult = (vContext.getConstant(val1,
-							evaluator) <= vContext.getConstant(val2, evaluator)) ? 1 : 0;
+						lresult = (vContext.getConstant(val1, evaluator) <= vContext
+								.getConstant(val2, evaluator)) ? 1 : 0;
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1344,8 +1352,8 @@ public class SymbolicPropogator {
 
 						val1 = vContext.getValue(in[0], false, evaluator);
 						val2 = vContext.getValue(in[1], false, evaluator);
-						lresult = (vContext.getConstant(val1,
-							evaluator) == vContext.getConstant(val2, evaluator)) ? 1 : 0;
+						lresult = (vContext.getConstant(val1, evaluator) == vContext
+								.getConstant(val2, evaluator)) ? 1 : 0;
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1353,8 +1361,8 @@ public class SymbolicPropogator {
 					case PcodeOp.INT_NOTEQUAL:
 						val1 = vContext.getValue(in[0], false, evaluator);
 						val2 = vContext.getValue(in[1], false, evaluator);
-						lresult = (vContext.getConstant(val1,
-							evaluator) != vContext.getConstant(val2, evaluator)) ? 1 : 0;
+						lresult = (vContext.getConstant(val1, evaluator) != vContext
+								.getConstant(val2, evaluator)) ? 1 : 0;
 						result = vContext.createConstantVarnode(lresult, val1.getSize());
 						vContext.putValue(out, result, mustClearAll);
 						break;
@@ -1571,7 +1579,7 @@ public class SymbolicPropogator {
 
 		PcodeInjectLibrary snippetLibrary = prog.getCompilerSpec().getPcodeInjectLibrary();
 		InjectPayload payload =
-			snippetLibrary.getPayload(InjectPayload.CALLFIXUP_TYPE, callFixupName, prog, null);
+			snippetLibrary.getPayload(InjectPayload.CALLFIXUP_TYPE, callFixupName);
 		if (payload == null) {
 			return null;
 		}
@@ -1598,7 +1606,7 @@ public class SymbolicPropogator {
 
 		PcodeInjectLibrary snippetLibrary = prog.getCompilerSpec().getPcodeInjectLibrary();
 		InjectPayload payload =
-			snippetLibrary.getPayload(InjectPayload.CALLMECHANISM_TYPE, injectionName, prog, null);
+			snippetLibrary.getPayload(InjectPayload.CALLMECHANISM_TYPE, injectionName);
 		if (payload == null) {
 			return null;
 		}
@@ -1762,7 +1770,7 @@ public class SymbolicPropogator {
 			signatureSource = func.getSignatureSource();
 		}
 
-		long callOffset = (callTarget == null ? 0 : callTarget.getOffset());
+		long callOffset = (callTarget == null ? -1 : callTarget.getOffset());
 
 		// If there are params defined or the params were specified (meaning it could be VOID params)
 		boolean signatureAssigned = signatureSource != SourceType.DEFAULT;
@@ -1843,14 +1851,14 @@ public class SymbolicPropogator {
 //					} else
 
 					if (!vContext.isStackSymbolicSpace(refLocation) && evaluator != null) {
-						Address constant = program.getAddressFactory().getAddress(
-							(int) targetSpaceID.getOffset(), offset);
+						Address constant = program.getAddressFactory()
+								.getAddress((int) targetSpaceID.getOffset(), offset);
 						Address newTarget = evaluator.evaluateConstant(vContext, instruction,
 							pcodeType, constant, 0, reftype);
 						if (newTarget != null) {
 							makeReference(vContext, instruction, Reference.MNEMONIC,
-								newTarget.getAddressSpace().getSpaceID(), newTarget.getOffset(),
-								0, reftype, pcodeType, false, monitor);
+								newTarget.getAddressSpace().getSpaceID(), newTarget.getOffset(), 0,
+								reftype, pcodeType, false, monitor);
 							return;
 						}
 					}

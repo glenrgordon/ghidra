@@ -42,29 +42,26 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 	 * 
 	 * @see ghidra.program.model.data.DataType#getMnemonic(Settings)
 	 */
+	@Override
 	public String getMnemonic(Settings settings) {
 		return name;
-	}
-
-	/**
-	 * @see ghidra.program.model.data.DataType#isDynamicallySized()
-	 */
-	public boolean isDynamicallySized() {
-		return false;
 	}
 
 	/**
 	 * 
 	 * @see ghidra.program.model.data.DataType#getDescription()
 	 */
+	@Override
 	public String getDescription() {
 		return "IEEE-754 Float";
 	}
 
 	/**
 	 * 
-	 * @see ghidra.program.model.data.DataType#getValue(ghidra.program.model.mem.MemBuffer, ghidra.docking.settings.Settings, int)
+	 * @see ghidra.program.model.data.DataType#getValue(ghidra.program.model.mem.MemBuffer,
+	 *      ghidra.docking.settings.Settings, int)
 	 */
+	@Override
 	public Object getValue(MemBuffer buf, Settings settings, int length) {
 		try {
 			int len = getLength(); // use type length (ignore length arg)
@@ -78,6 +75,7 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 				double doubleValue = floatFormat.getHostFloat(value);
 				switch (len) {
 					case 2:
+						// TODO: GP-1379
 						return (short) doubleValue;
 					case 4:
 						return (float) doubleValue;
@@ -85,8 +83,7 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 				return doubleValue;
 			}
 			BigInteger value = Utils.bytesToBigInteger(bytes, len, buf.isBigEndian(), false);
-			BigDecimal decValue = floatFormat.getHostFloat(value);
-			// TODO: adjust scale for improved display value ??
+			BigDecimal decValue = floatFormat.round(floatFormat.getHostFloat(value));
 			return decValue;
 		}
 		catch (UnsupportedFloatFormatException e) {
@@ -94,15 +91,82 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 		}
 	}
 
+	@Override
+	public boolean isEncodable() {
+		int length = getLength();
+		return length == 4 || length == 8;
+	}
+
+	@Override
+	public byte[] encodeValue(Object value, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		try {
+			int len = getLength();
+			if (length != -1 && length != len) {
+				throw new DataTypeEncodeException("Length mismatch", value, this);
+			}
+			FloatFormat floatFormat = FloatFormatFactory.getFloatFormat(len);
+			if (len == 8 || len == 4) {
+				if (!(value instanceof Number)) {
+					throw new DataTypeEncodeException(
+						"length-" + len + " float requires Number type", value, this);
+				}
+				double doubleValue = ((Number) value).doubleValue();
+				long encoding = floatFormat.getEncoding(doubleValue);
+				return Utils.longToBytes(encoding, len, buf.isBigEndian());
+			}
+			if (!(value instanceof BigFloat)) {
+				// TODO: BigFloat really ought to have a valueOf(double) method, or --
+				// TODO: -- or BigFloat really ought to have a valueOf(BigDecimal) method
+				throw new DataTypeEncodeException(
+					"non-standard float length requires BigFloat type", value, this);
+			}
+			BigInteger encoding = floatFormat.getEncoding((BigFloat) value);
+			return Utils.bigIntegerToBytes(encoding, len, buf.isBigEndian());
+		}
+		catch (DataTypeEncodeException e) {
+			throw e;
+		}
+		catch (Exception e) {
+			throw new DataTypeEncodeException(value, this, e);
+		}
+	}
+
 	/**
 	 * 
 	 * @see ghidra.program.model.data.DataType#getRepresentation(MemBuffer, Settings, int)
 	 */
+	@Override
 	public String getRepresentation(MemBuffer buf, Settings settings, int length) {
 		Object obj = getValue(buf, settings, length);
-		if (obj == null)
+		if (obj == null) {
 			return "??";
+		}
 		return obj.toString();
+	}
+
+	@Override
+	public byte[] encodeRepresentation(String repr, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		try {
+			int len = getLength();
+			if (length != -1 && length != len) {
+				throw new DataTypeEncodeException("Length mismatch", repr, this);
+			}
+			if (length == 8 || length == 4) {
+				double doubleValue = Double.parseDouble(repr);
+				return encodeValue(doubleValue, buf, settings, length);
+			}
+			// TODO: BigFloat ought to have a parse(String) method, or valueOf(BigDecimal)
+			throw new DataTypeEncodeException(
+				"Cannot yet parse values of non-standard float length", repr, this);
+		}
+		catch (DataTypeEncodeException e) {
+			throw e;
+		}
+		catch (Exception e) {
+			throw new DataTypeEncodeException(repr, this, e);
+		}
 	}
 
 	/**
@@ -120,7 +184,7 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 
 	@Override
 	public String getCTypeDeclaration(DataOrganization dataOrganization) {
-		return isDynamicallySized() ? null : name;
+		return hasLanguageDependantLength() ? null : name;
 	}
 
 	private static TreeMap<Integer, AbstractFloatDataType> floatTypes; // fixed-size float types
@@ -143,9 +207,10 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 
 	/**
 	 * Get a Float data-type instance of the requested size
+	 * 
 	 * @param size data type size, unsupported sizes will cause an undefined type to be returned.
-	 * @param dtm optional program data-type manager, if specified
-	 * a generic data-type will be returned if possible (i.e., float, double, long double).
+	 * @param dtm optional program data-type manager, if specified a generic data-type will be
+	 *            returned if possible (i.e., float, double, long double).
 	 * @return float data type of specified size
 	 */
 	public static DataType getFloatDataType(int size, DataTypeManager dtm) {
@@ -175,8 +240,9 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 
 	/**
 	 * Returns all built-in float data-types
-	 * @param dtm optional program data-type manager, if specified
-	 * generic data-types will be returned in place of fixed-sized data-types.
+	 * 
+	 * @param dtm optional program data-type manager, if specified generic data-types will be
+	 *            returned in place of fixed-sized data-types.
 	 */
 	public static AbstractFloatDataType[] getFloatDataTypes(DataTypeManager dtm) {
 		TreeMap<Integer, AbstractFloatDataType> floatMap = getFloatTypes();
@@ -197,7 +263,8 @@ public abstract class AbstractFloatDataType extends BuiltIn {
 				}
 				for (int size : floatMap.keySet()) {
 					if (!newFloatMap.containsKey(size)) {
-						newFloatMap.put(size, (AbstractFloatDataType) floatMap.get(size).clone(dtm));
+						newFloatMap.put(size,
+							(AbstractFloatDataType) floatMap.get(size).clone(dtm));
 					}
 				}
 			}

@@ -292,7 +292,7 @@ public class BytesFieldFactory extends FieldFactory {
 			return null; // e.g., union
 		}
 		Structure struct = (Structure) baseDataType;
-		if (!struct.isInternallyAligned()) {
+		if (!struct.isPackingEnabled()) {
 			return null;
 		}
 
@@ -427,11 +427,9 @@ public class BytesFieldFactory extends FieldFactory {
 
 		ListingTextField btf = (ListingTextField) bf;
 		RowColLocation rcl = btf.dataToScreenLocation(tokenIndex, tokenOffset);
-
 		if (hasSamePath(bf, loc)) {
 			return new FieldLocation(index, fieldNum, rcl.row(), rcl.col());
 		}
-
 		return null;
 	}
 

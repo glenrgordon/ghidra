@@ -155,7 +155,7 @@ public class FunctionManagerDB implements FunctionManager {
 			return name;
 		}
 		try {
-			Record record = callingConventionAdapter.getCallingConventionRecord(id);
+			DBRecord record = callingConventionAdapter.getCallingConventionRecord(id);
 			if (record == null) {
 				return null;
 			}
@@ -198,7 +198,7 @@ public class FunctionManagerDB implements FunctionManager {
 		if (callingConvention == null) {
 			throw new InvalidInputException("Invalid calling convention name: " + name);
 		}
-		Record record = callingConventionAdapter.getCallingConventionRecord(name);
+		DBRecord record = callingConventionAdapter.getCallingConventionRecord(name);
 		if (record == null) {
 			record = callingConventionAdapter.createCallingConventionRecord(name);
 		}
@@ -211,7 +211,7 @@ public class FunctionManagerDB implements FunctionManager {
 	@Override
 	public List<String> getCallingConventionNames() {
 		CompilerSpec compilerSpec = program.getCompilerSpec();
-		PrototypeModel[] namedCallingConventions = compilerSpec.getNamedCallingConventions();
+		PrototypeModel[] namedCallingConventions = compilerSpec.getCallingConventions();
 		List<String> names = new ArrayList<>(namedCallingConventions.length + 2);
 		names.add(Function.UNKNOWN_CALLING_CONVENTION_STRING);
 		names.add(Function.DEFAULT_CALLING_CONVENTION_STRING);
@@ -273,27 +273,27 @@ public class FunctionManagerDB implements FunctionManager {
 	 * Transform an existing external symbol into an external function.
 	 * This method should only be invoked by an ExternalSymbol
 	 * @param extSpaceAddr the external space address to use when creating this external.
-	 * @param name
-	 * @param nameSpace
-	 * @param extData3 internal symbol-data-3 string (see {@link ExternalLocationDB})
+	 * @param name the external function name
+	 * @param nameSpace the external function namespace
+	 * @param extData the external data string to store additional info (see {@link ExternalLocationDB})
 	 * @param source the source of this external.
 	 * @return external function
-	 * @throws InvalidInputException
-	 * @throws DuplicateNameException
+	 * @throws InvalidInputException if the name is invalid
+	 * @throws DuplicateNameException if the name is an invalid duplicate
 	 */
 	public Function createExternalFunction(Address extSpaceAddr, String name, Namespace nameSpace,
-			String extData3, SourceType source)
+			String extData, SourceType source)
 			throws DuplicateNameException, InvalidInputException {
 		lock.acquire();
 		try {
 
 			Symbol symbol = symbolMgr.createSpecialSymbol(extSpaceAddr, name, nameSpace,
-				SymbolType.FUNCTION, -1, -1, extData3, source);
+				SymbolType.FUNCTION, null, null, extData, source);
 
 			long returnDataTypeId = program.getDataTypeManager().getResolvedID(DataType.DEFAULT);
 
 			try {
-				Record rec = adapter.createFunctionRecord(symbol.getID(), returnDataTypeId);
+				DBRecord rec = adapter.createFunctionRecord(symbol.getID(), returnDataTypeId);
 
 				FunctionDB funcDB = new FunctionDB(this, cache, addrMap, rec);
 
@@ -403,7 +403,7 @@ public class FunctionManagerDB implements FunctionManager {
 						symbol, oldName, symbol.getName());
 				}
 
-				Record rec = adapter.createFunctionRecord(symbol.getID(), returnDataTypeId);
+				DBRecord rec = adapter.createFunctionRecord(symbol.getID(), returnDataTypeId);
 
 				FunctionDB funcDB = new FunctionDB(this, cache, addrMap, rec);
 				namespaceMgr.setBody(funcDB, body);
@@ -505,7 +505,7 @@ public class FunctionManagerDB implements FunctionManager {
 		try {
 			FunctionDB func = cache.get(key);
 			if (func != null) {
-				func.checkIsValid();
+				func.checkDeleted();
 				func.createClassStructIfNeeded();
 				func.updateParametersAndReturn();
 			}
@@ -533,7 +533,7 @@ public class FunctionManagerDB implements FunctionManager {
 				// TODO: How should thunks which refer to deleted function be handled?
 				//       What about case where use is "re-creating" referenced function?
 				// Delete thunks for now...
-				Record rec = thunks.next();
+				DBRecord rec = thunks.next();
 				Symbol s = symbolMgr.getSymbol(rec.getKey());
 				if (s != null) {
 					s.delete();
@@ -587,7 +587,7 @@ public class FunctionManagerDB implements FunctionManager {
 			FunctionDB func = cache.get(key);
 			if (func == null) {
 				try {
-					Record rec = adapter.getFunctionRecord(key);
+					DBRecord rec = adapter.getFunctionRecord(key);
 					if (rec != null) {
 						func = new FunctionDB(this, cache, addrMap, rec);
 					}
@@ -1006,8 +1006,7 @@ public class FunctionManagerDB implements FunctionManager {
 			}
 			else {
 				it = program.getSymbolTable()
-						.getSymbols(program.getMemory(), SymbolType.FUNCTION,
-							forward);
+						.getSymbols(program.getMemory(), SymbolType.FUNCTION, forward);
 			}
 		}
 
@@ -1325,7 +1324,7 @@ public class FunctionManagerDB implements FunctionManager {
 		try {
 			RecordIterator it = adapter.iterateFunctionRecords();
 			while (it.hasNext()) {
-				Record rec = it.next();
+				DBRecord rec = it.next();
 
 				if (thunkAdapter.getThunkRecord(rec.getKey()) != null) {
 					continue; // skip thunks
@@ -1380,7 +1379,7 @@ public class FunctionManagerDB implements FunctionManager {
 				return thunkedFunction != null ? thunkedFunction.getID() : -1;
 			}
 			try {
-				Record rec = thunkAdapter.getThunkRecord(functionId);
+				DBRecord rec = thunkAdapter.getThunkRecord(functionId);
 				return rec != null ? rec.getLongValue(ThunkFunctionAdapter.LINKED_FUNCTION_ID_COL)
 						: -1;
 			}
@@ -1405,7 +1404,7 @@ public class FunctionManagerDB implements FunctionManager {
 		try {
 			RecordIterator records = thunkAdapter.iterateThunkRecords(referencedFunctionId);
 			while (records.hasNext()) {
-				Record rec = records.next();
+				DBRecord rec = records.next();
 				if (list == null) {
 					list = new ArrayList<>(1);
 				}
@@ -1422,7 +1421,7 @@ public class FunctionManagerDB implements FunctionManager {
 	}
 
 	FunctionDB getThunkedFunction(FunctionDB function) {
-		Record rec = null;
+		DBRecord rec = null;
 		try {
 			rec = thunkAdapter.getThunkRecord(function.getKey());
 			if (rec != null) {
@@ -1453,7 +1452,7 @@ public class FunctionManagerDB implements FunctionManager {
 			while (recIter.hasNext()) {
 				monitor.checkCanceled();
 
-				Record rec = recIter.next();
+				DBRecord rec = recIter.next();
 				// NOTE: addrMap has already been switched-over to new language and its address spaces
 				String serialization = rec.getString(FunctionAdapter.RETURN_STORAGE_COL);
 

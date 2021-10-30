@@ -52,21 +52,24 @@ public class DialogComponentProvider
 	private static final String PROGRESS = "Progress";
 	private static final String DEFAULT = "No Progress";
 
-	protected JPanel rootPanel;
+	private static int idCounter;
+
+	private int id = ++idCounter;
 
 	private boolean modal;
 	private String title;
 
+	protected JPanel rootPanel;
 	private JPanel mainPanel;
 	private JComponent workPanel;
-	private JPanel buttonPanel;
+	protected JPanel buttonPanel;
 	private JPanel statusPanel;
 	protected JButton okButton;
 	protected JButton applyButton;
 	protected JButton cancelButton;
 	protected JButton dismissButton;
 	private boolean isAlerting;
-	private JLabel statusLabel;
+	private GDHtmlLabel statusLabel;
 	private JPanel statusProgPanel; // contains status panel and progress panel
 	private Timer showTimer;
 	private TaskScheduler taskScheduler;
@@ -97,7 +100,7 @@ public class DialogComponentProvider
 	private Dimension defaultSize;
 
 	/**
-	 * Constructor for a GhidraDialogComponent that be modal and will include a status line and
+	 * Constructor for a GhidraDialogComponent that will be modal and will include a status line and
 	 * a button panel. Its title will be the same as its name.
 	 * @param title the dialog title.
 	 */
@@ -106,8 +109,7 @@ public class DialogComponentProvider
 	}
 
 	/**
-	 * Constructor for a GhidraDialogComponent that will include a status line and
-	 * a button panel.
+	 * Constructor for a GhidraDialogComponent that will include a status line and a button panel.
 	 * @param title the title for this dialog.
 	 * @param modal true if this dialog should be modal.
 	 */
@@ -187,6 +189,10 @@ public class DialogComponentProvider
 	/** a callback mechanism for children to do work */
 	protected void doInitialize() {
 		// may be overridden by subclasses
+	}
+
+	public int getId() {
+		return id;
 	}
 
 	public JComponent getComponent() {
@@ -362,7 +368,7 @@ public class DialogComponentProvider
 	 * To change this behavior, call {@link #setDefaultButton(JButton)} with the desired
 	 * default button.
 	 * 
-	 * @param button the button 
+	 * @param button the button
 	 */
 	protected void addButton(JButton button) {
 		if (defaultButton == null && buttonPanel.getComponentCount() == 0) {
@@ -674,7 +680,7 @@ public class DialogComponentProvider
 
 		isAlerting = true;
 
-		// Note: manually call validate() so the 'statusLabel' updates its bounds after 
+		// Note: manually call validate() so the 'statusLabel' updates its bounds after
 		//       the text has been setStatusText() (validation is buffered which means the
 		//       normal Swing mechanism may not have yet happened).
 		mainPanel.validate();
@@ -690,7 +696,7 @@ public class DialogComponentProvider
 		});
 	}
 
-	private Color getStatusColor(MessageType type) {
+	protected Color getStatusColor(MessageType type) {
 		switch (type) {
 			case ALERT:
 				return Color.orange;
@@ -755,7 +761,7 @@ public class DialogComponentProvider
 	private void showProgressBar(String localTitle, boolean hasProgress, boolean canCancel) {
 
 		if (!isVisible()) {
-			// It doesn't make any sense to show the task monitor when the dialog is not 
+			// It doesn't make any sense to show the task monitor when the dialog is not
 			// visible, so show the dialog
 			DockingWindowManager.showDialog(getParent(), this);
 		}
@@ -870,9 +876,21 @@ public class DialogComponentProvider
 	}
 
 	public void close() {
-		if (dialog != null) {
+		if (isShowing()) {
 			dialog.close();
 		}
+
+	}
+
+	public void dispose() {
+		cancelCurrentTask();
+		close();
+		popupManager.dispose();
+
+		dialogActions.forEach(DockingActionIf::dispose);
+
+		actionMap.clear();
+		dialogActions.clear();
 	}
 
 	/**
@@ -1069,7 +1087,7 @@ public class DialogComponentProvider
 		return dialog;
 	}
 
-	private Component getParent() {
+	protected Component getParent() {
 		if (dialog == null) {
 			return null;
 		}
@@ -1191,7 +1209,7 @@ public class DialogComponentProvider
 
 	/**
 	 * Add an action to this dialog.  Only actions with icons are added to the toolbar.
-	 * Note, if you add an action to this dialog, do not also add the action to 
+	 * Note, if you add an action to this dialog, do not also add the action to
 	 * the tool, as this dialog will do that for you.
 	 * @param action the action
 	 */
@@ -1204,7 +1222,7 @@ public class DialogComponentProvider
 
 	private void addKeyBindingAction(DockingActionIf action) {
 
-		// add the action to the tool in order get key event management (key bindings 
+		// add the action to the tool in order get key event management (key bindings
 		// options and key event processing)
 		DockingWindowManager dwm = DockingWindowManager.getActiveInstance();
 		if (dwm == null) {

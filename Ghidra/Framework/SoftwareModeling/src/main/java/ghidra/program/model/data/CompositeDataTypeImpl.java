@@ -26,17 +26,18 @@ import ghidra.util.exception.NotYetImplementedException;
 /**
  * Common implementation methods for structure and union
  */
-public abstract class CompositeDataTypeImpl extends GenericDataType implements Composite {
-	private final static long serialVersionUID = 1;
+public abstract class CompositeDataTypeImpl extends GenericDataType implements CompositeInternal {
+
+	// Strings used for toString formatting
+	private static final String ALIGN_NAME = "aligned";
+	private static final String PACKING_NAME = "pack";
+	private static final String DISABLED_PACKING_NAME = "disabled";
+	private static final String DEFAULT_PACKING_NAME = "";
+
 	private String description;
 
-	protected boolean aligned = false; // WARNING, changing the initial value for this will cause
-										// subtle errors - One I know of is in the StructureDataType
-										// copyComponent method. It has built in assumptions about this.
-
-	protected AlignmentType alignmentType = AlignmentType.DEFAULT_ALIGNED;
-	protected int packingValue = NOT_PACKING;
-	protected int externalAlignment = DEFAULT_ALIGNMENT_VALUE;
+	protected int minimumAlignment = DEFAULT_ALIGNMENT;
+	protected int packing = NO_PACKING;
 
 	/**
 	 * Construct a new composite with the given name
@@ -67,6 +68,21 @@ public abstract class CompositeDataTypeImpl extends GenericDataType implements C
 		description = "";
 	}
 
+	@Override
+	public int getStoredPackingValue() {
+		return packing;
+	}
+
+	@Override
+	public int getStoredMinimumAlignment() {
+		return minimumAlignment;
+	}
+
+	@Override
+	public void dataTypeNameChanged(DataType dt, String oldName) {
+		// ignored
+	}
+
 	/**
 	 * Get the preferred length for a new component. For Unions and internally
 	 * aligned structures the preferred component length for a fixed-length dataType
@@ -80,7 +96,10 @@ public abstract class CompositeDataTypeImpl extends GenericDataType implements C
 	 * @return preferred component length
 	 */
 	protected int getPreferredComponentLength(DataType dataType, int length) {
-		if ((isInternallyAligned() || (this instanceof Union)) && !(dataType instanceof Dynamic)) {
+		if (DataTypeComponent.usesZeroLengthComponent(dataType)) {
+			return 0;
+		}
+		if ((isPackingEnabled() || (this instanceof Union)) && !(dataType instanceof Dynamic)) {
 			length = -1; // force use of datatype size
 		}
 		int dtLength = dataType.getLength();
@@ -98,8 +117,22 @@ public abstract class CompositeDataTypeImpl extends GenericDataType implements C
 	}
 
 	@Override
-	public boolean isDynamicallySized() {
-		return isInternallyAligned();
+	public abstract boolean hasLanguageDependantLength();
+
+	/**
+	 * Determine if this composite should be treated as undefined.
+	 * <p>
+	 * A composite is considered undefined with a zero-length when it has 
+	 * no components and packing is disabled.  A {@link DataTypeComponent} defined by an
+	 * an datatype which is not-yet-defined (i.e., {@link DataType#isNotYetDefined()} is true) 
+	 * will always have a size of 1.  If an empty composite should be treated as 
+	 * fully specified, packing on the composite should be enabled to ensure that 
+	 * a zero-length component is used should the occassion arise (e.g., empty structure 
+	 * placed within union as a component).
+	 */
+	@Override
+	public final boolean isNotYetDefined() {
+		return getNumComponents() == 0 && !isPackingEnabled();
 	}
 
 	@Override
@@ -129,27 +162,33 @@ public abstract class CompositeDataTypeImpl extends GenericDataType implements C
 
 	/**
 	 * This method throws an exception if the indicated data type is not a valid
-	 * data type for a component of this composite data type.
+	 * data type for a component of this composite data type.  If the DEFAULT 
+	 * datatype is specified when unsupported an Undefined1 will be returned 
+	 * in its place (e.g., packing enabled, Union).
 	 * 
 	 * @param dataType the data type to be checked.
+	 * @return datatype to be used for insert/add
 	 * @throws IllegalArgumentException if the data type is invalid.
 	 */
-	protected void validateDataType(DataType dataType) {
-		if (isInternallyAligned() && dataType == DataType.DEFAULT) {
-			throw new IllegalArgumentException(
-				"The DEFAULT data type is not allowed in an aligned composite data type.");
+	protected DataType validateDataType(DataType dataType) {
+		if (dataType == DataType.DEFAULT) {
+			if (isPackingEnabled() || (this instanceof Union)) {
+				return Undefined1DataType.dataType;
+			}
+			return dataType;
 		}
-		if (dataType instanceof FactoryDataType) {
-			throw new IllegalArgumentException("The \"" + dataType.getName() +
-				"\" data type is not allowed in a composite data type.");
-		}
-		else if (dataType instanceof Dynamic) {
+		if (dataType instanceof Dynamic) {
 			Dynamic dynamicDataType = (Dynamic) dataType;
 			if (!dynamicDataType.canSpecifyLength()) {
 				throw new IllegalArgumentException("The \"" + dataType.getName() +
 					"\" data type is not allowed in a composite data type.");
 			}
 		}
+		else if (dataType instanceof FactoryDataType || dataType.getLength() <= 0) {
+			throw new IllegalArgumentException("The \"" + dataType.getName() +
+				"\" data type is not allowed in a composite data type.");
+		}
+		return dataType;
 	}
 
 	/**
@@ -250,220 +289,147 @@ public abstract class CompositeDataTypeImpl extends GenericDataType implements C
 	}
 
 	@Override
-	public int getPackingValue() {
-		return packingValue;
-	}
-
-	@Override
-	public void setPackingValue(int packingValue) {
-		if (packingValue < 0) {
-			packingValue = NOT_PACKING;
-		}
-		aligned = true;
-		this.packingValue = packingValue;
-		adjustInternalAlignment();
-	}
-
-	@Override
-	public int getMinimumAlignment() {
-		if (alignmentType == AlignmentType.MACHINE_ALIGNED) {
-			return getMachineAlignment();
-		}
-		if (alignmentType == AlignmentType.DEFAULT_ALIGNED) {
-			return Composite.DEFAULT_ALIGNMENT_VALUE;
-		}
-		return externalAlignment;
-	}
-
-	@Override
-	public void setMinimumAlignment(int externalAlignment) {
-		if (externalAlignment < 1) {
-			this.externalAlignment = DEFAULT_ALIGNMENT_VALUE;
-			alignmentType = AlignmentType.DEFAULT_ALIGNED;
-		}
-		else {
-			this.externalAlignment = externalAlignment;
-			alignmentType = AlignmentType.ALIGNED_BY_VALUE;
-		}
-		aligned = true;
-		adjustInternalAlignment();
-	}
-
-	private int getMachineAlignment() {
-		return getDataOrganization().getMachineAlignment();
-	}
-
-	@Override
-	public boolean isInternallyAligned() {
-		return aligned;
-	}
-
-	@Override
-	public boolean isDefaultAligned() {
-		return alignmentType == AlignmentType.DEFAULT_ALIGNED;
-	}
-
-	@Override
-	public boolean isMachineAligned() {
-		return alignmentType == AlignmentType.MACHINE_ALIGNED;
-	}
-
-	@Override
-	public void setInternallyAligned(boolean aligned) {
-		if (this.aligned != aligned) {
-			this.aligned = aligned;
-			if (!aligned) {
-				alignmentType = AlignmentType.DEFAULT_ALIGNED;
-				packingValue = Composite.NOT_PACKING;
-			}
-		}
-		adjustInternalAlignment();
-	}
-
-	@Override
-	public void setToDefaultAlignment() {
-		aligned = true;
-		alignmentType = AlignmentType.DEFAULT_ALIGNED;
-		adjustInternalAlignment();
-	}
-
-	@Override
-	public void setToMachineAlignment() {
-		aligned = true;
-		alignmentType = AlignmentType.MACHINE_ALIGNED;
-		adjustInternalAlignment();
+	public final void repack() {
+		repack(true);
 	}
 
 	/**
-	 * Notify any parent data types that this composite data type's alignment has
-	 * changed.
-	 */
-	protected void notifyAlignmentChanged() {
-		DataType[] parents = getParents();
-		for (DataType dataType : parents) {
-			if (dataType instanceof Composite) {
-				Composite composite = (Composite) dataType;
-				composite.dataTypeAlignmentChanged(this);
-			}
-		}
-	}
-
-	/**
-	 * Adjusts the internal alignment of components within this composite based on
-	 * the current settings of the internal alignment, packing, alignment type and
-	 * minimum alignment value. This method should be called whenever any of the
-	 * above settings are changed or whenever a components data type is changed or a
-	 * component is added or removed.
-	 */
-	protected abstract void adjustInternalAlignment();
-
-	@Override
-	public int getAlignment() {
-		return CompositeAlignmentHelper.getAlignment(getDataOrganization(), this);
-	}
-
-	// set my alignment info to the same as the given composite
-	protected void setAlignment(Composite composite) {
-
-		aligned = composite.isInternallyAligned();
-
-		if (composite.isDefaultAligned()) {
-			alignmentType = AlignmentType.DEFAULT_ALIGNED;
-		}
-		else if (composite.isMachineAligned()) {
-			alignmentType = AlignmentType.MACHINE_ALIGNED;
-		}
-		else {
-			if (alignmentType != AlignmentType.ALIGNED_BY_VALUE) {
-				alignmentType = AlignmentType.ALIGNED_BY_VALUE;
-			}
-			externalAlignment = composite.getMinimumAlignment();
-		}
-
-		packingValue = composite.getPackingValue();
-
-		adjustInternalAlignment();
-	}
-
-	/**
-	 * Dump all components for use in {@link #toString()} representation.
+	 * Repack components within this composite based on the current packing, alignment 
+	 * and {@link DataOrganization} settings.  Non-packed Structures: change detection
+	 * is limited to component count and length is assumed to already be correct.
+	 * <p>
+	 * NOTE: If modifications to stored length are made prior to invoking this method, 
+	 * detection of a size change may not be possible.  
+	 * <p>
+	 * NOTE: Currently a change in calculated alignment can not be provided since
+	 * this value is not stored.
 	 * 
-	 * @param buffer string buffer
-	 * @param pad    padding to be used with each component output line
+	 * @param notify if true notification will be sent to parents if a size change
+	 * or component placement change is detected.
+	 * @return true if a layout change was detected.
 	 */
-	protected void dumpComponents(StringBuilder buffer, String pad) {
-		// limit output of filler components for unaligned structures
-		DataTypeComponent[] components = getDefinedComponents();
-		for (DataTypeComponent dtc : components) {
-			DataType dataType = dtc.getDataType();
-			buffer.append(pad + dtc.getOffset());
-			buffer.append(pad + dataType.getName());
-			if (dataType instanceof BitFieldDataType) {
-				BitFieldDataType bfDt = (BitFieldDataType) dataType;
-				buffer.append("(");
-				buffer.append(Integer.toString(bfDt.getBitOffset()));
-				buffer.append(")");
-			}
-			buffer.append(pad + dtc.getLength());
-			buffer.append(pad + dtc.getFieldName());
-			String comment = dtc.getComment();
-			if (comment == null) {
-				comment = "";
-			}
-			buffer.append(pad + "\"" + comment + "\"");
-			buffer.append("\n");
+	public abstract boolean repack(boolean notify);
+
+	@Override
+	public void setPackingEnabled(boolean enabled) {
+		if (enabled == isPackingEnabled()) {
+			return;
 		}
+		setStoredPackingValue(enabled ? DEFAULT_PACKING : NO_PACKING);
 	}
+
+	@Override
+	public PackingType getPackingType() {
+		if (packing < DEFAULT_PACKING) {
+			return PackingType.DISABLED;
+		}
+		if (packing == DEFAULT_PACKING) {
+			return PackingType.DEFAULT;
+		}
+		return PackingType.EXPLICIT;
+	}
+
+	@Override
+	public void setToDefaultPacking() {
+		setStoredPackingValue(DEFAULT_PACKING);
+	}
+
+	@Override
+	public int getExplicitPackingValue() {
+		return packing;
+	}
+
+	@Override
+	public void setExplicitPackingValue(int packingValue) {
+		if (packingValue <= 0) {
+			throw new IllegalArgumentException(
+				"explicit packing value must be positive: " + packingValue);
+		}
+		setStoredPackingValue(packingValue);
+	}
+
+	private void setStoredPackingValue(int packingValue) {
+		if (minimumAlignment < NO_PACKING) {
+			throw new IllegalArgumentException("invalid packing value: " + packingValue);
+		}
+		if (packingValue == this.packing) {
+			return;
+		}
+		if (this.packing == NO_PACKING || packingValue == NO_PACKING) {
+			// force default alignment when transitioning to or from disabled packing
+			this.minimumAlignment = DEFAULT_ALIGNMENT;
+		}
+		this.packing = packingValue;
+		repack(true);
+	}
+
+	@Override
+	public AlignmentType getAlignmentType() {
+		if (minimumAlignment < DEFAULT_ALIGNMENT) {
+			return AlignmentType.MACHINE;
+		}
+		if (minimumAlignment == DEFAULT_ALIGNMENT) {
+			return AlignmentType.DEFAULT;
+		}
+		return AlignmentType.EXPLICIT;
+	}
+
+	@Override
+	public void setToDefaultAligned() {
+		setStoredMinimumAlignment(DEFAULT_ALIGNMENT);
+	}
+
+	@Override
+	public void setToMachineAligned() {
+		setStoredMinimumAlignment(MACHINE_ALIGNMENT);
+	}
+
+	@Override
+	public int getExplicitMinimumAlignment() {
+		return minimumAlignment;
+	}
+
+	@Override
+	public void setExplicitMinimumAlignment(int minimumAlignment) {
+		if (minimumAlignment <= 0) {
+			throw new IllegalArgumentException(
+				"explicit minimum alignment must be positive: " + minimumAlignment);
+		}
+		setStoredMinimumAlignment(minimumAlignment);
+	}
+
+	private void setStoredMinimumAlignment(int minimumAlignment) {
+		if (minimumAlignment < MACHINE_ALIGNMENT) {
+			throw new IllegalArgumentException(
+				"invalid minimum alignment value: " + minimumAlignment);
+		}
+		if (this.minimumAlignment == minimumAlignment) {
+			return;
+		}
+		this.minimumAlignment = minimumAlignment;
+		repack(true);
+	}
+
+	protected final int getNonPackedAlignment() {
+		int alignment;
+		if (minimumAlignment == DEFAULT_ALIGNMENT) {
+			alignment = 1;
+		}
+		else if (minimumAlignment == MACHINE_ALIGNMENT) {
+			alignment = getDataOrganization().getMachineAlignment();
+		}
+		else {
+			alignment = minimumAlignment;
+		}
+		return alignment;
+	}
+
+	@Override
+	public abstract int getAlignment();
 
 	@Override
 	public String toString() {
-		StringBuilder stringBuffer = new StringBuilder();
-		stringBuffer.append(getPathName() + "\n");
-		stringBuffer.append(getAlignmentSettingsString() + "\n");
-		stringBuffer.append(getTypeName() + " " + getDisplayName() + " {\n");
-		dumpComponents(stringBuffer, "   ");
-		stringBuffer.append("}\n");
-		stringBuffer.append(
-			"Size = " + getLength() + "   Actual Alignment = " + getAlignment() + "\n");
-		return stringBuffer.toString();
+		return CompositeInternal.toString(this);
 	}
 
-	private String getTypeName() {
-		if (this instanceof Structure) {
-			return "Structure";
-		}
-		else if (this instanceof Union) {
-			return "Union";
-		}
-		return "";
-	}
-
-	private String getAlignmentSettingsString() {
-		StringBuffer stringBuffer = new StringBuffer();
-		if (!isInternallyAligned()) {
-			stringBuffer.append("Unaligned");
-		}
-		else if (isDefaultAligned()) {
-			stringBuffer.append("Aligned");
-		}
-		else if (isMachineAligned()) {
-			stringBuffer.append("Machine aligned");
-		}
-		else {
-			long alignment = getMinimumAlignment();
-			stringBuffer.append("align(" + alignment + ")");
-		}
-		stringBuffer.append(getPackingString());
-		return stringBuffer.toString();
-	}
-
-	private String getPackingString() {
-		if (!isInternallyAligned()) {
-			return "";
-		}
-		if (packingValue == Composite.NOT_PACKING) {
-			return "";
-		}
-		return " pack(" + packingValue + ")";
-	}
 }

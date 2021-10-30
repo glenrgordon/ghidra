@@ -571,8 +571,8 @@ PcodeOp *Funcdata::cloneOp(const PcodeOp *op,const SeqNum &seq)
 {
   PcodeOp *newop = newOp(op->numInput(),seq);
   opSetOpcode(newop,op->code());
-  uint4 flags = op->flags & (PcodeOp::startmark | PcodeOp::startbasic);
-  newop->setFlag(flags);
+  uint4 fl = op->flags & (PcodeOp::startmark | PcodeOp::startbasic);
+  newop->setFlag(fl);
   if (op->getOut() != (Varnode *)0)
     opSetOutput(newop,cloneVarnode(op->getOut()));
   for(int4 i=0;i<op->numInput();++i)
@@ -610,15 +610,15 @@ PcodeOp *Funcdata::newOpBefore(PcodeOp *follow,OpCode opc,Varnode *in1,Varnode *
 
 {
   PcodeOp *newop;
-  int4 size;
+  int4 sz;
 
-  size = (in3 == (Varnode *)0) ? 2 : 3;
-  newop = newOp(size,follow->getAddr());
+  sz = (in3 == (Varnode *)0) ? 2 : 3;
+  newop = newOp(sz,follow->getAddr());
   opSetOpcode(newop,opc);
   newUniqueOut(in1->getSize(),newop);
   opSetInput(newop,in1,0);
   opSetInput(newop,in2,1);
-  if (size==3)
+  if (sz==3)
     opSetInput(newop,in3,2);
   opInsertBefore(newop,follow);
   return newop;
@@ -630,19 +630,19 @@ PcodeOp *Funcdata::newOpBefore(PcodeOp *follow,OpCode opc,Varnode *in1,Varnode *
 /// through a CALL or STORE. An output Varnode is automatically created.
 /// \param indeffect is the PcodeOp with the indirect effect
 /// \param addr is the starting address of the storage range to protect
-/// \param size is the number of bytes in the storage range
+/// \param sz is the number of bytes in the storage range
 /// \param extraFlags are extra boolean properties to put on the INDIRECT
 /// \return the new CPUI_INDIRECT op
-PcodeOp *Funcdata::newIndirectOp(PcodeOp *indeffect,const Address &addr,int4 size,uint4 extraFlags)
+PcodeOp *Funcdata::newIndirectOp(PcodeOp *indeffect,const Address &addr,int4 sz,uint4 extraFlags)
 
 {
   Varnode *newin;
   PcodeOp *newop;
 
-  newin = newVarnode(size,addr);
+  newin = newVarnode(sz,addr);
   newop = newOp(2,indeffect->getAddr());
   newop->flags |= extraFlags;
-  newVarnodeOut(size,addr,newop);
+  newVarnodeOut(sz,addr,newop);
   opSetOpcode(newop,CPUI_INDIRECT);
   opSetInput(newop,newin,0);
   opSetInput(newop,newVarnodeIop(indeffect),1);
@@ -657,19 +657,19 @@ PcodeOp *Funcdata::newIndirectOp(PcodeOp *indeffect,const Address &addr,int4 siz
 /// The new Varnode is allocated with a given storage range.
 /// \param indeffect is the p-code causing the indirect effect
 /// \param addr is the starting address of the given storage range
-/// \param size is the number of bytes in the storage range
+/// \param sz is the number of bytes in the storage range
 /// \param possibleout is \b true if the output should be treated as a \e directwrite.
 /// \return the new CPUI_INDIRECT op
-PcodeOp *Funcdata::newIndirectCreation(PcodeOp *indeffect,const Address &addr,int4 size,bool possibleout)
+PcodeOp *Funcdata::newIndirectCreation(PcodeOp *indeffect,const Address &addr,int4 sz,bool possibleout)
 
 {
   Varnode *newout,*newin;
   PcodeOp *newop;
 
-  newin = newConstant(size,0);
+  newin = newConstant(sz,0);
   newop = newOp(2,indeffect->getAddr());
   newop->flags |= PcodeOp::indirect_creation;
-  newout = newVarnodeOut(size,addr,newop);
+  newout = newVarnodeOut(sz,addr,newop);
   if (!possibleout)
     newin->flags |= Varnode::indirect_creation;
   newout->flags |= Varnode::indirect_creation;
@@ -1027,34 +1027,34 @@ bool Funcdata::distributeIntMultAdd(PcodeOp *op)
   if ((vn0->isFree())&&(!vn0->isConstant())) return false;
   if ((vn1->isFree())&&(!vn1->isConstant())) return false;
   uintb coeff = op->getIn(1)->getOffset();
-  int4 size = op->getOut()->getSize();
+  int4 sz = op->getOut()->getSize();
 				// Do distribution
   if (vn0->isConstant()) {
     uintb val = coeff * vn0->getOffset();
-    val &= calc_mask(size);
-    newvn0 = newConstant(size,val);
+    val &= calc_mask(sz);
+    newvn0 = newConstant(sz,val);
   }
   else {
     PcodeOp *newop0 = newOp(2,op->getAddr());
     opSetOpcode(newop0,CPUI_INT_MULT);
-    newvn0 = newUniqueOut(size,newop0);
+    newvn0 = newUniqueOut(sz,newop0);
     opSetInput(newop0, vn0, 0); // To first input of original add
-    Varnode *newcvn = newConstant(size,coeff);
+    Varnode *newcvn = newConstant(sz,coeff);
     opSetInput(newop0, newcvn, 1);
     opInsertBefore(newop0, op);
   }
 
   if (vn1->isConstant()) {
     uintb val = coeff * vn1->getOffset();
-    val &= calc_mask(size);
-    newvn1 = newConstant(size,val);
+    val &= calc_mask(sz);
+    newvn1 = newConstant(sz,val);
   }
   else {
     PcodeOp *newop1 = newOp(2,op->getAddr());
     opSetOpcode(newop1,CPUI_INT_MULT);
-    newvn1 = newUniqueOut(size,newop1);
+    newvn1 = newUniqueOut(sz,newop1);
     opSetInput(newop1, vn1, 0); // To second input of original add
-    Varnode *newcvn = newConstant(size,coeff);
+    Varnode *newcvn = newConstant(sz,coeff);
     opSetInput(newop1, newcvn, 1);
     opInsertBefore(newop1, op);
   }
@@ -1091,9 +1091,9 @@ bool Funcdata::collapseIntMultMult(Varnode *vn)
   if (!constVnSecond->isConstant()) return false;
   Varnode *invn = otherMultOp->getIn(0);
   if (invn->isFree()) return false;
-  int4 size = invn->getSize();
-  uintb val = (constVnFirst->getOffset() * constVnSecond->getOffset()) & calc_mask(size);
-  Varnode *newvn = newConstant(size,val);
+  int4 sz = invn->getSize();
+  uintb val = (constVnFirst->getOffset() * constVnSecond->getOffset()) & calc_mask(sz);
+  Varnode *newvn = newConstant(sz,val);
   opSetInput(op,newvn,1);
   opSetInput(op,invn,0);
   return true;
@@ -1360,4 +1360,55 @@ void cseEliminateList(Funcdata &data,vector< pair<uintm,PcodeOp *> > &list,vecto
     liter1++;
     liter2++;
   }
+}
+
+/// This routine should be called only after Varnode merging and explicit/implicit attributes have
+/// been calculated.  Determine if the given op can be moved (only within its basic block) to
+/// after \e lastOp.  The output of any PcodeOp moved across must not be involved, directly or
+/// indirectly, with any variable in the expression rooted at the given op.
+/// If the move is possible, perform the move.
+/// \param op is the given PcodeOp
+/// \param lastOp is the PcodeOp to move past
+/// \return \b true if the move is possible
+bool Funcdata::moveRespectingCover(PcodeOp *op,PcodeOp *lastOp)
+
+{
+  if (op == lastOp) return true;	// Nothing to move past
+  if (op->isCall()) return false;
+  PcodeOp *prevOp = (PcodeOp *)0;
+  if (op->code() == CPUI_CAST) {
+    Varnode *vn = op->getIn(0);
+    if (!vn->isExplicit()) {		// If CAST is part of expression, we need to move the previous op as well
+      if (!vn->isWritten()) return false;
+      prevOp = vn->getDef();
+      if (prevOp->isCall()) return false;
+      if (op->previousOp() != prevOp) return false;	// Previous op must exist and feed into the CAST
+    }
+  }
+  Varnode *rootvn = op->getOut();
+  vector<HighVariable *> highList;
+  int4 typeVal = HighVariable::markExpression(rootvn, highList);
+  PcodeOp *curOp = op;
+  do {
+    PcodeOp *nextOp = curOp->nextOp();
+    OpCode opc = nextOp->code();
+    if (opc != CPUI_COPY && opc != CPUI_CAST) break;	// Limit ourselves to only crossing COPY and CAST ops
+    if (rootvn == nextOp->getIn(0)) break;	// Data-flow order dependence
+    Varnode *copyVn = nextOp->getOut();
+    if (copyVn->getHigh()->isMark()) break;	// Direct interference: COPY writes what original op reads
+    if (typeVal != 0 && copyVn->isAddrTied()) break;	// Possible indirect interference
+    curOp = nextOp;
+  } while(curOp != lastOp);
+  for(int4 i=0;i<highList.size();++i)		// Clear marks on expression
+    highList[i]->clearMark();
+  if (curOp == lastOp) {			// If we are able to cross everything
+    opUninsert(op);				// Move -op-
+    opInsertAfter(op, lastOp);
+    if (prevOp != (PcodeOp *)0) {		// If there was a CAST, move both ops
+      opUninsert(prevOp);
+      opInsertAfter(prevOp, lastOp);
+    }
+    return true;
+  }
+  return false;
 }

@@ -18,8 +18,7 @@ package ghidra.program.database.data;
 import java.io.IOException;
 
 import db.*;
-import ghidra.program.model.data.DataType;
-import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.data.*;
 import ghidra.util.UniversalID;
 import ghidra.util.UniversalIdGenerator;
 import ghidra.util.exception.VersionException;
@@ -67,16 +66,25 @@ class CompositeDBAdapterV0 extends CompositeDBAdapter implements RecordTranslato
 		}
 	}
 
+	int getVersion() {
+		return compositeTable.getSchema().getVersion();
+	}
+
 	@Override
-	public Record createRecord(String name, String comments, boolean isUnion, long categoryID,
-			int length, long sourceArchiveID, long sourceDataTypeID, long lastChangeTime,
-			int internalAlignment, int externalAlignment) throws IOException {
+	int getRecordCount() {
+		return compositeTable.getRecordCount();
+	}
+
+	@Override
+	public DBRecord createRecord(String name, String comments, boolean isUnion, long categoryID,
+			int length, int computedAlignment, long sourceArchiveID, long sourceDataTypeID,
+			long lastChangeTime, int packValue, int minAlignment) throws IOException {
 		throw new UnsupportedOperationException("Not allowed to update prior version #" + VERSION +
 			" of " + COMPOSITE_TABLE_NAME + " table.");
 	}
 
 	@Override
-	public Record getRecord(long dataTypeID) throws IOException {
+	public DBRecord getRecord(long dataTypeID) throws IOException {
 		return translateRecord(compositeTable.getRecord(dataTypeID));
 	}
 
@@ -86,13 +94,14 @@ class CompositeDBAdapterV0 extends CompositeDBAdapter implements RecordTranslato
 	}
 
 	@Override
-	public void updateRecord(Record record, boolean setLastChangeTime) throws IOException {
+	public void updateRecord(DBRecord record, boolean setLastChangeTime) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public boolean removeRecord(long compositeID) throws IOException {
-		return compositeTable.deleteRecord(compositeID);
+		throw new UnsupportedOperationException("Not allowed to update prior version #" + VERSION +
+			" of " + COMPOSITE_TABLE_NAME + " table.");
 	}
 
 	@Override
@@ -112,11 +121,11 @@ class CompositeDBAdapterV0 extends CompositeDBAdapter implements RecordTranslato
 	}
 
 	@Override
-	public Record translateRecord(Record oldRec) {
+	public DBRecord translateRecord(DBRecord oldRec) {
 		if (oldRec == null) {
 			return null;
 		}
-		Record rec = CompositeDBAdapter.COMPOSITE_SCHEMA.createRecord(oldRec.getKey());
+		DBRecord rec = CompositeDBAdapter.COMPOSITE_SCHEMA.createRecord(oldRec.getKey());
 		rec.setString(COMPOSITE_NAME_COL, oldRec.getString(V0_COMPOSITE_NAME_COL));
 		rec.setString(COMPOSITE_COMMENT_COL, oldRec.getString(V0_COMPOSITE_COMMENT_COL));
 		rec.setBooleanValue(COMPOSITE_IS_UNION_COL,
@@ -129,14 +138,13 @@ class CompositeDBAdapterV0 extends CompositeDBAdapter implements RecordTranslato
 		rec.setLongValue(COMPOSITE_UNIVERSAL_DT_ID, UniversalIdGenerator.nextID().getValue());
 		rec.setLongValue(COMPOSITE_SOURCE_SYNC_TIME_COL, DataType.NO_SOURCE_SYNC_TIME);
 		rec.setLongValue(COMPOSITE_LAST_CHANGE_TIME_COL, DataType.NO_LAST_CHANGE_TIME);
-		rec.setIntValue(COMPOSITE_INTERNAL_ALIGNMENT_COL, CompositeDBAdapter.UNALIGNED);
-		rec.setIntValue(COMPOSITE_EXTERNAL_ALIGNMENT_COL, CompositeDBAdapter.DEFAULT_ALIGNED);
+		rec.setIntValue(COMPOSITE_PACKING_COL, CompositeInternal.NO_PACKING);
+		rec.setIntValue(COMPOSITE_MIN_ALIGN_COL, CompositeInternal.DEFAULT_ALIGNMENT);
 		return rec;
 	}
 
 	@Override
-	Record getRecordWithIDs(UniversalID sourceID, UniversalID datatypeID) throws IOException {
+	DBRecord getRecordWithIDs(UniversalID sourceID, UniversalID datatypeID) throws IOException {
 		return null;
 	}
-
 }

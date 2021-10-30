@@ -260,12 +260,12 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		Instruction inst = null;
 		RecordIterator recIt = instAdapter.getRecords(firstInstrStart, true);
 		if (recIt.hasNext()) {
-			Record rec = recIt.next();
+			DBRecord rec = recIt.next();
 			inst = getInstructionDB(rec);
 			recIt.previous();
 		}
 		if (recIt.hasPrevious()) {
-			Record rec = recIt.previous();
+			DBRecord rec = recIt.previous();
 			Instruction prevInst = getInstructionDB(rec);
 			if (prevInst.getMaxAddress().compareTo(firstInstrStart) >= 0) {
 				return prevInst;
@@ -275,12 +275,12 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		Data data = null;
 		recIt = dataAdapter.getRecords(firstInstrStart, true);
 		if (recIt.hasNext()) {
-			Record rec = recIt.next();
+			DBRecord rec = recIt.next();
 			data = getDataDB(rec);
 			recIt.previous();
 		}
 		if (recIt.hasPrevious()) {
-			Record rec = recIt.previous();
+			DBRecord rec = recIt.previous();
 			Data prevData = getDataDB(rec);
 			if (prevData.getMaxAddress().compareTo(firstInstrStart) >= 0) {
 				return prevData;
@@ -472,8 +472,11 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 					if (prototype.hasDelaySlots()) {
 						// perform bounds check on entire delay slot instruction group
 						try {
-							endAddr = startAddr.addNoWrap(prototype.getFallThroughOffset(
-								protoInstr.getInstructionContext())).previous();
+							endAddr =
+								startAddr
+										.addNoWrap(prototype.getFallThroughOffset(
+											protoInstr.getInstructionContext()))
+										.previous();
 						}
 						catch (AddressOverflowException e) {
 							break;
@@ -553,9 +556,10 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 					InstructionPrototype prototype = lastInstruction.getPrototype();
 					if (prototype.hasDelaySlots()) {
 						try {
-							maxAddr = lastInstruction.getAddress().addNoWrap(
-								prototype.getFallThroughOffset(
-									lastInstruction.getInstructionContext())).previous();
+							maxAddr = lastInstruction.getAddress()
+									.addNoWrap(prototype.getFallThroughOffset(
+										lastInstruction.getInstructionContext()))
+									.previous();
 						}
 						catch (AddressOverflowException e) {
 							// ignore
@@ -630,7 +634,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		prototype = protoMgr.getPrototype(protoID);
 
 		Register contextReg = contextMgr.getBaseContextRegister();
-		if (contextReg != null) {
+		if (contextReg != Register.NO_CONTEXT) {
 			try {
 				RegisterValue contextValue = context.getRegisterValue(contextReg);
 				Address start = address;
@@ -930,8 +934,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	private CodeUnit getDefinedBefore(Address address) throws IOException {
-		Record dataRec = dataAdapter.getRecordBefore(address);
-		Record instRec = instAdapter.getRecordBefore(address);
+		DBRecord dataRec = dataAdapter.getRecordBefore(address);
+		DBRecord instRec = instAdapter.getRecordBefore(address);
 
 		if (dataRec == null && instRec == null) {
 			return null;
@@ -1010,8 +1014,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 				return cu;
 			}
 			try {
-				Record dataRec = dataAdapter.getRecordBefore(address);
-				Record instRec = instAdapter.getRecordBefore(address);
+				DBRecord dataRec = dataAdapter.getRecordBefore(address);
+				DBRecord instRec = instAdapter.getRecordBefore(address);
 
 				CodeUnit cuFirst = null, cuSecond = null;
 
@@ -1174,6 +1178,9 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		if (addrSetView == null) {
 			addrSetView = program.getMemory();
 		}
+		else if (addrSetView.isEmpty()) {
+			return CodeUnitIterator.EMPTY_ITERATOR;
+		}
 
 		if (property.equals(CodeUnit.COMMENT_PROPERTY)) {
 			try {
@@ -1219,7 +1226,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	/**
 	 * Get a forward iterator over code units that have comments of the given type.
 	 * @param commentType comment type defined in CodeUnit
-	 * @param set address set
+	 * @param set address set (null for all defined memory)
+	 * @return code unit iterator
 	 */
 	public CodeUnitIterator getCommentCodeUnitIterator(int commentType, AddressSetView set) {
 		CodeUnitIterator it = getCodeUnitIterator(CodeUnit.COMMENT_PROPERTY, set, true);
@@ -1229,10 +1237,15 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	/**
 	 * Get a forward iterator over addresses that have comments of the given type.
 	 * @param commentType comment type defined in CodeUnit
-	 * @param set address set
+	 * @param set address set (null for all defined memory)
+	 * @param forward true to iterate in the direction of increasing addresses.
+	 * @return address iterator
 	 */
 	public AddressIterator getCommentAddressIterator(int commentType, AddressSetView set,
 			boolean forward) {
+		if (set != null && set.isEmpty()) {
+			return AddressIterator.EMPTY_ITERATOR;
+		}
 		try {
 			AddressKeyIterator keyIter = commentAdapter.getKeys(set, forward);
 			AddressIterator addrIter =
@@ -1251,6 +1264,9 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * @param forward true to iterate in the direction of increasing addresses.
 	 */
 	public AddressIterator getCommentAddressIterator(AddressSetView addrSet, boolean forward) {
+		if (addrSet != null && addrSet.isEmpty()) {
+			return AddressIterator.EMPTY_ITERATOR;
+		}
 		try {
 			AddressKeyIterator keyIter = commentAdapter.getKeys(addrSet, forward);
 			return new AddressKeyAddressIterator(keyIter, forward, addrMap, program);
@@ -1320,7 +1336,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		try {
 			CodeUnit cu = cache.get(addr);
 			if (cu == null) {
-				Record rec = dataAdapter.getRecord(addr);
+				DBRecord rec = dataAdapter.getRecord(addr);
 				return getDataDB(rec);
 			}
 			else if (cu instanceof Data) {
@@ -1350,7 +1366,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	public Instruction getInstructionBefore(Address addr) {
 		lock.acquire();
 		try {
-			Record rec = instAdapter.getRecordBefore(addr);
+			DBRecord rec = instAdapter.getRecordBefore(addr);
 			return getInstructionDB(rec);
 		}
 		catch (IOException e) {
@@ -1374,7 +1390,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	public Instruction getInstructionAfter(Address addr) {
 		lock.acquire();
 		try {
-			Record rec = instAdapter.getRecordAfter(addr);
+			DBRecord rec = instAdapter.getRecordAfter(addr);
 			return getInstructionDB(rec);
 		}
 		catch (IOException e) {
@@ -1548,7 +1564,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	public Data getDefinedDataAfter(Address addr) {
 		lock.acquire();
 		try {
-			Record rec = dataAdapter.getRecordAfter(addr);
+			DBRecord rec = dataAdapter.getRecordAfter(addr);
 			return getDataDB(rec);
 		}
 		catch (IOException e) {
@@ -1573,7 +1589,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	public Data getDefinedDataBefore(Address addr) {
 		lock.acquire();
 		try {
-			Record rec = dataAdapter.getRecordBefore(addr);
+			DBRecord rec = dataAdapter.getRecordBefore(addr);
 			return getDataDB(rec);
 		}
 		catch (IOException e) {
@@ -1632,6 +1648,9 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 				searchSet = new AddressSet(
 					initializedMemoryOnly ? mem.getLoadedAndInitializedAddressSet() : mem);
 			}
+			else if (set.isEmpty()) {
+				return set;
+			}
 			else {
 				searchSet = new AddressSet(set);
 				searchSet = searchSet.intersect(
@@ -1682,7 +1701,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 				while (true) {
 
 					if (nextInstAddr == null && instIter.hasNext()) {
-						Record nextInstRec = instIter.next();
+						DBRecord nextInstRec = instIter.next();
 						nextInstAddr = addrMap.decodeAddress(nextInstRec.getKey());
 						nextInstEndAddr = nextInstAddr;
 						int protoID = nextInstRec.getIntValue(InstDBAdapter.PROTO_ID_COL);
@@ -1700,7 +1719,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 					}
 
 					if (nextDataAddr == null && dataIter.hasNext()) {
-						Record nextDataRec = dataIter.next();
+						DBRecord nextDataRec = dataIter.next();
 						nextDataAddr = addrMap.decodeAddress(nextDataRec.getKey());
 						nextDataEndAddr = nextDataAddr;
 						DataDB data = getDataDB(nextDataRec);
@@ -1855,13 +1874,19 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * Returns the next undefined data whose min address falls within the address set
 	 * searching in the forward direction {@code (e.g., 0 -> 0xfff).}
 	 *
-	 * @param set the address set to look within.
+	 * @param set the address set to look within (required).
 	 * @param monitor the current monitor.
 	 * @return Data the first undefined data within the address set, or null if there is none.
 	 */
 	public Data getFirstUndefinedData(AddressSetView set, TaskMonitor monitor) {
+		if (set.isEmpty()) {
+			return null;
+		}
 		Memory mem = program.getMemory();
 		set = mem.intersect(set);
+		if (set.isEmpty()) {
+			return null;
+		}
 
 		int i = 0;
 		CodeUnitIterator it = getCodeUnits(set, true);
@@ -1919,7 +1944,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 
 		RecordIterator recIt = instAdapter.getRecords(startAddr, true);
 		if (recIt.hasNext()) {
-			Record rec = recIt.next();
+			DBRecord rec = recIt.next();
 			Instruction inst = getInstructionDB(rec);
 			if (inst.getMinAddress().compareTo(endAddr) <= 0) {
 				throw new CodeUnitInsertionException("Conflicting instruction exists at address " +
@@ -1928,7 +1953,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 			recIt.previous();
 		}
 		if (recIt.hasPrevious()) {
-			Record rec = recIt.previous();
+			DBRecord rec = recIt.previous();
 			Instruction inst = getInstructionDB(rec);
 			if (inst.getMaxAddress().compareTo(startAddr) >= 0) {
 				throw new CodeUnitInsertionException("Conflicting instruction exists at address " +
@@ -1938,7 +1963,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 
 		recIt = dataAdapter.getRecords(startAddr, true);
 		if (recIt.hasNext()) {
-			Record rec = recIt.next();
+			DBRecord rec = recIt.next();
 			Data data = getDataDB(rec);
 			if (data.getMinAddress().compareTo(endAddr) <= 0) {
 				throw new CodeUnitInsertionException("Conflicting data exists at address " +
@@ -1947,7 +1972,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 			recIt.previous();
 		}
 		if (recIt.hasPrevious()) {
-			Record rec = recIt.previous();
+			DBRecord rec = recIt.previous();
 			Data data = getDataDB(rec);
 			if (data.getMaxAddress().compareTo(startAddr) >= 0) {
 				throw new CodeUnitInsertionException("Conflicting data exists at address " +
@@ -2033,7 +2058,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 				return getUndefinedDataDB(addr, addrMap.getKey(addr, false));
 			}
 
-			Record record = dataAdapter.createData(addr, dataManager.getResolvedID(dataType));
+			DBRecord record = dataAdapter.createData(addr, dataManager.getResolvedID(dataType));
 
 			DataType baseDt = dataType;
 			if (baseDt instanceof TypeDef) {
@@ -2172,8 +2197,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	private boolean exceedsLimitOn64BitAddressSegments(List<Address> longSegmentAddressList,
 			Address toAddr) {
 		long maskedOffset = toAddr.getOffset() & 0xffffffff00000000L;
-		for (int i = 0; i < longSegmentAddressList.size(); i++) {
-			Address address = longSegmentAddressList.get(i);
+		for (Address address : longSegmentAddressList) {
 			long offset = address.getOffset();
 			if ((offset & 0xffffffff00000000L) == maskedOffset) {
 				return false;
@@ -2419,6 +2443,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * @param forward if true the iterator returns all codeUnits from the given
 	 * start address to the end of the program, otherwise it returns all codeUnits
 	 * from the given start address to the start of the program.
+	 * @return code unit iterator
 	 */
 	public CodeUnitIterator getCodeUnits(Address start, boolean forward) {
 
@@ -2439,6 +2464,10 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 			bounds = program.getAddressFactory().getAddressSet(min, start);
 		}
 
+		AddressSet set = mem.intersect(bounds);
+		if (set.isEmpty()) {
+			return CodeUnitIterator.EMPTY_ITERATOR;
+		}
 		return new CodeUnitRecordIterator(this, getInstructions(start, forward),
 			getDefinedData(start, forward), mem.intersect(bounds), forward);
 	}
@@ -2447,10 +2476,15 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * Returns an iterator over all codeUnits in the given addressSet. The iterator
 	 * will go from the lowest address to the largest or from the largest to the
 	 * lowest depending on the forward parameter.
+	 * @param set the memory address set over which code units should be iterated (required)
 	 * @param forward determines if the iterator goes from lowest address to highest
 	 * or the other way around.
+	 * @return code unit iterator
 	 */
 	public CodeUnitIterator getCodeUnits(AddressSetView set, boolean forward) {
+		if (set.isEmpty()) {
+			return CodeUnitIterator.EMPTY_ITERATOR;
+		}
 		return new CodeUnitRecordIterator(this, getInstructions(set, forward),
 			getDefinedData(set, forward), set, forward);
 	}
@@ -2635,7 +2669,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	protected boolean isUndefined(Address address, long addr) {
 		if (program.getMemory().contains(address)) {
 			try {
-				Record rec = dataAdapter.getRecord(addr);
+				DBRecord rec = dataAdapter.getRecord(addr);
 				if (rec == null) {
 					rec = instAdapter.getRecord(addr);
 				}
@@ -2668,7 +2702,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 			RecordIterator it = dataAdapter.getRecords();
 			while (it.hasNext()) {
 				monitor.checkCanceled();
-				Record rec = it.next();
+				DBRecord rec = it.next();
 				long id = rec.getLongValue(DataDBAdapter.DATA_TYPE_ID_COL);
 				for (long dataTypeID : dataTypeIDs) {
 					if (id == dataTypeID) {
@@ -2677,9 +2711,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 					}
 				}
 			}
-			for (int i = 0; i < addrs.size(); i++) {
+			for (Address addr : addrs) {
 				monitor.checkCanceled();
-				Address addr = addrs.get(i);
 				clearCodeUnits(addr, addr, false, monitor);
 			}
 		}
@@ -2726,7 +2759,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * the cache, create a new DB object and add it.
 	 * @param rec record for the instruction
 	 */
-	InstructionDB getInstructionDB(Record rec) {
+	InstructionDB getInstructionDB(DBRecord rec) {
 		lock.acquire();
 		try {
 			if (rec != null) {
@@ -2754,7 +2787,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * create a new DB object and add it.
 	 * @param rec data record
 	 */
-	DataDB getDataDB(Record rec) {
+	DataDB getDataDB(DBRecord rec) {
 		lock.acquire();
 		try {
 			if (rec != null) {
@@ -2792,8 +2825,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	Address getDefinedAddressAfter(Address address) {
-		Record dataRec = null;
-		Record instRec = null;
+		DBRecord dataRec = null;
+		DBRecord instRec = null;
 		try {
 			dataRec = dataAdapter.getRecordAfter(address);
 			instRec = instAdapter.getRecordAfter(address);
@@ -2876,7 +2909,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		RecordIterator iter = dataAdapter.getRecords(start, end, true);
 		while (iter.hasNext()) {
 			monitor.checkCanceled();
-			Record rec = iter.next();
+			DBRecord rec = iter.next();
 			Data data = getDataDB(rec);
 			addDataReferences(data, new ArrayList<Address>());
 		}
@@ -2960,8 +2993,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 				boolean isFallthrough =
 					(flowType.isJump() && flowAddr.equals(inst.getMaxAddress().next()));
 				if (!isFallthrough) {
-					mnemonicPrimaryRef = addDefaultMemoryReferenceIfMissing(inst, Reference.MNEMONIC,
-						flowAddr, flowType, oldRefList, mnemonicPrimaryRef);
+					mnemonicPrimaryRef = addDefaultMemoryReferenceIfMissing(inst,
+						Reference.MNEMONIC, flowAddr, flowType, oldRefList, mnemonicPrimaryRef);
 				}
 			}
 		}
@@ -2991,8 +3024,8 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	 * @param operandPrimaryRef current preferred primary reference for operand
 	 * @return updated preferred primary address for operand (i.e., operandPrimaryRef)
 	 */
-	private Reference addDefaultMemoryReferenceIfMissing(Instruction inst,
-			int opIndex, Address refAddr, RefType refType, List<Reference> oldRefList,
+	private Reference addDefaultMemoryReferenceIfMissing(Instruction inst, int opIndex,
+			Address refAddr, RefType refType, List<Reference> oldRefList,
 			Reference operandPrimaryRef) {
 
 		Reference ref = removeOldReference(oldRefList, refAddr, opIndex, refType);
@@ -3010,12 +3043,12 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	/**
-	 * Remove matching DEFAULT memory reference from oldRefList
+	 * Remove matching memory reference from oldRefList (considers toAddr and opIndex only)
 	 * @param oldRefList list of existing DEFAULT memory references (may be null)
 	 * @param toAddr new reference desination address
 	 * @param opIndex new reference operand
 	 * @param refType new reference type
-	 * @return existing reference if it already exists in oldRefList, else null
+	 * @return existing reference if it already exists in oldRefList with matching refType, else null
 	 */
 	private Reference removeOldReference(List<Reference> oldRefList, Address toAddr, int opIndex,
 			RefType refType) {
@@ -3025,10 +3058,12 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		Iterator<Reference> iterator = oldRefList.iterator();
 		while (iterator.hasNext()) {
 			Reference ref = iterator.next();
-			if (opIndex == ref.getOperandIndex() && refType == ref.getReferenceType() &&
-				toAddr.equals(ref.getToAddress())) {
+			if (opIndex == ref.getOperandIndex() && toAddr.equals(ref.getToAddress())) {
 				iterator.remove();
-				return ref;
+				if (refType == ref.getReferenceType()) {
+					return ref;
+				}
+				break; // return null - can't re-use due to refType change
 			}
 		}
 		return null;
@@ -3091,11 +3126,11 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	private InstructionDB getInstructionDB(long addr) throws IOException {
-		Record rec = instAdapter.getRecord(addr);
+		DBRecord rec = instAdapter.getRecord(addr);
 		return getInstructionDB(rec);
 	}
 
-	protected Record getInstructionRecord(long addr) {
+	protected DBRecord getInstructionRecord(long addr) {
 		try {
 			return instAdapter.getRecord(addr);
 		}
@@ -3115,7 +3150,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		return null;
 	}
 
-	DataType getDataType(Record dataRecord) {
+	DataType getDataType(DBRecord dataRecord) {
 		if (dataRecord != null) {
 			long datatypeID = dataRecord.getLongValue(DataDBAdapter.DATA_TYPE_ID_COL);
 			DataType dt = dataManager.getDataType(datatypeID);
@@ -3323,7 +3358,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	public String getComment(int commentType, Address address) {
 		try {
 			long addr = addrMap.getKey(address, false);
-			Record commentRec = getCommentAdapter().getRecord(addr);
+			DBRecord commentRec = getCommentAdapter().getRecord(addr);
 			if (commentRec != null) {
 				return commentRec.getString(commentType);
 			}
@@ -3353,7 +3388,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		lock.acquire();
 		try {
 			long addr = addrMap.getKey(address, true);
-			Record commentRec = getCommentAdapter().getRecord(addr);
+			DBRecord commentRec = getCommentAdapter().getRecord(addr);
 			if (commentRec == null) {
 				if (comment == null) {
 					return;
@@ -3444,20 +3479,20 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		try {
 
 			// records are sorted by date ascending						
-			List<Record> allRecords = getHistoryRecords(addr, commentType);
+			List<DBRecord> allRecords = getHistoryRecords(addr, commentType);
 
 			List<CommentHistory> results = new ArrayList<>();
 			String comment = getComment(addr, commentType);
 			while (!allRecords.isEmpty()) {
 
-				Record rec = allRecords.get(allRecords.size() - 1);
+				DBRecord rec = allRecords.get(allRecords.size() - 1);
 				long date = rec.getLongValue(CommentHistoryAdapter.HISTORY_DATE_COL);
-				List<Record> records = subListByDate(allRecords, date);
+				List<DBRecord> records = subListByDate(allRecords, date);
 
 				List<StringDiff> diffs = new ArrayList<>(records.size());
 
 				String user = null;
-				for (Record r : records) {
+				for (DBRecord r : records) {
 					user = r.getString(CommentHistoryAdapter.HISTORY_USER_COL);
 					int pos1 = r.getIntValue(CommentHistoryAdapter.HISTORY_POS1_COL);
 					int pos2 = r.getIntValue(CommentHistoryAdapter.HISTORY_POS2_COL);
@@ -3484,11 +3519,11 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	// note: you must have the lock when calling this method
-	private List<Record> getHistoryRecords(Address addr, int commentType) throws IOException {
+	private List<DBRecord> getHistoryRecords(Address addr, int commentType) throws IOException {
 		RecordIterator it = historyAdapter.getRecordsByAddress(addr);
-		List<Record> list = new ArrayList<>();
+		List<DBRecord> list = new ArrayList<>();
 		while (it.hasNext()) {
-			Record rec = it.next();
+			DBRecord rec = it.next();
 			if (rec.getByteValue(CommentHistoryAdapter.HISTORY_TYPE_COL) == commentType) {
 				list.add(rec);
 			}
@@ -3497,10 +3532,10 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	// note: records are sorted by date; assume that the date we seek is at the end
-	private List<Record> subListByDate(List<Record> records, long date) {
+	private List<DBRecord> subListByDate(List<DBRecord> records, long date) {
 
 		for (int i = records.size() - 1; i >= 0; i--) {
-			Record rec = records.get(i);
+			DBRecord rec = records.get(i);
 			if (date != rec.getLongValue(CommentHistoryAdapter.HISTORY_DATE_COL)) {
 				return records.subList(i + 1, records.size());
 			}
@@ -3511,7 +3546,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	}
 
 	private String getComment(Address addr, int commentType) throws IOException {
-		Record record = commentAdapter.getRecord(addrMap.getKey(addr, false));
+		DBRecord record = commentAdapter.getRecord(addrMap.getKey(addr, false));
 		if (record != null) {
 			return record.getString(commentType);
 		}
@@ -3523,7 +3558,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		try {
 			RecordIterator it = dataAdapter.getRecords();
 			while (it.hasNext()) {
-				Record rec = it.next();
+				DBRecord rec = it.next();
 				long id = rec.getLongValue(DataDBAdapter.DATA_TYPE_ID_COL);
 				if (id == oldDataTypeID) {
 					rec.setLongValue(DataDBAdapter.DATA_TYPE_ID_COL, newDataTypeID);
@@ -3551,7 +3586,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 	private void addCommentHistoryRecords(Address start, Address end) throws IOException {
 		RecordIterator iter = commentAdapter.getRecords(start, end, true);
 		while (iter.hasNext()) {
-			Record rec = iter.next();
+			DBRecord rec = iter.next();
 			addCommentHistoryRecord(rec, CodeUnit.PRE_COMMENT);
 			addCommentHistoryRecord(rec, CodeUnit.POST_COMMENT);
 			addCommentHistoryRecord(rec, CodeUnit.EOL_COMMENT);
@@ -3560,7 +3595,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 		}
 	}
 
-	private void addCommentHistoryRecord(Record commentRec, int commentType) {
+	private void addCommentHistoryRecord(DBRecord commentRec, int commentType) {
 		String comment = commentRec.getString(commentType);
 		if (comment != null) {
 			createCommentHistoryRecord(addrMap.decodeAddress(commentRec.getKey()), commentType,
@@ -3608,7 +3643,7 @@ public class CodeManager implements ErrorHandler, ManagerDB {
 			int count = 0;
 			RecordIterator recIter = instAdapter.getRecords();
 			while (recIter.hasNext()) {
-				Record rec = recIter.next();
+				DBRecord rec = recIter.next();
 
 				Address addr = addrMap.decodeAddress(rec.getKey());
 				if (minAddr == null) {

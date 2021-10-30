@@ -17,12 +17,10 @@ package ghidra.program.database.data;
 
 import java.io.IOException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.util.List;
 
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-
-import db.Record;
+import db.DBRecord;
 import ghidra.docking.settings.Settings;
 import ghidra.docking.settings.SettingsDefinition;
 import ghidra.program.database.DBObjectCache;
@@ -38,9 +36,9 @@ import ghidra.util.exception.NotYetImplementedException;
  *
  *
  */
-abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeListener {
+abstract class DataTypeDB extends DatabaseObject implements DataType {
 
-	protected Record record;
+	protected DBRecord record;
 	protected final DataTypeManagerDB dataMgr;
 	private volatile Settings defaultSettings;
 	private final static SettingsDefinition[] EMPTY_DEFINITIONS = new SettingsDefinition[0];
@@ -51,7 +49,7 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 	private volatile Category category;
 
 	protected DataTypeDB(DataTypeManagerDB dataMgr, DBObjectCache<DataTypeDB> cache,
-			Record record) {
+			DBRecord record) {
 		super(cache, record.getKey());
 		this.dataMgr = dataMgr;
 		this.record = record;
@@ -64,29 +62,27 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 	}
 
 	/**
-	 * Subclasses implement this to either read the name from the database record or
-	 * compute if it is a derived name such as a pointer or array. Implementers can
-	 * assume that the database lock will be acquired when this method is called.
+	 * Subclasses implement this to either read the name from the database record or compute if it
+	 * is a derived name such as a pointer or array. Implementers can assume that the database lock
+	 * will be acquired when this method is called.
 	 */
 	protected abstract String doGetName();
 
 	/**
-	 * Subclasses implement this to read the category path from the database
-	 * record.Implementers can assume that the database lock will be acquired when
-	 * this method is called.
+	 * Subclasses implement this to read the category path from the database record.Implementers can
+	 * assume that the database lock will be acquired when this method is called.
 	 */
 	protected abstract long doGetCategoryID();
 
 	/**
-	 * Subclasses implement this to update the category path ID to the database.
-	 * Implementers can assume that the database lock will be acquired when this
-	 * method is called.
+	 * Subclasses implement this to update the category path ID to the database. Implementers can
+	 * assume that the database lock will be acquired when this method is called.
 	 */
 	protected abstract void doSetCategoryPathRecord(long categoryID) throws IOException;
 
 	/**
-	 * Subclasses implement this to update the to the database. Implementers can
-	 * assume that the database lock will be acquired when this method is called.
+	 * Subclasses implement this to update the to the database. Implementers can assume that the
+	 * database lock will be acquired when this method is called.
 	 * 
 	 * @param newName new data type name
 	 */
@@ -94,16 +90,14 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 			throws IOException, InvalidNameException;
 
 	/**
-	 * Subclasses implement this to read the source archive id from the record.
-	 * Implementers can assume that the database lock will be acquired when this
-	 * method is called.
+	 * Subclasses implement this to read the source archive id from the record. Implementers can
+	 * assume that the database lock will be acquired when this method is called.
 	 */
 	protected abstract UniversalID getSourceArchiveID();
 
 	/**
-	 * Subclasses implement this to update the source archive id from the record.
-	 * Implementers can assume that the database lock will be acquired when this
-	 * method is called.
+	 * Subclasses implement this to update the source archive id from the record. Implementers can
+	 * assume that the database lock will be acquired when this method is called.
 	 */
 	protected abstract void setSourceArchiveID(UniversalID id);
 
@@ -125,9 +119,11 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 		return false;
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getDisplayName()
-	 */
+	@Override
+	public boolean isZeroLength() {
+		return false;
+	}
+
 	@Override
 	public String getDisplayName() {
 		return getName();
@@ -150,8 +146,8 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 	}
 
 	/**
-	 * Get the current name without refresh. This is intended to be used for event
-	 * generation when an old-name is needed.
+	 * Get the current name without refresh. This is intended to be used for event generation when
+	 * an old-name is needed.
 	 * 
 	 * @return old name
 	 */
@@ -159,9 +155,6 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 		return name;
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getDefaultSettings()
-	 */
 	@Override
 	public Settings getDefaultSettings() {
 		Settings localDefaultSettings = defaultSettings;
@@ -182,9 +175,6 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getDocs()
-	 */
 	@Override
 	public URL getDocs() {
 		return null;
@@ -193,59 +183,41 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 	/**
 	 * Set the data in the form of the appropriate Object for this DataType.
 	 *
-	 * @param buf      the data buffer.
+	 * @param buf the data buffer.
 	 * @param settings the display settings for the current value.
-	 * @param length   the number of bytes to set the value from.
-	 * @param value    the new value to set object
+	 * @param length the number of bytes to set the value from.
+	 * @param value the new value to set object
 	 */
 
 	public void setValue(MemBuffer buf, Settings settings, int length, Object value) {
 		throw new NotYetImplementedException("setValue() not implemented");
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getSettingsDefinitions()
-	 */
 	@Override
 	public SettingsDefinition[] getSettingsDefinitions() {
 		return EMPTY_DEFINITIONS;
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#isDeleted()
-	 */
 	@Override
 	public boolean isDeleted() {
-		return !checkIsValid();
+		return isDeleted(lock);
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#update(ghidra.program.model.data.DataType)
-	 */
 	@Override
 	public void dataTypeSizeChanged(DataType dt) {
-		// no-op
+		// do nothing
 	}
 
-	/**
-	 * @see javax.swing.event.ChangeListener#stateChanged(javax.swing.event.ChangeEvent)
-	 */
 	@Override
-	public void stateChanged(ChangeEvent e) {
-		dataMgr.dataTypeChanged(this);
+	public void dataTypeAlignmentChanged(DataType dt) {
+		// do nothing
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getDataTypeManager()
-	 */
 	@Override
 	public DataTypeManager getDataTypeManager() {
 		return dataMgr;
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#setDefaultSettings(ghidra.docking.settings.Settings)
-	 */
 	@Override
 	public void setDefaultSettings(Settings settings) {
 		checkIsValid();
@@ -259,12 +231,9 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 			return 1;
 		}
 		DataOrganization dataOrganization = dataMgr.getDataOrganization();
-		return dataOrganization.getAlignment(this, length);
+		return dataOrganization.getAlignment(this);
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#getPathName()
-	 */
 	@Override
 	public String getPathName() {
 		return getDataTypePath().getPath();
@@ -320,9 +289,6 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 		return new DataTypePath(getCategoryPath(), getName());
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#setName(java.lang.String)
-	 */
 	@Override
 	public void setName(String name) throws InvalidNameException, DuplicateNameException {
 		lock.acquire();
@@ -357,9 +323,6 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 
 	}
 
-	/**
-	 * @see ghidra.program.model.data.DataType#setCategoryPath(ghidra.program.model.data.CategoryPath)
-	 */
 	@Override
 	public void setCategoryPath(CategoryPath path) throws DuplicateNameException {
 		lock.acquire();
@@ -450,11 +413,29 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 		}
 	}
 
-	protected void notifySizeChanged() {
+	/**
+	 * Notify all parents that the size of this datatype has changed or other significant change
+	 * that may affect a parent containing this datatype.
+	 * 
+	 * @param isAutoChange true if changes are in response to another datatype's change.
+	 */
+	protected void notifySizeChanged(boolean isAutoChange) {
 		for (DataType dt : dataMgr.getParentDataTypes(key)) {
 			dt.dataTypeSizeChanged(this);
 		}
-		dataMgr.dataTypeChanged(this);
+		dataMgr.dataTypeChanged(this, isAutoChange);
+	}
+
+	/**
+	 * Notification that this composite data type's alignment has changed.
+	 * 
+	 * @param isAutoChange true if changes are in response to another datatype's change.
+	 */
+	protected void notifyAlignmentChanged(boolean isAutoChange) {
+		for (DataType dt : dataMgr.getParentDataTypes(key)) {
+			dt.dataTypeAlignmentChanged(this);
+		}
+		dataMgr.dataTypeChanged(this, isAutoChange);
 	}
 
 	protected void notifyNameChanged(String oldName) {
@@ -532,8 +513,8 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 
 	/**
 	 * Sets a String briefly describing this DataType. <br>
-	 * If a data type that extends this class wants to allow the description to be
-	 * changed, then it must override this method.
+	 * If a data type that extends this class wants to allow the description to be changed, then it
+	 * must override this method.
 	 * 
 	 * @param description a one-liner describing this DataType.
 	 */
@@ -543,15 +524,13 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 	}
 
 	/**
-	 * setUniversalID is a package level method that allows you to change a data
-	 * type's universal ID. This is only intended to be used when transforming a
-	 * newly parsed data type archive so that it can be used as a replacement of the
-	 * archive from a previous software release.
+	 * setUniversalID is a package level method that allows you to change a data type's universal
+	 * ID. This is only intended to be used when transforming a newly parsed data type archive so
+	 * that it can be used as a replacement of the archive from a previous software release.
 	 * 
-	 * @param oldUniversalID the old universal ID value that the user is already
-	 *                       referencing with their data types. This is the
-	 *                       universal ID that we want the new data type to be known
-	 *                       by.
+	 * @param oldUniversalID the old universal ID value that the user is already referencing with
+	 *            their data types. This is the universal ID that we want the new data type to be
+	 *            known by.
 	 */
 	abstract void setUniversalID(UniversalID oldUniversalID);
 
@@ -574,4 +553,20 @@ abstract class DataTypeDB extends DatabaseObject implements DataType, ChangeList
 			getName().equals(otherDt.getName()) && isEquivalent(otherDt);
 	}
 
+	@Override
+	public boolean isEncodable() {
+		return false;
+	}
+
+	@Override
+	public byte[] encodeValue(Object value, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		throw new DataTypeEncodeException("Encoding not supported", value, this);
+	}
+
+	@Override
+	public byte[] encodeRepresentation(String repr, MemBuffer buf, Settings settings, int length)
+			throws DataTypeEncodeException {
+		throw new DataTypeEncodeException("Encoding not supported", repr, this);
+	}
 }

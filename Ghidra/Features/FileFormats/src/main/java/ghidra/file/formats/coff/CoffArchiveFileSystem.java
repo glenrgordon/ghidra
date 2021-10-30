@@ -15,18 +15,20 @@
  */
 package ghidra.file.formats.coff;
 
+import static ghidra.formats.gfilesystem.fileinfo.FileAttributeType.*;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
 
 import ghidra.app.util.bin.ByteProvider;
-import ghidra.app.util.bin.ByteProviderInputStream;
+import ghidra.app.util.bin.ByteProviderWrapper;
 import ghidra.app.util.bin.format.coff.CoffException;
 import ghidra.app.util.bin.format.coff.archive.CoffArchiveHeader;
 import ghidra.app.util.bin.format.coff.archive.CoffArchiveMemberHeader;
 import ghidra.formats.gfilesystem.*;
 import ghidra.formats.gfilesystem.annotations.FileSystemInfo;
-import ghidra.util.exception.CancelledException;
+import ghidra.formats.gfilesystem.fileinfo.FileAttributes;
 import ghidra.util.task.TaskMonitor;
 
 @FileSystemInfo(type = "coff", description = "COFF Archive", factory = CoffArchiveFileSystemFactory.class)
@@ -74,12 +76,11 @@ public class CoffArchiveFileSystem implements GFileSystem {
 	}
 
 	@Override
-	public InputStream getInputStream(GFile file, TaskMonitor monitor)
-			throws IOException, CancelledException {
-
+	public ByteProvider getByteProvider(GFile file, TaskMonitor monitor) {
 		CoffArchiveMemberHeader entry = fsih.getMetadata(file);
 		return (entry != null && entry.isCOFF())
-				? new ByteProviderInputStream(provider, entry.getPayloadOffset(), entry.getSize())
+				? new ByteProviderWrapper(provider, entry.getPayloadOffset(), entry.getSize(),
+					file.getFSRL())
 				: null;
 	}
 
@@ -104,21 +105,18 @@ public class CoffArchiveFileSystem implements GFileSystem {
 	}
 
 	@Override
-	public String getInfo(GFile file, TaskMonitor monitor) {
+	public FileAttributes getFileAttributes(GFile file, TaskMonitor monitor) {
 		CoffArchiveMemberHeader entry = fsih.getMetadata(file);
-		return (entry == null) ? null : FSUtilities.infoMapToString(getInfoMap(entry));
-	}
-
-	public Map<String, String> getInfoMap(CoffArchiveMemberHeader blob) {
-		Map<String, String> info = new LinkedHashMap<>();
-		info.put("Name", blob.getName());
-		info.put("Size",
-			"" + Long.toString(blob.getSize()) + ", 0x" + Long.toHexString(blob.getSize()));
-		info.put("UserID", blob.getUserId());
-		info.put("GroupID", blob.getGroupId());
-		info.put("Mode", blob.getMode());
-		info.put("Time", new Date(blob.getDate()).toString());
-		return info;
+		FileAttributes result = new FileAttributes();
+		if (entry != null) {
+			result.add(NAME_ATTR, entry.getName());
+			result.add(SIZE_ATTR, entry.getSize());
+			result.add(USER_ID_ATTR, (long) entry.getUserIdInt());
+			result.add(GROUP_ID_ATTR, (long) entry.getGroupIdInt());
+			result.add(MODIFIED_DATE_ATTR, new Date(entry.getDate()));
+			result.add("Mode", entry.getMode());
+		}
+		return result;
 	}
 
 	@Override

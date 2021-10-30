@@ -214,9 +214,11 @@ public interface EditorModel {
 	/**
 	 * Sets the data type for the component at the indicated row index.
 	 * @param rowIndex the row index of the component 
-	 * @param dataTypeInstance
+	 * @param dt component datatype
+	 * @param length component length
+	 * @throws UsrException if invalid datatype or length specified
 	 */
-	public void setComponentDataTypeInstance(int rowIndex, DataTypeInstance dataTypeInstance)
+	public void setComponentDataTypeInstance(int rowIndex, DataType dt, int length)
 			throws UsrException;
 
 	/**
@@ -322,8 +324,7 @@ public interface EditorModel {
 	public void cycleDataType(CycleGroup cycleGroup);
 
 	/**
-	 * 
-	 * @param parent
+	 * Create array component
 	 * @throws UsrException
 	 */
 	public void createArray() throws UsrException;
@@ -331,10 +332,9 @@ public interface EditorModel {
 	/**
 	 *  Delete the selected components.
 	 *
-	 * @param monitor the task monitor
 	 * @throws UsrException if the data type isn't allowed to be deleted.
 	 */
-	public void deleteSelectedComponents(TaskMonitor monitor) throws UsrException;
+	public void deleteSelectedComponents() throws UsrException;
 
 	/**
 	 * Creates multiple duplicates of the indicated component.

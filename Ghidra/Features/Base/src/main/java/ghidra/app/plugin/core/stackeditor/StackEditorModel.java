@@ -38,7 +38,6 @@ import ghidra.app.plugin.core.compositeeditor.CompositeEditorModel;
 import ghidra.app.plugin.core.compositeeditor.DataTypeHelper;
 import ghidra.app.util.datatype.EmptyCompositeException;
 import ghidra.framework.plugintool.Plugin;
-import ghidra.program.database.DatabaseObject;
 import ghidra.program.model.data.*;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.SourceType;
@@ -47,7 +46,7 @@ import ghidra.util.*;
 import ghidra.util.exception.*;
 import ghidra.util.task.TaskMonitor;
 
-class StackEditorModel extends CompositeEditorModel {
+public class StackEditorModel extends CompositeEditorModel {
 
 	private static final long serialVersionUID = 1L;
 	public static final int OFFSET = 0;
@@ -78,6 +77,16 @@ class StackEditorModel extends CompositeEditorModel {
 		else {
 			showHexNumbers = true;
 		}
+	}
+
+	@Override
+	protected boolean allowsZeroLengthComponents() {
+		return false;
+	}
+
+	@Override
+	protected boolean allowsBitFields() {
+		return false;
 	}
 
 	void stackChangedExcternally(boolean changed) {
@@ -613,7 +622,7 @@ class StackEditorModel extends CompositeEditorModel {
 			if (currentIndex < 0 || currentIndex >= getRowCount()) {
 				return false;
 			}
-			checkIsAllowableDataType(dataType, true);
+			checkIsAllowableDataType(dataType);
 		}
 		catch (InvalidDataTypeException e) {
 			return false;
@@ -721,7 +730,7 @@ class StackEditorModel extends CompositeEditorModel {
 			if (currentIndex < 0 || currentIndex >= getRowCount()) {
 				return false;
 			}
-			checkIsAllowableDataType(dataType, true);
+			checkIsAllowableDataType(dataType);
 		}
 		catch (InvalidDataTypeException e) {
 			return false;
@@ -789,10 +798,9 @@ class StackEditorModel extends CompositeEditorModel {
 	}
 
 	@Override
-	public void setComponentDataTypeInstance(int index, DataTypeInstance dti) throws UsrException {
-		DataType dt = dti.getDataType();
-		checkIsAllowableDataType(dt, true);
-		((StackFrameDataType) viewComposite).setDataType(index, dt, dti.getLength());
+	public void setComponentDataTypeInstance(int index, DataType dt, int length) throws UsrException {
+		checkIsAllowableDataType(dt);
+		((StackFrameDataType) viewComposite).setDataType(index, dt, length);
 	}
 
 	@Override
@@ -807,7 +815,7 @@ class StackEditorModel extends CompositeEditorModel {
 	public void setComponentName(int rowIndex, String newName)
 			throws InvalidInputException, InvalidNameException, DuplicateNameException {
 
-		if (newName.equals("")) {
+		if (newName.trim().length() == 0) {
 			newName = null;
 		}
 //		if (nameExistsElsewhere(newName, currentIndex)) {
@@ -1271,11 +1279,8 @@ class StackEditorModel extends CompositeEditorModel {
 		for (int i = comps.length - 1; i >= 0; i--) {
 			DataTypeComponent component = comps[i];
 			DataType compDt = component.getDataType();
-			if (compDt instanceof DatabaseObject) {
-				DatabaseObject dbObj = (DatabaseObject) compDt;
-				if (!dbObj.checkIsValid()) {
-					clearComponent(component.getOrdinal());
-				}
+			if (compDt.isDeleted()) {
+				clearComponent(component.getOrdinal());
 			}
 		}
 	}
@@ -1334,7 +1339,7 @@ class StackEditorModel extends CompositeEditorModel {
 
 		int newLength = newDt.getLength();
 
-		checkIsAllowableDataType(newDt, true);
+		checkIsAllowableDataType(newDt);
 		newDt = DataTypeHelper.resolveDataType(newDt, viewDTM, null);
 		int maxLength = getMaxReplaceLength(index);
 		if (newLength <= 0) {

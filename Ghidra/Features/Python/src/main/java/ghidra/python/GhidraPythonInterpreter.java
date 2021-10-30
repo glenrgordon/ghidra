@@ -211,6 +211,9 @@ public class GhidraPythonInterpreter extends InteractiveInterpreter {
 
 		Py.getThreadState().tracefunc = interruptTraceFunction;
 
+		// The Python import system sets the __file__ attribute to the file it's executing
+		setVariable("__file__", new PyString(file.getAbsolutePath()));
+
 		// If the remote python debugger is alive, initialize it by calling settrace()
 		if (!SystemUtilities.isInDevelopmentMode() && !SystemUtilities.isInHeadlessMode()) {
 			if (PyDevUtils.getPyDevSrcDir() != null) {
@@ -218,8 +221,12 @@ public class GhidraPythonInterpreter extends InteractiveInterpreter {
 					InetAddress localhost = InetAddress.getLocalHost();
 					new Socket(localhost, PyDevUtils.PYDEV_REMOTE_DEBUGGER_PORT).close();
 					Msg.info(this, "Python debugger found");
-					exec("import pydevd; pydevd.settrace(host=\"" + localhost.getHostName() +
+					StringBuilder dbgCmds = new StringBuilder();
+					dbgCmds.append("import pydevd;");
+					dbgCmds.append("pydevd.threadingCurrentThread().__pydevd_main_thread = True;");
+					dbgCmds.append("pydevd.settrace(host=\"" + localhost.getHostName() +
 						"\", port=" + PyDevUtils.PYDEV_REMOTE_DEBUGGER_PORT + ", suspend=False);");
+					exec(dbgCmds.toString());
 					Msg.info(this, "Connected to a python debugger.");
 				}
 				catch (IOException e) {

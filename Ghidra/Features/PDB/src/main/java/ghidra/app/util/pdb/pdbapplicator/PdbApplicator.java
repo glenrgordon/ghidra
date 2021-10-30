@@ -25,6 +25,7 @@ import ghidra.app.util.bin.format.pdb.PdbParserConstants;
 import ghidra.app.util.bin.format.pdb2.pdbreader.*;
 import ghidra.app.util.bin.format.pdb2.pdbreader.symbol.*;
 import ghidra.app.util.bin.format.pdb2.pdbreader.type.AbstractMsType;
+import ghidra.app.util.bin.format.pe.cli.tables.CliAbstractTableRow;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.pdb.PdbCategories;
 import ghidra.app.util.pdb.pdbapplicator.SymbolGroup.AbstractMsSymbolIterator;
@@ -122,6 +123,8 @@ public class PdbApplicator {
 	private PdbAddressManager pdbAddressManager;
 	private List<SymbolGroup> symbolGroups;
 
+	private PdbCliInfoManager pdbCliManagedInfoManager;
+
 	//==============================================================================================
 	// If we have symbols and memory with VBTs in them, then a better VbtManager is created.
 	VbtManager vbtManager;
@@ -139,7 +142,7 @@ public class PdbApplicator {
 	 * <PRE>
 	 *   false = simple namespace
 	 *   true = class namespace
-	 *  </PRE> 
+	 *  </PRE>
 	 */
 	private Map<SymbolPath, Boolean> isClassByNamespace;
 
@@ -189,22 +192,23 @@ public class PdbApplicator {
 		initializeApplyTo(programParam, dataTypeManagerParam, imageBaseParam,
 			applicatorOptionsParam, monitorParam, logParam);
 
-		switch (applicatorOptions.getRestrictions()) {
+		switch (applicatorOptions.getProcessingControl()) {
 			case DATA_TYPES_ONLY:
 				processTypes();
 				break;
 			case PUBLIC_SYMBOLS_ONLY:
 				processPublicSymbols();
 				break;
-			case NONE:
+			case ALL:
 				processTypes();
 				processSymbols();
 				break;
 			default:
-				throw new PdbException("Invalid Restriction");
+				throw new PdbException("PDB: Invalid Application Control: " +
+					applicatorOptions.getProcessingControl());
 		}
 
-		if (program == null) {
+		if (program != null) {
 			Options options = program.getOptions(Program.PROGRAM_INFO);
 			options.setBoolean(PdbParserConstants.PDB_LOADED, true);
 		}
@@ -308,6 +312,9 @@ public class PdbApplicator {
 		pdbApplicatorMetrics = new PdbApplicatorMetrics();
 
 		pdbAddressManager = new PdbAddressManager(this, imageBase);
+
+		pdbCliManagedInfoManager = new PdbCliInfoManager(this);
+
 		symbolGroups = createSymbolGroups();
 
 		categoryUtils = setPdbCatogoryUtils(pdbFilename);
@@ -345,15 +352,16 @@ public class PdbApplicator {
 		if (programParam == null) {
 			if (dataTypeManagerParam == null) {
 				throw new PdbException(
-					"programParam and dataTypeManagerParam may not both be null.");
+					"PDB: programParam and dataTypeManagerParam may not both be null.");
 			}
 			if (imageBaseParam == null) {
-				throw new PdbException("programParam and imageBaseParam may not both be null.");
-			}
-			if (applicatorOptions.getRestrictions() != PdbApplicatorRestrictions.DATA_TYPES_ONLY) {
 				throw new PdbException(
-					"programParam may not be null for the chosen PdbApplicatorRestrictions: " +
-						applicatorOptions.getRestrictions());
+					"PDB: programParam and imageBaseParam may not both be null.");
+			}
+			if (applicatorOptions.getProcessingControl() != PdbApplicatorControl.DATA_TYPES_ONLY) {
+				throw new PdbException(
+					"PDB: programParam may not be null for the chosen Applicator Control: " +
+						applicatorOptions.getProcessingControl());
 			}
 		}
 		monitor = (monitorParam != null) ? monitorParam : TaskMonitor.DUMMY;
@@ -414,6 +422,14 @@ public class PdbApplicator {
 	}
 
 	/**
+	 * Returns the MessageLog.
+	 * @return the MessageLog
+	 */
+	MessageLog getMessageLog() {
+		return log;
+	}
+
+	/**
 	 * Puts message to {@link PdbLog} and to Msg.info()
 	 * @param originator a Logger instance, "this", or YourClass.class
 	 * @param message the message to display
@@ -421,6 +437,23 @@ public class PdbApplicator {
 	void pdbLogAndInfoMessage(Object originator, String message) {
 		PdbLog.message(message);
 		Msg.info(originator, message);
+	}
+
+	/**
+	 * Puts error message to {@link PdbLog} and to Msg.error() which will
+	 * also log a stack trace if exception is specified.
+	 * @param originator a Logger instance, "this", or YourClass.class
+	 * @param message the error message to display/log
+	 * @param exc exception whose stack trace should be reported or null
+	 */
+	void pdbLogAndErrorMessage(Object originator, String message, Exception exc) {
+		PdbLog.message(message);
+		if (exc != null) {
+			Msg.error(originator, message);
+		}
+		else {
+			Msg.error(originator, message, exc);
+		}
 	}
 
 	/**
@@ -469,7 +502,7 @@ public class PdbApplicator {
 	// Information for a putative PdbTypeApplicator:
 
 	/**
-	 * Returns the {@link DataTypeManager} associated with this analyzer. 
+	 * Returns the {@link DataTypeManager} associated with this analyzer.
 	 * @return DataTypeManager which this analyzer is using.
 	 */
 	DataTypeManager getDataTypeManager() {
@@ -501,8 +534,8 @@ public class PdbApplicator {
 
 	/**
 	 * Returns the {@link CategoryPath} for a typedef with with the give {@link SymbolPath} and
-	 * module number; 1 <= moduleNumber <= {@link PdbDebugInfo#getNumModules()}, 
-	 * except that modeleNumber of 0 represents publics/globals. 
+	 * module number; 1 <= moduleNumber <= {@link PdbDebugInfo#getNumModules()},
+	 * except that modeleNumber of 0 represents publics/globals.
 	 * @param moduleNumber module number
 	 * @param symbolPath SymbolPath of the symbol
 	 * @return the CategoryPath
@@ -627,7 +660,7 @@ public class PdbApplicator {
 				return sectionContribution.getModule();
 			}
 		}
-		throw new PdbException("Module not found for section/offset");
+		throw new PdbException("PDB: Module not found for section/offset");
 	}
 
 	//==============================================================================================
@@ -910,6 +943,33 @@ public class PdbApplicator {
 	}
 
 	//==============================================================================================
+	// CLI-Managed infor methods.
+	//==============================================================================================
+
+	// Currently in CLI, but could move.
+	boolean isDll() {
+		return pdbCliManagedInfoManager.isDll();
+	}
+
+	// Currently in CLI, but could move.
+	boolean isAslr() {
+		return pdbCliManagedInfoManager.isAslr();
+	}
+
+	/**
+	 * Get CLI metadata for specified tableNum and rowNum within the CLI
+	 * metadata stream.
+	 * @param tableNum CLI metadata stream table index
+	 * @param rowNum table row number
+	 * @return CLI metadata or null if specified tableNum not found
+	 * @throws PdbException if CLI metadata stream is not found in program file bytes
+	 * @throws IndexOutOfBoundsException if specified rowNum is invalid
+	 */
+	CliAbstractTableRow getCliTableRow(int tableNum, int rowNum) throws PdbException {
+		return pdbCliManagedInfoManager.getCliTableRow(tableNum, rowNum);
+	}
+
+	//==============================================================================================
 	// Virtual-Base-Table-related methods.
 	//==============================================================================================
 	VbtManager getVbtManager() {
@@ -917,7 +977,7 @@ public class PdbApplicator {
 	}
 
 	//==============================================================================================
-	// 
+	//
 	//==============================================================================================
 	Register getRegister(String pdbRegisterName) {
 		return registerNameToRegisterMapper.getRegister(pdbRegisterName);
@@ -1139,7 +1199,7 @@ public class PdbApplicator {
 				num++;
 			}
 		}
-		appendLogMsg("Not processing linker symbols because linker module not found");
+		pdbLogAndInfoMessage(this, "Not processing linker symbols because linker module not found");
 		return -1;
 	}
 
@@ -1531,8 +1591,8 @@ public class PdbApplicator {
 					program, address, SourceType.IMPORTED);
 			}
 
-			symbol = SymbolUtilities.createPreferredLabelOrFunctionSymbol(program, address,
-				namespace, name, SourceType.IMPORTED);
+			symbol =
+				program.getSymbolTable().createLabel(address, name, namespace, SourceType.IMPORTED);
 		}
 		catch (InvalidInputException e) {
 			log.appendMsg("PDB Warning: Unable to create symbol at " + address +

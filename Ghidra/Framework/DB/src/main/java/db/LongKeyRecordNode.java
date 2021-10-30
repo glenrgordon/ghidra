@@ -26,7 +26,7 @@ import ghidra.util.task.TaskMonitor;
  * <code>LongKeyRecordNode</code> is an abstract implementation of a BTree leaf node
  * which utilizes long key values and stores records.
  * <p>
- * This type of node has the following partial layout within a single DataBuffer 
+ * This type of node has the following partial layout within a single DataBuffer
  * (field size in bytes):
  * <pre>
  *   | NodeType(1) | KeyCount(4) | PrevLeafId(4) | NextLeafId(4) | ...
@@ -311,7 +311,7 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	 * @return root node which may have changed.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	LongKeyNode putRecord(Record record, Table table) throws IOException {
+	LongKeyNode putRecord(DBRecord record, Table table) throws IOException {
 
 		long key = record.getKey();
 		int index = getKeyIndex(key);
@@ -360,7 +360,7 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	 * @return root node which may have changed.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	LongKeyNode appendNewLeaf(Record record) throws IOException {
+	LongKeyNode appendNewLeaf(DBRecord record) throws IOException {
 		LongKeyRecordNode newLeaf = createNewLeaf(-1, -1);
 		newLeaf.insertRecord(0, record);
 		return appendLeaf(newLeaf);
@@ -412,22 +412,22 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 
 	/**
 	 * Inserts the record at the given index if there is sufficient space in
-	 * the buffer. 
+	 * the buffer.
 	 * @param index insertion index
 	 * @param record record to be inserted
 	 * @return true if the record was successfully inserted.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	abstract boolean insertRecord(int index, Record record) throws IOException;
+	abstract boolean insertRecord(int index, DBRecord record) throws IOException;
 
 	/**
-	 * Updates the record at the given index. 
+	 * Updates the record at the given index.
 	 * @param index record index
 	 * @param record new record
 	 * @return root node which may have changed.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	abstract LongKeyNode updateRecord(int index, Record record) throws IOException;
+	abstract LongKeyNode updateRecord(int index, DBRecord record) throws IOException;
 
 	/**
 	 * Get the record identified by the specified key.
@@ -436,7 +436,7 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	 * @return Record requested or null if record not found.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	abstract Record getRecord(long key, Schema schema) throws IOException;
+	abstract DBRecord getRecord(long key, Schema schema) throws IOException;
 
 	/**
 	 * Get the record located at the specified index.
@@ -445,16 +445,16 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	 * @return Record
 	 * @throws IOException thrown if IO error occurs
 	 */
-	abstract Record getRecord(Schema schema, int index) throws IOException;
+	abstract DBRecord getRecord(Schema schema, int index) throws IOException;
 
 	/**
-	 * Get the first record whoose key is less than the specified key.
+	 * Get the first record whose key is less than the specified key.
 	 * @param key record key
 	 * @param schema record data schema
 	 * @return Record requested or null if record not found.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	Record getRecordBefore(long key, Schema schema) throws IOException {
+	DBRecord getRecordBefore(long key, Schema schema) throws IOException {
 		int index = getKeyIndex(key);
 		if (index < 0) {
 			index = -index - 2;
@@ -470,13 +470,13 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	}
 
 	/**
-	 * Get the first record whoose key is greater than the specified key.
+	 * Get the first record whose key is greater than the specified key.
 	 * @param key record key
 	 * @param schema record data schema
 	 * @return Record requested or null if record not found.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	Record getRecordAfter(long key, Schema schema) throws IOException {
+	DBRecord getRecordAfter(long key, Schema schema) throws IOException {
 		int index = getKeyIndex(key);
 		if (index < 0) {
 			index = -(index + 1);
@@ -492,14 +492,14 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	}
 
 	/**
-	 * Get the first record whoose key is less than or equal to the specified
+	 * Get the first record whose key is less than or equal to the specified
 	 * key.
 	 * @param key record key
 	 * @param schema record data schema
 	 * @return Record requested or null if record not found.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	Record getRecordAtOrBefore(long key, Schema schema) throws IOException {
+	DBRecord getRecordAtOrBefore(long key, Schema schema) throws IOException {
 		int index = getKeyIndex(key);
 		if (index < 0) {
 			index = -index - 2;
@@ -512,14 +512,14 @@ abstract class LongKeyRecordNode extends LongKeyNode implements RecordNode {
 	}
 
 	/**
-	 * Get the first record whoose key is greater than or equal to the specified
+	 * Get the first record whose key is greater than or equal to the specified
 	 * key.
 	 * @param key record key
 	 * @param schema record data schema
 	 * @return Record requested or null if record not found.
 	 * @throws IOException thrown if IO error occurs
 	 */
-	Record getRecordAtOrAfter(long key, Schema schema) throws IOException {
+	DBRecord getRecordAtOrAfter(long key, Schema schema) throws IOException {
 		int index = getKeyIndex(key);
 		if (index < 0) {
 			index = -(index + 1);

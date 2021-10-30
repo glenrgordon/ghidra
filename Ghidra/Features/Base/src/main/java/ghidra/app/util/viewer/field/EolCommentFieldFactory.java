@@ -58,6 +58,8 @@ public class EolCommentFieldFactory extends FieldFactory {
 		GROUP_TITLE + Options.DELIMITER + "Always Show the Automatic Comment";
 	public static final String USE_ABBREVIATED_AUTOMITIC_COMMENT_MSG =
 		GROUP_TITLE + Options.DELIMITER + "Use Abbreviated Automatic Comments";
+	public static final String SHOW_FUNCTION_AUTOMITIC_COMMENT_MSG =
+		GROUP_TITLE + Options.DELIMITER + "Show Function Reference Automatic Comments";
 	public final static String ENABLE_PREPEND_REF_ADDRESS_MSG =
 		GROUP_TITLE + Options.DELIMITER + "Prepend the Address to Each Referenced Comment";
 	public static final Color DEFAULT_COLOR = Color.BLUE;
@@ -69,6 +71,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 	private boolean alwaysShowRefRepeatables;
 	private boolean alwaysShowAutomatic;
 	private boolean useAbbreviatedAutomatic;
+	private boolean showAutomaticFunctions;
 	private boolean prependRefAddress;
 	private Color repeatableCommentColor;
 	private Color automaticCommentColor;
@@ -78,7 +81,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 	private int refRepeatableCommentStyle;
 
 	// The codeUnitFormatOptions is used to monitor "follow pointer..." option to avoid
-	// duplication of data within auto-comment.  We don't bother adding a listener 
+	// duplication of data within auto-comment.  We don't bother adding a listener
 	// to kick the model since this is done by the operand field.
 	private BrowserCodeUnitFormatOptions codeUnitFormatOptions;
 
@@ -92,7 +95,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 	/**
 	 * Constructor
 	 * @param model the model that the field belongs to.
-	 * @param hsProvider the HightLightStringProvider.
+	 * @param hlProvider the HightLightStringProvider.
 	 * @param displayOptions the Options for display properties.
 	 * @param fieldOptions the Options for field specific properties.
 	 */
@@ -126,6 +129,9 @@ public class EolCommentFieldFactory extends FieldFactory {
 				"aren't any EOL or repeatable comments.");
 		fieldOptions.registerOption(USE_ABBREVIATED_AUTOMITIC_COMMENT_MSG, true, hl,
 			"When showing automatic comments, show the smallest amount of information possible");
+		fieldOptions.registerOption(SHOW_FUNCTION_AUTOMITIC_COMMENT_MSG, true, hl,
+			"When showing automatic comments, show direct function references");
+
 		fieldOptions.registerOption(ENABLE_PREPEND_REF_ADDRESS_MSG, false, hl,
 			"Displays the address before each referenced repeatable comment.");
 
@@ -153,6 +159,9 @@ public class EolCommentFieldFactory extends FieldFactory {
 		alwaysShowAutomatic = fieldOptions.getBoolean(ENABLE_ALWAYS_SHOW_AUTOMATIC_MSG, false);
 		useAbbreviatedAutomatic =
 			fieldOptions.getBoolean(USE_ABBREVIATED_AUTOMITIC_COMMENT_MSG, true);
+		showAutomaticFunctions =
+			fieldOptions.getBoolean(SHOW_FUNCTION_AUTOMITIC_COMMENT_MSG, true);
+
 		prependRefAddress = fieldOptions.getBoolean(ENABLE_PREPEND_REF_ADDRESS_MSG, false);
 
 		fieldOptions.getOptions(GROUP_TITLE).setOptionsHelpLocation(hl);
@@ -300,8 +309,9 @@ public class EolCommentFieldFactory extends FieldFactory {
 		DisplayableEol displayableEol =
 			new DisplayableEol(cu, alwaysShowRepeatable, alwaysShowRefRepeatables,
 				alwaysShowAutomatic, codeUnitFormatOptions.followReferencedPointers(),
-				maxDisplayLines, useAbbreviatedAutomatic);
-		ArrayList<FieldElement> elementList = new ArrayList<>();
+				maxDisplayLines, useAbbreviatedAutomatic, showAutomaticFunctions);
+
+		List<FieldElement> elementList = new ArrayList<>();
 
 		// This Code Unit's End of Line Comment
 		AttributedString myEolPrefixString =
@@ -326,7 +336,6 @@ public class EolCommentFieldFactory extends FieldFactory {
 		if (alwaysShowRefRepeatables || elementList.isEmpty()) {
 			AttributedString refRepeatPrefixString = new AttributedString(SEMICOLON_PREFIX,
 				refRepeatableCommentColor, getMetrics(refRepeatableCommentStyle), false, null);
-			//int refRepeatLinesSoFar = 0;
 			int refRepeatCount = displayableEol.getReferencedRepeatableCommentsCount();
 			for (int subTypeIndex = 0; subTypeIndex < refRepeatCount; subTypeIndex++) {
 				RefRepeatComment refRepeatComment =
@@ -336,7 +345,6 @@ public class EolCommentFieldFactory extends FieldFactory {
 					refRepeatComments, program, refRepeatPrefixString, showSemicolon, isWordWrap,
 					prependRefAddress, refRepeatComment.getAddress(), getNextRow(elementList));
 				elementList.addAll(refRepeatFieldElements);
-				//refRepeatLinesSoFar += refRepeatComments.length;
 			}
 		}
 
@@ -359,7 +367,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 			maxDisplayLines, hlProvider);
 	}
 
-	private int getNextRow(ArrayList<FieldElement> elementList) {
+	private int getNextRow(List<FieldElement> elementList) {
 		int elementIndex = elementList.size() - 1;
 		if (elementIndex >= 0) {
 			FieldElement element = elementList.get(elementIndex);
@@ -500,7 +508,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 		DisplayableEol displayableEol =
 			new DisplayableEol(cu, alwaysShowRepeatable, alwaysShowRefRepeatables,
 				alwaysShowAutomatic, codeUnitFormatOptions.followReferencedPointers(),
-				maxDisplayLines, useAbbreviatedAutomatic);
+				maxDisplayLines, useAbbreviatedAutomatic, showAutomaticFunctions);
 
 		// Hold position in connected tool if navigating within semicolon.
 		int numLeadColumns = 0;
@@ -537,7 +545,7 @@ public class EolCommentFieldFactory extends FieldFactory {
 		DisplayableEol displayableEol =
 			new DisplayableEol((CodeUnit) obj, alwaysShowRepeatable, alwaysShowRefRepeatables,
 				alwaysShowAutomatic, codeUnitFormatOptions.followReferencedPointers(),
-				maxDisplayLines, useAbbreviatedAutomatic);
+				maxDisplayLines, useAbbreviatedAutomatic, showAutomaticFunctions);
 
 		ListingTextField btf = (ListingTextField) bf;
 

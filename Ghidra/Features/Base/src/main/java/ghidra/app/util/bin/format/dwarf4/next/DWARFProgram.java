@@ -28,8 +28,7 @@ import ghidra.app.util.bin.format.dwarf4.attribs.DWARFAttributeFactory;
 import ghidra.app.util.bin.format.dwarf4.encoding.*;
 import ghidra.app.util.bin.format.dwarf4.expression.DWARFExpressionException;
 import ghidra.app.util.bin.format.dwarf4.next.sectionprovider.*;
-import ghidra.app.util.opinion.ElfLoader;
-import ghidra.app.util.opinion.MachoLoader;
+import ghidra.app.util.opinion.*;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.data.CategoryPath;
@@ -54,12 +53,8 @@ public class DWARFProgram implements Closeable {
 	private static final int NAME_HASH_REPLACEMENT_SIZE = 8 + 2 + 2;
 	private static final String ELLIPSES_STR = "...";
 
-	public static boolean alreadyDWARFImported(Program prog) {
-		return DWARFFunctionImporter.hasDWARFProgModule(prog, DWARF_ROOT_NAME);
-	}
-
 	/**
-	 * Returns true if the {@link Program program} probably DWARF information.
+	 * Returns true if the {@link Program program} probably has DWARF information.
 	 * <p>
 	 * If the program is an Elf binary, it must have (at least) ".debug_info" and ".debug_abbr" program sections.
 	 * <p>
@@ -67,19 +62,21 @@ public class DWARFProgram implements Closeable {
 	 * original binary file on the native filesystem.  (ie. outside of Ghidra).  See the DSymSectionProvider
 	 * for more info.
 	 * <p>
-	 * @param program
-	 * @param monitor
-	 * @return
+	 * @param program {@link Program} to test
+	 * @return boolean true if program has DWARF info, false if not
 	 */
-	public static boolean isDWARF(Program program, TaskMonitor monitor) {
-		String format = program.getExecutableFormat();
+	public static boolean isDWARF(Program program) {
+		String format = Objects.requireNonNullElse(program.getExecutableFormat(), "");
 
-		if (ElfLoader.ELF_NAME.equals(format)) {
-			return true;
-		}
-		else if (MachoLoader.MACH_O_NAME.equals(format) &&
-			DSymSectionProvider.getDSYMForProgram(program) != null) {
-			return true;
+		switch (format) {
+			case ElfLoader.ELF_NAME:
+			case PeLoader.PE_NAME:
+				try (DWARFSectionProvider dsp =
+					DWARFSectionProviderFactory.createSectionProviderFor(program)) {
+					return dsp != null;
+				}
+			case MachoLoader.MACH_O_NAME:
+				return DSymSectionProvider.getDSYMForProgram(program) != null;
 		}
 		return false;
 	}
@@ -398,14 +395,6 @@ public class DWARFProgram implements Closeable {
 
 		String origName = isAnon ? null : name;
 		String workingName = ensureSafeNameLength(name);
-		switch (diea.getTag()) {
-			// fixup DWARF entries that are related to Ghidra symbols
-			case DWARFTag.DW_TAG_subroutine_type:
-			case DWARFTag.DW_TAG_subprogram:
-			case DWARFTag.DW_TAG_inlined_subroutine:
-				workingName = SymbolUtilities.replaceInvalidChars(workingName, false);
-				break;
-		}
 
 		DWARFNameInfo result =
 			parentDNI.createChild(origName, workingName, DWARFUtil.getSymbolTypeFromDIE(diea));
@@ -770,8 +759,7 @@ public class DWARFProgram implements Closeable {
 				if (refdOffset == -1) {
 					continue;
 				}
-				DWARFCompilationUnit targetCU = getCompilationUnitFor(refdOffset);
-				if (targetCU != null && targetCU != die.getCompilationUnit()) {
+				if (!die.getCompilationUnit().containsOffset(refdOffset)) {
 					return true;
 				}
 			}

@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.symbol;
 
 import java.io.IOException;
@@ -24,8 +21,7 @@ import java.util.Set;
 import db.*;
 import ghidra.program.database.map.AddressIndexPrimaryKeyIterator;
 import ghidra.program.database.map.AddressMap;
-import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressSpace;
+import ghidra.program.model.address.*;
 import ghidra.program.model.symbol.*;
 import ghidra.util.exception.*;
 import ghidra.util.task.TaskMonitor;
@@ -61,13 +57,10 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 	private AddressMap addrMap;
 
 	/**
-	 * Construct a Version-0 Symbol Table adadpter.
+	 * Construct a Version-0 Symbol Table adapter.
 	 * @param handle the database handle.
 	 * @param addrMap the address map
-	 * @param namespaceMgr namespace manager which already contains function namespaces
 	 * @throws VersionException if the database version doesn't match this adapter.
-	 * @throws IOException if a database io error occurs.
-	 * @throws CancelledException if the user cancels the upgrade.
 	 */
 	SymbolDatabaseAdapterV0(DBHandle handle, AddressMap addrMap) throws VersionException {
 		this.addrMap = addrMap.getOldAddressMap();
@@ -80,16 +73,28 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 		}
 	}
 
+	/**
+	 * Stores local symbols information in a temporary database table because this version
+	 * is so old, we don't have enough information in the record to upgrade during the normal
+	 * upgrade time. So we store off the information and will complete this upgrade when
+	 * {@link SymbolManager#programReady(int, int, TaskMonitor)} is called
+	 * 
+	 * @param handle handle to temporary database
+	 * @param monitor the {@link TaskMonitor}
+	 * @return the next available database key after all the records are store
+	 * @throws IOException if a database I/O error occurs
+	 * @throws CancelledException if the user cancels the upgrade
+	 */
 	long extractLocalSymbols(DBHandle handle, TaskMonitor monitor)
 			throws IOException, CancelledException {
 
-		monitor.setMessage("Extracting Local and Dynamic Symbols...");
+		monitor.setMessage("Extracting Local Symbols...");
 		monitor.initialize(symbolTable.getRecordCount());
 		int cnt = 0;
 		RecordIterator iter = symbolTable.iterator();
 		while (iter.hasNext()) {
 			monitor.checkCanceled();
-			Record rec = iter.next();
+			DBRecord rec = iter.next();
 			if (rec.getBooleanValue(V0_SYMBOL_LOCAL_COL)) {
 				SymbolManager.saveLocalSymbol(handle, rec.getKey(),
 					rec.getLongValue(V0_SYMBOL_ADDR_COL), rec.getString(V0_SYMBOL_NAME_COL),
@@ -100,7 +105,7 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 		return symbolTable.getKey();
 	}
 
-	private Record convertRecord(Record record) {
+	private DBRecord convertRecord(DBRecord record) {
 		if (record == null) {
 			return null;
 		}
@@ -108,23 +113,37 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 			record.getBooleanValue(V0_SYMBOL_LOCAL_COL)) {
 			throw new AssertException("Unexpected Symbol");
 		}
-		Record rec = SymbolDatabaseAdapter.SYMBOL_SCHEMA.createRecord(record.getKey());
-		rec.setString(SymbolDatabaseAdapter.SYMBOL_NAME_COL, record.getString(V0_SYMBOL_NAME_COL));
+		DBRecord rec = SymbolDatabaseAdapter.SYMBOL_SCHEMA.createRecord(record.getKey());
+
+		String symbolName = record.getString(V0_SYMBOL_NAME_COL);
+		rec.setString(SymbolDatabaseAdapter.SYMBOL_NAME_COL, symbolName);
+		long addressKey = record.getLongValue(V0_SYMBOL_ADDR_COL);
 		rec.setLongValue(SymbolDatabaseAdapter.SYMBOL_ADDR_COL,
-			record.getLongValue(V0_SYMBOL_ADDR_COL));
-		rec.setIntValue(SymbolDatabaseAdapter.SYMBOL_DATA2_COL,
-			record.getBooleanValue(V0_SYMBOL_PRIMARY_COL) ? 1 : 0);
+			addressKey);
+
+		boolean isPrimary = record.getBooleanValue(V0_SYMBOL_PRIMARY_COL);
+		if (isPrimary) {
+			rec.setLongValue(SymbolDatabaseAdapter.SYMBOL_PRIMARY_COL, addressKey);
+		}
+
 		rec.setByteValue(SymbolDatabaseAdapter.SYMBOL_TYPE_COL, SymbolType.LABEL.getID());
-		rec.setLongValue(SymbolDatabaseAdapter.SYMBOL_DATA1_COL, -1); // not applicable
-		rec.setLongValue(SymbolDatabaseAdapter.SYMBOL_PARENT_COL, Namespace.GLOBAL_NAMESPACE_ID);
+
+		long namespaceId = Namespace.GLOBAL_NAMESPACE_ID;
+		rec.setLongValue(SymbolDatabaseAdapter.SYMBOL_PARENT_COL, namespaceId);
+
 		rec.setByteValue(SymbolDatabaseAdapter.SYMBOL_FLAGS_COL,
 			(byte) SourceType.USER_DEFINED.ordinal());
+
+		Field hash = computeLocatorHash(symbolName, namespaceId, addressKey);
+		rec.setField(SymbolDatabaseAdapter.SYMBOL_HASH_COL, hash);
+
 		return rec;
 	}
 
 	@Override
-	Record createSymbol(String name, Address address, long namespaceID, SymbolType symbolType,
-			long data1, int data2, String data3, SourceType source) {
+	DBRecord createSymbol(String name, Address address, long namespaceID, SymbolType symbolType,
+			String stringData, Long dataTypeId, Integer varOffset, SourceType source,
+			boolean isPrimary) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
@@ -144,7 +163,7 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 	}
 
 	@Override
-	Record getSymbolRecord(long symbolID) throws IOException {
+	DBRecord getSymbolRecord(long symbolID) throws IOException {
 		return convertRecord(symbolTable.getRecord(symbolID));
 	}
 
@@ -167,7 +186,7 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 	}
 
 	@Override
-	void updateSymbolRecord(Record record) throws IOException {
+	void updateSymbolRecord(DBRecord record) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
@@ -178,28 +197,39 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 
 	@Override
 	RecordIterator getSymbols(Address start, Address end, boolean forward) throws IOException {
-
-		if (!forward)
-			throw new UnsupportedOperationException();
-//TODO: Is there any reason we need to support reverse symbol iteration ???
-		// Yes, to search text backwards!
 		return new V0ConvertedRecordIterator(
 			new KeyToRecordIterator(symbolTable, new AddressIndexPrimaryKeyIterator(symbolTable,
 				V0_SYMBOL_ADDR_COL, addrMap, start, end, forward)));
 	}
 
-	void deleteExternalEntries(Address start, Address end) {
-		throw new UnsupportedOperationException();
+	@Override
+	RecordIterator getSymbols(AddressSetView set, boolean forward) throws IOException {
+		return new V0ConvertedRecordIterator(
+			new KeyToRecordIterator(symbolTable, new AddressIndexPrimaryKeyIterator(symbolTable,
+				V0_SYMBOL_ADDR_COL, addrMap, set, forward)));
+	}
+
+	@Override
+	RecordIterator getPrimarySymbols(AddressSetView set, boolean forward)
+			throws IOException {
+		KeyToRecordIterator it =
+			new KeyToRecordIterator(symbolTable, new AddressIndexPrimaryKeyIterator(symbolTable,
+				SYMBOL_ADDR_COL, addrMap, set, forward));
+
+		return getPrimaryFilterRecordIterator(new V0ConvertedRecordIterator(it));
+	}
+
+	@Override
+	DBRecord getPrimarySymbol(Address address) throws IOException {
+		RecordIterator it = getPrimarySymbols(new AddressSet(address, address), true);
+		if (it.hasNext()) {
+			return it.next();
+		}
+		return null;
 	}
 
 	@Override
 	void moveAddress(Address oldAddr, Address newAddr) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	void moveAddressRange(Address fromAddr, Address toAddr, long length, TaskMonitor monitor)
-			throws CancelledException, IOException {
 		throw new UnsupportedOperationException();
 	}
 
@@ -228,12 +258,11 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 	private class V0ConvertedRecordIterator implements RecordIterator {
 
 		private RecordIterator symIter;
-		private Record rec;
+		private DBRecord rec;
 
 		/**
 		 * Construct a symbol filtered record iterator
-		 * @param iter
-		 * @param locals if true 
+		 * @param symIter the {@link RecordIterator} to wrap so that records are adapter to new schema
 		 */
 		V0ConvertedRecordIterator(RecordIterator symIter) {
 			this.symIter = symIter;
@@ -259,9 +288,9 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 		}
 
 		@Override
-		public Record next() throws IOException {
+		public DBRecord next() throws IOException {
 			if (hasNext()) {
-				Record r = rec;
+				DBRecord r = rec;
 				rec = null;
 				return convertRecord(r);
 			}
@@ -269,7 +298,7 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 		}
 
 		@Override
-		public Record previous() throws IOException {
+		public DBRecord previous() throws IOException {
 			throw new UnsupportedOperationException();
 		}
 
@@ -288,6 +317,25 @@ class SymbolDatabaseAdapterV0 extends SymbolDatabaseAdapter {
 	@Override
 	Address getMaxSymbolAddress(AddressSpace space) throws IOException {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	RecordIterator getSymbolsByNameAndNamespace(String name, long id) throws IOException {
+		RecordIterator symbolsByName = getSymbolsByName(name);
+		return getNameAndNamespaceFilterIterator(name, id, symbolsByName);
+	}
+
+	@Override
+	DBRecord getSymbolRecord(Address address, String name, long id) throws IOException {
+		StringField value = new StringField(name);
+		RecordIterator it = symbolTable.indexIterator(SYMBOL_NAME_COL, value, value, true);
+		long addressKey = addrMap.getKey(address, false);
+		RecordIterator filtered =
+			getNameNamespaceAddressFilterIterator(name, id, addressKey, it);
+		if (filtered.hasNext()) {
+			return filtered.next();
+		}
+		return null;
 	}
 
 }

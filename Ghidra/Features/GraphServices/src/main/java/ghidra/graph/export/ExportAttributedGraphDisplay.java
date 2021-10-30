@@ -19,11 +19,12 @@ import java.util.*;
 
 import org.jgrapht.Graph;
 
-import docking.action.DockingAction;
+import docking.action.DockingActionIf;
 import docking.widgets.EventTrigger;
 import ghidra.app.services.GraphDisplayBroker;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.service.graph.*;
+import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
 /**
@@ -59,8 +60,6 @@ class ExportAttributedGraphDisplay implements GraphDisplay {
 		listener.dispose();
 	}
 
-
-
 	/**
 	 * set the {@link AttributedGraph} for visualization
 	 * @param attributedGraph the {@link AttributedGraph} to visualize
@@ -80,27 +79,17 @@ class ExportAttributedGraphDisplay implements GraphDisplay {
 	}
 
 	@Override
-	public void defineVertexAttribute(String attributeName) {
-		// no effect
-	}
-
-	@Override
-	public void defineEdgeAttribute(String attributeName) {
-		// no effect
-	}
-
-	@Override
-	public void setVertexLabel(String attributeName, int alignment, int size, boolean monospace,
-			int maxLines) {
-		// no effect
-	}
-
-	@Override
 	public void setGraph(AttributedGraph graph, String title, boolean append,
 			TaskMonitor monitor) {
 		this.title = title;
 		this.graph = graph;
 		doSetGraphData(graph);
+	}
+
+	@Override
+	public void setGraph(AttributedGraph graph, GraphDisplayOptions options, String title,
+			boolean append, TaskMonitor monitor) throws CancelledException {
+		this.setGraph(graph, title, append, monitor);
 	}
 
 	/**
@@ -122,7 +111,7 @@ class ExportAttributedGraphDisplay implements GraphDisplay {
 	}
 
 	@Override
-	public void addAction(DockingAction action) {
+	public void addAction(DockingActionIf action) {
 		// do nothing, actions are not supported by this display
 	}
 
@@ -150,5 +139,4 @@ class ExportAttributedGraphDisplay implements GraphDisplay {
 	public void selectVertices(Set<AttributedVertex> vertexList, EventTrigger eventTrigger) {
 		// not interactive, so N/A
 	}
-
 }

@@ -43,7 +43,7 @@ class AlignedComponentPacker {
 
 	private InternalDataTypeComponent lastComponent;
 
-	private int externalAlignment = 1;
+	private int defaultAlignment = 1;
 	private boolean componentsChanged;
 
 	AlignedComponentPacker(int packValue, DataOrganization dataOrganization) {
@@ -54,12 +54,12 @@ class AlignedComponentPacker {
 
 	/**
 	 * Add next component within structure.  All components should be added in sequence excluding
-	 * DEFAULT components and any trailing flexible array component.
+	 * DEFAULT components.
 	 * @param dtc structure component
 	 * @param isLastComponent true if dtc is the last component within the structure
 	 */
 	void addComponent(InternalDataTypeComponent dtc, boolean isLastComponent) {
-		if (dtc.getDataType() == DataType.DEFAULT || dtc.isFlexibleArrayComponent()) {
+		if (dtc.getDataType() == DataType.DEFAULT) {
 			throw new IllegalArgumentException("unsupported component");
 		}
 		if (!packComponent(dtc)) {
@@ -68,7 +68,7 @@ class AlignedComponentPacker {
 		lastComponent = dtc;
 		++nextOrdinal;
 
-		externalAlignment = getComponentAlignmentLCM(externalAlignment);
+		defaultAlignment = getComponentAlignmentLCM(defaultAlignment);
 	}
 
 	/**
@@ -80,13 +80,11 @@ class AlignedComponentPacker {
 	}
 
 	/**
-	 * Get the external structure alignment after all components have been added.
-	 * This value does not factor in the affects of any trailing flexible array component
-	 * which may exist.
+	 * Get the external structure alignment after all components have been packed.
 	 * @return external alignment
 	 */
-	int getExternalAlignment() {
-		return externalAlignment;
+	int getDefaultAlignment() {
+		return defaultAlignment;
 	}
 
 	/**
@@ -108,12 +106,11 @@ class AlignedComponentPacker {
 			offset = lastComponent.getOffset() + lastComponent.getLength();
 			if (!bitFieldPacking.useMSConvention() && lastComponent.isZeroBitFieldComponent()) {
 				// factor in trailing zero-length bitfield
+				// TODO: does pack setting need to be considered?
 				BitFieldDataType bitfieldDt = (BitFieldDataType) lastComponent.getDataType();
-				int sizeAlignment = CompositeAlignmentHelper.getPackedAlignment(dataOrganization,
-					Composite.NOT_PACKING, bitfieldDt.getBaseDataType(),
-					bitfieldDt.getBaseTypeSize());
+				int sizeAlignment = bitfieldDt.getBaseDataType().getAlignment();
 				getBitFieldAlignment((BitFieldDataType) lastComponent.getDataType());
-				offset += DataOrganizationImpl.getPaddingSize(sizeAlignment, offset);
+				offset = DataOrganizationImpl.getAlignedOffset(sizeAlignment, offset);
 			}
 		}
 		return offset;
@@ -129,17 +126,17 @@ class AlignedComponentPacker {
 
 	private int getBitFieldAlignment(BitFieldDataType bitfieldDt) {
 
-		if (!bitFieldPacking.useMSConvention() && packValue != Composite.NOT_PACKING) {
+		if (!bitFieldPacking.useMSConvention() && packValue != CompositeInternal.DEFAULT_PACKING) {
 			// GCC always uses 1 when packing regardless of pack value
 			return 1;
 		}
 
-		return CompositeAlignmentHelper.getPackedAlignment(dataOrganization, packValue,
-			bitfieldDt.getBaseDataType(), bitfieldDt.getBaseTypeSize());
+		return CompositeAlignmentHelper
+				.getPackedAlignment(bitfieldDt.getBaseDataType().getAlignment(), packValue);
 	}
 
 	private boolean isIgnoredZeroBitField(BitFieldDataType zeroBitFieldDt) {
-		if (!zeroBitFieldDt.isZeroLengthField()) {
+		if (!zeroBitFieldDt.isZeroLength()) {
 			return false;
 		}
 		if (bitFieldPacking.useMSConvention()) {
@@ -167,11 +164,11 @@ class AlignedComponentPacker {
 		if (!bitFieldPacking.useMSConvention() && !isLastComponent) {
 			// GCC ignores pack value for :0 bitfield alignment but considers it when 
 			// passing alignment along to structure
-			pack = Composite.NOT_PACKING;
+			pack = CompositeInternal.NO_PACKING;
 		}
 
-		return CompositeAlignmentHelper.getPackedAlignment(dataOrganization, pack,
-			zeroBitFieldDt.getBaseDataType(), zeroBitFieldDt.getBaseTypeSize());
+		return CompositeAlignmentHelper
+				.getPackedAlignment(zeroBitFieldDt.getBaseDataType().getAlignment(), pack);
 	}
 
 	private void initGroup(InternalDataTypeComponent dataTypeComponent, boolean isLastComponent) {
@@ -203,15 +200,9 @@ class AlignedComponentPacker {
 				}
 
 				if (isLastComponent) {
-					// special handling of zero-length bitfield when it is last component,
-					// place on last byte within structure.
-					int offset = groupOffset;
-					int length = 1;
-					if (lastComponent != null) {
-						offset = groupOffset - 1; // lastComponent.getEndOffset();
-					}
-					updateComponent(dataTypeComponent, nextOrdinal, offset, length,
-						alignment > 0 ? alignment : 1);
+					// special handling of zero-length bitfield when it is last component
+					int offset = DataOrganizationImpl.getAlignedOffset(zeroBitFieldDt.getBaseDataType().getAlignment(), groupOffset);
+					updateComponent(dataTypeComponent, nextOrdinal, offset, 0, alignment > 0 ? alignment : 1);
 					groupOffset = -1;
 				}
 				else {
@@ -248,8 +239,8 @@ class AlignedComponentPacker {
 	 */
 	private void adjustZeroLengthBitField(int ordinal, int minimumAlignment) {
 
-		int minOffset = DataOrganizationImpl.getOffset(minimumAlignment, groupOffset);
-		int zeroAlignmentOffset = DataOrganizationImpl.getOffset(zeroAlignment, groupOffset);
+		int minOffset = DataOrganizationImpl.getAlignedOffset(minimumAlignment, groupOffset);
+		int zeroAlignmentOffset = DataOrganizationImpl.getAlignedOffset(zeroAlignment, groupOffset);
 
 		// Determine component offset of zero-length bitfield and the component
 		// which immediately follows it.
@@ -262,7 +253,7 @@ class AlignedComponentPacker {
 			groupOffset = zeroAlignmentOffset;
 		}
 
-		updateComponent(lastComponent, ordinal, groupOffset, 1, minimumAlignment);
+		updateComponent(lastComponent, ordinal, groupOffset, 0, minimumAlignment);
 	}
 
 	private boolean packComponent(InternalDataTypeComponent dataTypeComponent) {
@@ -307,13 +298,14 @@ class AlignedComponentPacker {
 	private void alignAndPackNonBitfieldComponent(InternalDataTypeComponent dataTypeComponent,
 			int minOffset) {
 		DataType componentDt = dataTypeComponent.getDataType();
-		int dtSize = componentDt.getLength();
-		if (dtSize <= 0) {
+
+		int dtSize = componentDt.isZeroLength() ? 0 : componentDt.getLength();
+		if (dtSize < 0) {
 			dtSize = dataTypeComponent.getLength();
 		}
 
-		int alignment = CompositeAlignmentHelper.getPackedAlignment(dataOrganization, packValue,
-			componentDt, dtSize);
+		int alignment =
+			CompositeAlignmentHelper.getPackedAlignment(componentDt.getAlignment(), packValue);
 
 		int offset;
 		if (lastComponent != null && lastComponent.isZeroBitFieldComponent()) {
@@ -322,7 +314,7 @@ class AlignedComponentPacker {
 			offset = groupOffset;
 		}
 		else {
-			offset = DataOrganizationImpl.getOffset(alignment, minOffset);
+			offset = DataOrganizationImpl.getAlignedOffset(alignment, minOffset);
 			if (lastComponent == null) {
 				groupOffset = offset; // establish corrected group offset after alignment
 			}
@@ -345,14 +337,14 @@ class AlignedComponentPacker {
 		int bitsConsumed;
 
 		// update lastAlignment to be conveyed onto structure alignment
-		int alignment = CompositeAlignmentHelper.getPackedAlignment(dataOrganization, packValue,
-			bitfieldDt.getPrimitiveBaseDataType(), bitfieldDt.getBaseTypeSize());
+		int alignment = CompositeAlignmentHelper.getPackedAlignment(
+			bitfieldDt.getPrimitiveBaseDataType().getAlignment(), packValue);
 
 		// Set conveyed alignment early since bitfield alignment may be reduced below
 		lastAlignment = Math.max(alignment, lastAlignment);
 
 		if (lastComponent == null) {
-			offset = DataOrganizationImpl.getOffset(alignment, groupOffset);
+			offset = DataOrganizationImpl.getAlignedOffset(alignment, groupOffset);
 			bitsConsumed = 0;
 			groupOffset = offset; // establish corrected group offset after alignment
 		}
@@ -406,10 +398,10 @@ class AlignedComponentPacker {
 			if (offset % alignment != 0 || byteSize > bitfieldDt.getBaseTypeSize()) {
 				// offset is not an aligned offset (which may be OK when packing with lastComponent)
 				int alignedBaseOffset =
-					DataOrganizationImpl.getOffset(alignment, offset) - alignment;
+					DataOrganizationImpl.getAlignedOffset(alignment, offset) - alignment;
 				if (endOffset >= alignedBaseOffset + bitfieldDt.getBaseTypeSize()) {
 					// skip ahead to next aligned offset
-					offset = DataOrganizationImpl.getOffset(alignment, offset + 1);
+					offset = DataOrganizationImpl.getAlignedOffset(alignment, offset + 1);
 					endOffset = offset + byteSize - 1;
 					bitsConsumed = 0;
 				}

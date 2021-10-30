@@ -30,6 +30,11 @@ public class ARM_ElfRelocationHandler extends ElfRelocationHandler {
 	}
 
 	@Override
+	public int getRelrRelocationType() {
+		return ARM_ElfRelocationConstants.R_ARM_RELATIVE;
+	}
+
+	@Override
 	public void relocate(ElfRelocationContext elfRelocationContext, ElfRelocation relocation,
 			Address relocationAddress) throws MemoryAccessException, NotFoundException {
 
@@ -59,6 +64,7 @@ public class ARM_ElfRelocationHandler extends ElfRelocationHandler {
 
 		long offset = (int) relocationAddress.getOffset();
 
+		Address symbolAddr = elfRelocationContext.getSymbolAddress(sym);
 		long symbolValue = elfRelocationContext.getSymbolValue(sym);
 
 		int newValue = 0;
@@ -84,6 +90,10 @@ public class ARM_ElfRelocationHandler extends ElfRelocationHandler {
 			case ARM_ElfRelocationConstants.R_ARM_ABS32: { // Target class: Data
 				if (elfRelocationContext.extractAddend()) {
 					addend = memory.getInt(relocationAddress);
+				}
+				if (addend != 0 && isUnsupportedExternalRelocation(program, relocationAddress,
+					symbolAddr, symbolName, addend, elfRelocationContext.getLog())) {
+					addend = 0; // prefer bad fixup for EXTERNAL over really-bad fixup
 				}
 				newValue = (int) (symbolValue + addend);
 				if (isThumb) {
@@ -344,12 +354,29 @@ public class ARM_ElfRelocationHandler extends ElfRelocationHandler {
 			case ARM_ElfRelocationConstants.R_ARM_PREL31: {
 				break;
 			}
-			case ARM_ElfRelocationConstants.R_ARM_MOVW_ABS_NC: {
+*/
+			case ARM_ElfRelocationConstants.R_ARM_MOVW_ABS_NC: 
+			case ARM_ElfRelocationConstants.R_ARM_MOVT_ABS: {	// Target Class: ARM Instruction		
+				oldValue = memory.getInt(relocationAddress, instructionBigEndian);
+				newValue = oldValue;
+				
+				oldValue = ((oldValue & 0xf0000) >> 4) | (oldValue & 0xfff);
+				oldValue = (oldValue ^ 0x8000) - 0x8000;
+
+				oldValue += symbolValue;
+				if (type == ARM_ElfRelocationConstants.R_ARM_MOVT_ABS) {
+					oldValue >>= 16;
+				}
+
+				newValue &= 0xfff0f000;
+				newValue |= ((oldValue & 0xf000) << 4) |
+					(oldValue & 0x0fff);
+
+				memory.setInt(relocationAddress, newValue, instructionBigEndian);
+
 				break;
 			}
-			case ARM_ElfRelocationConstants.R_ARM_MOVT_ABS: {
-				break;
-			}
+/*
 			case ARM_ElfRelocationConstants.R_ARM_MOVW_PREL_NC: {
 				break;
 			}

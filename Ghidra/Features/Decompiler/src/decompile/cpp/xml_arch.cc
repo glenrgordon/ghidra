@@ -24,6 +24,12 @@ XmlArchitectureCapability::XmlArchitectureCapability(void)
   name = "xml";
 }
 
+XmlArchitectureCapability::~XmlArchitectureCapability(void)
+
+{
+  SleighArchitecture::shutdown();
+}
+
 Architecture *XmlArchitectureCapability::buildArchitecture(const string &filename,const string &target,ostream *estream)
 
 {
@@ -123,6 +129,12 @@ void XmlArchitecture::restoreXml(DocumentStorage &store)
   iter = list.begin();
   if (iter!=list.end()) {
     if ((*iter)->getName() == "binaryimage") {
+      store.registerTag(*iter);
+      ++iter;
+    }
+  }
+  if (iter != list.end()) {
+    if ((*iter)->getName() == "specextensions") {
       store.registerTag(*iter);
       ++iter;
     }

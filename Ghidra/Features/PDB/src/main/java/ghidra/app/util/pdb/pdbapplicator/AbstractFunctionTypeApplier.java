@@ -105,7 +105,7 @@ public abstract class AbstractFunctionTypeApplier extends MsTypeApplier {
 
 	/**
 	 * Returns whether the function has a "this" pointer
-	 * @return {@code true} if it has a "this" pointer 
+	 * @return {@code true} if it has a "this" pointer
 	 */
 	protected abstract boolean hasThisPointer();
 
@@ -122,8 +122,16 @@ public abstract class AbstractFunctionTypeApplier extends MsTypeApplier {
 	protected abstract RecordNumber getArgListRecordNumber();
 
 	/**
+	 * Returns if known to be a constructor.
+	 * @return true if constructor.
+	 */
+	protected boolean isConstructor() {
+		return false;
+	}
+
+	/**
 	 * Method to create the {@link DataType} based upon the type indices of the calling
-	 * convention, return type, and arguments list. 
+	 * convention, return type, and arguments list.
 	 * @param callingConventionParam Identification of the {@link AbstractMsType} record of the
 	 * {@link CallingConvention}.
 	 * @param hasThisPointerParam true if has a this pointer
@@ -203,6 +211,10 @@ public abstract class AbstractFunctionTypeApplier extends MsTypeApplier {
 
 	private boolean setReturnType() {
 
+		if (isConstructor()) {
+			return true;
+		}
+
 		DataType returnDataType = returnApplier.getDataType();
 		if (returnDataType == null) {
 			applicator.appendLogMsg("Return type is null in " + functionDefinition.getName());
@@ -222,7 +234,7 @@ public abstract class AbstractFunctionTypeApplier extends MsTypeApplier {
 			// Since we are a member function, we will always assume a _thiscall...
 			// but how do we know it is not a atatic member function (no "this")?
 			switch (callingConvention) {
-				// TODO: figure all of these out. 
+				// TODO: figure all of these out.
 				case THISCALL: // "this" passed in register (we have not yet seen this)
 					convention = GenericCallingConvention.thiscall; // Is this correct if in reg?
 					break;

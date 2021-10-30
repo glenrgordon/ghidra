@@ -21,17 +21,13 @@ import java.util.List;
 import ghidra.app.cmd.comments.SetCommentCmd;
 import ghidra.app.plugin.core.analysis.AutoAnalysisManager;
 import ghidra.app.services.ProgramManager;
-import ghidra.app.util.bin.BinaryReader;
-import ghidra.app.util.bin.ByteProvider;
-import ghidra.app.util.bin.MemoryByteProvider;
+import ghidra.app.util.bin.*;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.file.analyzers.FileFormatAnalyzer;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.DataType;
-import ghidra.program.model.listing.CodeUnit;
-import ghidra.program.model.listing.Data;
-import ghidra.program.model.listing.Program;
+import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
@@ -256,17 +252,14 @@ public class NewExt4Analyzer extends FileFormatAnalyzer {
 				comment += "Group Descriptor ID: 0x" + Integer.toHexString( i ) + "\n";
 				comment += "Inode Offset Into Group: 0x" + Integer.toHexString( j ) + "\n";
 
-				Ext4IBlock iBlock = inode.getI_block( );
-				if ( iBlock != null ) {
-					for ( Ext4Extent extent : iBlock.getExtentEntries( ) ) {
-						monitor.checkCanceled( );
-						long lo = extent.getEe_start_lo( ) & 0xffffffffL;
-						long hi = extent.getEe_start_hi( ) & 0xffffffffL;
-						long value = ( hi << 32 ) | lo;
-						long destination = value * blockSize;
-						comment += "Extent: 0x" + Long.toHexString( destination ) + "\n";
-					}
-				}
+//				Ext4IBlock iBlock = inode.getI_block( );
+//				if ( iBlock != null ) {
+//					for ( Ext4Extent extent : iBlock.getExtentEntries( ) ) {
+//						monitor.checkCanceled( );
+//						long destination = extent.getExtentStartBlockNumber() * blockSize;
+//						comment += "Extent: 0x" + Long.toHexString( destination ) + "\n";
+//					}
+//				}
 
 				setPlateComment( program, address, comment );
 				createLabel( program, address, "INODE_" + "0x" + Integer.toHexString( inodeIndex + 1 ) );
@@ -329,8 +322,8 @@ public class NewExt4Analyzer extends FileFormatAnalyzer {
 		boolean isDirEntry2 = (superBlock.getS_feature_incompat() & Ext4Constants.INCOMPAT_FILETYPE) != 0;
 		// if uses extents
 		if ( (inode.getI_flags() & Ext4Constants.EXT4_EXTENTS_FL) != 0 ) {
-			Ext4IBlock i_block = inode.getI_block();
-			processIBlock( program, reader, isDirEntry2, i_block, monitor );
+//			Ext4IBlock i_block = inode.getI_block();
+//			processIBlock( program, reader, isDirEntry2, i_block, monitor );
 		}
 	}
 
@@ -346,15 +339,12 @@ public class NewExt4Analyzer extends FileFormatAnalyzer {
 			List<Ext4Extent> entries = i_block.getExtentEntries();
 			for ( int i = 0; i < numEntries; i++ ) {
 				Ext4Extent extent = entries.get( i );
-				long lo = extent.getEe_start_lo( ) & 0xffffffffL;
-				long hi = extent.getEe_start_hi( ) & 0xffffffffL;
-				long value = ( hi << 32 ) | lo;
-				long offset = value * blockSize;
+				long offset = extent.getExtentStartBlockNumber() * blockSize;
 				reader.setPointerIndex(offset);
 				Address address = toAddr( program, offset );
 				if ( isDirEntry2 ) {
 					while ( ( reader.getPointerIndex( ) - offset ) < ( extent.getEe_len( ) * blockSize ) ) {
-						Ext4DirEntry2 dirEnt2 = new Ext4DirEntry2( reader );
+						Ext4DirEntry2 dirEnt2 = Ext4DirEntry2.read(reader);
 						DataType dataType = dirEnt2.toDataType( );
 						createData( program, address, dataType );
 						String comment = "Name: " + dirEnt2.getName( ) + "\n";

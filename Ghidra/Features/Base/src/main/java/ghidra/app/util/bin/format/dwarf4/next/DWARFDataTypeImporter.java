@@ -26,6 +26,7 @@ import ghidra.app.util.DataTypeNamingUtil;
 import ghidra.app.util.bin.format.dwarf4.*;
 import ghidra.app.util.bin.format.dwarf4.encoding.*;
 import ghidra.app.util.bin.format.dwarf4.expression.DWARFExpressionException;
+import ghidra.program.database.DatabaseObject;
 import ghidra.program.database.data.DataTypeUtilities;
 import ghidra.program.model.data.*;
 import ghidra.program.model.data.Enum;
@@ -140,6 +141,13 @@ public class DWARFDataTypeImporter {
 			return result;
 		}
 
+		// Query the dwarfDTM for plain Ghidra dataTypes that were previously
+		// registered in a different import session.
+		DataType alreadyImportedDT = dwarfDTM.getDataType(diea.getOffset(), null);
+		if (shouldReuseAlreadyImportedDT(alreadyImportedDT)) {
+			return new DWARFDataType(alreadyImportedDT, null, diea.getOffset());
+		}
+
 		if (!trackRecursion(diea.getOffset(), 1)) {
 			return defaultValue;
 		}
@@ -212,6 +220,20 @@ public class DWARFDataTypeImporter {
 		return result;
 	}
 
+	/**
+	 * Returns true if the previously imported data type should be reused.
+	 * <p>
+	 * Don't re-use empty structs (isNotYetDefined) to ensure that newer
+	 * definitions of the same struct are given a chance to be resolved() 
+	 * into the DTM. 
+	 * 
+	 * @param alreadyImportedDT dataType to check
+	 * @return boolean true if its okay to reuse the data type
+	 */
+	private boolean shouldReuseAlreadyImportedDT(DataType alreadyImportedDT) {
+		return alreadyImportedDT != null && !alreadyImportedDT.isNotYetDefined();
+	}
+
 	/*
 	 * when a clone()'d datatype is created, update the current mappings to
 	 * point to the new instance instead of the old instance.
@@ -229,6 +251,10 @@ public class DWARFDataTypeImporter {
 	 * 						offset -> ddt
 	 */
 	private void recordTempDataType(DWARFDataType ddt) {
+		if (ddt.dataType instanceof DatabaseObject) {
+			// don't store info about types that are already in the database
+			return;
+		}
 		dataTypeInstanceToDDTMap.put(ddt.dataType, ddt);
 		for (Long offset : ddt.offsets) {
 			dieOffsetToDataTypeMap.put(offset, ddt);
@@ -518,11 +544,18 @@ public class DWARFDataTypeImporter {
 			structSize = 0;
 		}
 		boolean isUnion = diea.getTag() == DWARFTag.DW_TAG_union_type;
+		boolean isDecl = diea.getBool(DWARFAttribute.DW_AT_declaration, false);
 
 		DataType struct =
 			isUnion ? new UnionDataType(dni.getParentCP(), dni.getName(), dataTypeManager)
 					: new StructureDataType(dni.getParentCP(), dni.getName(), (int) structSize,
 						dataTypeManager);
+
+		if (!isDecl && origStructSize == 0) {
+			// Enable packing on 0-byte composites so they are treated as defined
+			// and will not take space if used in a field in another composite.
+			((Composite) struct).setToDefaultPacking();
+		}
 
 		DWARFDataType result = new DWARFDataType(struct, dni, diea.getOffset());
 		result.dsi = DWARFSourceInfo.create(diea);
@@ -685,6 +718,9 @@ public class DWARFDataTypeImporter {
 		}
 
 		if (union.getLength() < unionSize) {
+			// NOTE: this is likely due incorrect alignment for union or one or more of its components.
+			// Default alignment is 1 for non-packed unions and structures.
+			
 			// if the Ghidra union data type is smaller than the DWARF union, pad it out
 			DataType padding = Undefined.getUndefinedDataType((int) unionSize);
 			try {
@@ -739,11 +775,14 @@ public class DWARFDataTypeImporter {
 		DataTypeComponent[] definedComponents = structure.getDefinedComponents();
 		for (int i = 0; i < definedComponents.length; i++) {
 			DataTypeComponent dtc = definedComponents[i];
+			DataType dtcDT = dtc.getDataType();
+			if (dtcDT.isZeroLength()) {
+				continue;
+			}
 			int nextDTCOffset =
 				(i < definedComponents.length - 1) ? definedComponents[i + 1].getOffset()
 						: structure.getLength();
-			int emptySpaceBetween = nextDTCOffset - dtc.getEndOffset();
-			DataType dtcDT = dtc.getDataType();
+			int emptySpaceBetween = nextDTCOffset - (dtc.getEndOffset() + 1);
 			if (dtc.getLength() < dtcDT.getLength() && emptySpaceBetween > 0) {
 				DataTypeComponent newDTC = structure.replaceAtOffset(dtc.getOffset(), dtcDT,
 					Math.min(nextDTCOffset - dtc.getOffset(), dtc.getDataType().getLength()),
@@ -768,10 +807,10 @@ public class DWARFDataTypeImporter {
 			DataTypeComponent[] definedComponents = structure.getDefinedComponents();
 			if (definedComponents.length > 0) {
 				DataTypeComponent lastDTC = definedComponents[definedComponents.length - 1];
-				return lastDTC.getOffset() + getUnpaddedDataTypeLength(lastDTC.getDataType());
+				return lastDTC.getOffset() + lastDTC.getLength();
 			}
 		}
-		return dt.getLength();
+		return dt.isZeroLength() ? 0 : dt.getLength();
 	}
 
 	private void populateStubStruct_worker(DWARFDataType ddt, StructureDataType structure,
@@ -834,9 +873,6 @@ public class DWARFDataTypeImporter {
 				}
 			}
 
-			boolean isDynamicSizedType = (childDT.dataType instanceof Dynamic ||
-				childDT.dataType instanceof FactoryDataType);
-
 			//if (childDT.getPathName().equals(structure.getPathName()) && childDT != structure) {
 			// The child we are adding has the exact same fullpath as us.
 			// This can happen when DWARF namespace info gets squished and two types
@@ -846,33 +882,7 @@ public class DWARFDataTypeImporter {
 			// TODO: rename parent struct here.  use .conflict or _basetype?
 			//}
 
-			if (childDT.isEmptyArrayType && childDT.dataType instanceof Array) {
-
-				if (memberOffset == structure.getLength() &&
-					structure.getFlexibleArrayComponent() == null) {
-					DataType arrayElementType = ((Array) childDT.dataType).getDataType();
-					structure.setFlexibleArrayComponent(arrayElementType, memberName, null);
-				}
-				else {
-					DWARFUtil.appendDescription(structure,
-						memberDesc("Missing member",
-							"Unsupported interior flex array: " + childDT.dataType.getName(),
-							memberName, childDT, memberOffset, -1, -1),
-						"\n");
-
-				}
-
-				// skip the rest of this loop as it deals with adding component children members.
-				continue;
-			}
-
 			if (isBitField) {
-				if (isDynamicSizedType) {
-					DWARFUtil.appendDescription(structure, memberDesc("Missing member",
-						"dynamic length type", memberName, childDT, memberOffset, bitSize, -1),
-						"\n");
-					continue;
-				}
 				if (!BitFieldDataType.isValidBaseDataType(childDT.dataType)) {
 					DWARFUtil.appendDescription(structure,
 						memberDesc("Missing member",
@@ -936,11 +946,12 @@ public class DWARFDataTypeImporter {
 			}
 			else {
 				String memberComment = null;
+				boolean isDynamicSizedType = (childDT.dataType instanceof Dynamic ||
+					childDT.dataType instanceof FactoryDataType);
 				if (isDynamicSizedType) {
 					memberComment = "Unsupported dynamic size data type: " + childDT.dataType;
 					childDT.dataType = Undefined.getUndefinedDataType(1);
 				}
-
 				int childLength = getUnpaddedDataTypeLength(childDT.dataType);
 				if (memberOffset + childLength > structure.getLength()) {
 					DWARFUtil.appendDescription(structure, memberDesc("Missing member",
@@ -950,21 +961,39 @@ public class DWARFDataTypeImporter {
 					continue;
 				}
 
-				DataTypeComponent existingDTC = structure.getComponentAt(memberOffset);
-				if (existingDTC != null &&
-					!(existingDTC.getDataType() instanceof DefaultDataType)) {
-					DWARFUtil.appendDescription(structure,
-						memberDesc("Missing member", "conflict with " + existingDTC.getFieldName(),
-							memberName, childDT, memberOffset, -1, -1),
-						"\n");
-					continue;
-				}
 
 				try {
-					DataTypeComponent dtc = structure.replaceAtOffset(memberOffset,
-						childDT.dataType, childLength, memberName, memberComment);
-
-					// struct.replaceAtOffset() clones the childDT, which will mess up our
+					DataTypeComponent dtc;
+					if (DataTypeComponent.usesZeroLengthComponent(childDT.dataType)) {
+						if (!isUndefinedOrZeroLenAtOffset(structure, memberOffset)) {
+							DWARFUtil.appendDescription(structure, memberDesc("Missing member",
+								"conflicting member at same offset", memberName, childDT,
+								memberOffset, -1, -1), "\n");
+							continue;
+						}
+						// use insertAt for zero len members to allow multiple at same offset
+						dtc =
+							structure.insertAtOffset(memberOffset, childDT.dataType, 0, memberName,
+							memberComment);
+					}
+					else {
+						int ordinalToReplace = getUndefinedOrdinalAt(structure, memberOffset);
+						if (ordinalToReplace == -1) {
+							DataTypeComponent existingDTC =
+								structure.getComponentContaining(memberOffset);
+							if (existingDTC != null) {
+								DWARFUtil.appendDescription(structure,
+									memberDesc("Missing member",
+										"conflict with " + existingDTC.getFieldName(),
+										memberName, childDT, memberOffset, -1, -1),
+									"\n");
+							}
+							continue;
+						}
+						dtc = structure.replace(ordinalToReplace, childDT.dataType, childLength,
+							memberName, memberComment);
+					}
+					// struct.replaceAtOffset() and insertAtOffset() clones the childDT, which will mess up our
 					// identity based mapping in currentImplDataTypeToDDT.
 					// Update the mapping to prevent that.
 					updateMapping(childDT.dataType, dtc.getDataType());
@@ -979,6 +1008,31 @@ public class DWARFDataTypeImporter {
 				}
 			}
 		}
+	}
+
+	private boolean isUndefinedOrZeroLenAtOffset(Structure struct, int offset) {
+		List<DataTypeComponent> compsAt = struct.getComponentsContaining(offset);
+		DataTypeComponent lastComp = !compsAt.isEmpty() ? compsAt.get(compsAt.size() - 1) : null;
+		if (lastComp == null) {
+			// only triggered if offset == length of struct, which is okay since we are adding
+			// a zero-length component to the struct
+			return true;
+		}
+		if (lastComp.getOffset() != offset) {
+			return false;
+		}
+		DataType dt = lastComp.getDataType();
+		return dt.isZeroLength() || dt instanceof DefaultDataType;
+	}
+
+	private int getUndefinedOrdinalAt(Structure struct, int offset) {
+		List<DataTypeComponent> compsAt = struct.getComponentsContaining(offset);
+		DataTypeComponent lastComp = !compsAt.isEmpty() ? compsAt.get(compsAt.size() - 1) : null;
+		if (lastComp == null || lastComp.getOffset() != offset ||
+			!(lastComp.getDataType() instanceof DefaultDataType)) {
+			return -1;
+		}
+		return lastComp.getOrdinal();
 	}
 
 	private static String memberDesc(String prefix, String errorStr, String memberName,
@@ -1003,7 +1057,6 @@ public class DWARFDataTypeImporter {
 			throws IOException, DWARFExpressionException {
 
 		DWARFDataType elementType = getDataType(diea.getTypeRef(), voidDDT);
-
 		// do a second query to see if there was a recursive loop in the call above back
 		// to this datatype that resulted in this datatype being created.
 		// Use that instance if possible.
@@ -1015,7 +1068,6 @@ public class DWARFDataTypeImporter {
 		// Build a list of the defined dimensions for this array type.
 		// The first element in the DWARF dimension list would be where a wild-card (-1 length)
 		// dimension would be defined.
-		boolean isEmptyArray = false;
 		List<Integer> dimensions = new ArrayList<>();
 		List<DebugInfoEntry> subrangeDIEs =
 			diea.getHeadFragment().getChildren(DWARFTag.DW_TAG_subrange_type);
@@ -1029,17 +1081,14 @@ public class DWARFDataTypeImporter {
 				}
 				// Otherwise check for an upper bound
 				else if (subrangeAggr.hasAttribute(DWARFAttribute.DW_AT_upper_bound)) {
-					// TODO: Check lower bound or get the difference based on
-					// the language (See DWARF4 Section 5.11)
-					// TODO: upperbound == -1 seems to indicate zero length array
 					long upperBound =
 						subrangeAggr.parseUnsignedLong(DWARFAttribute.DW_AT_upper_bound, 0xbadbeef);
 
 					// fix special flag values used by DWARF to indicate that the array dimension
-					// is unknown.  64bit 0xffffff...s will already be -1, and 32bit 0xffff..s will
-					// be forced to -1.
+					// is unknown.  64bit 0xffffff...s and 32bit 0xffff..s will
+					// be forced to 0.
 					if (upperBound == 0xFF_FF_FF_FFL /* ie. max uint32 */ || upperBound == -1) {
-						upperBound = -1;
+						upperBound = 0;
 					}
 					else {
 						numElements = upperBound + 1;
@@ -1052,23 +1101,9 @@ public class DWARFDataTypeImporter {
 			}
 
 			if (numElements == -1) {
-				// if numElements is the DWARF special flag value for unknown, set flag
-				// and force the value back to something that Ghidra datatypes can handle.
-				// The consumer of the resultant data type will get back an array with
-				// 1 element instead of 0 elements because of Ghidra's limitations.
-				// They should check the DWARFDataType.isEmptyArrayType flag (I'm looking at
-				// you makeDataTypeForStruct()) if they can handle unknown length arrays.
-				if (subRangeDIEIndex == 0) {
-					isEmptyArray = true;
-				}
-				else {
-					Msg.error(this,
-						"Bad undefined-length array dimension for subrange " + subRangeDIEIndex +
-							" for array's size in DIE: " + diea.getOffset() + ", forcing to 1");
-				}
-				numElements = 1;
+				numElements = 0;
 			}
-			else if (numElements == 0 || numElements > Integer.MAX_VALUE) {
+			else if (numElements > Integer.MAX_VALUE) {
 				Msg.error(this, "Bad value [" + numElements + "] for array's size in DIE: " +
 					diea.getOffset() + ", forcing to 1");
 				numElements = 1;
@@ -1081,7 +1116,7 @@ public class DWARFDataTypeImporter {
 		for (int i = dimensions.size() - 1; i >= 0; i--) {
 			int numElements = dimensions.get(i);
 			ArrayDataType subArray =
-				new ArrayDataType(dt, numElements, dt.getLength(), dataTypeManager);
+				new ArrayDataType(dt, numElements, -1, dataTypeManager);
 			if (dt == elementType.dataType) {
 				updateMapping(dt, subArray.getDataType());
 			}
@@ -1089,7 +1124,6 @@ public class DWARFDataTypeImporter {
 		}
 
 		DWARFDataType result = new DWARFDataType(dt, null, diea.getOffset());
-		result.isEmptyArrayType = isEmptyArray;
 
 		return result;
 	}
@@ -1313,7 +1347,7 @@ public class DWARFDataTypeImporter {
 		for (int i = ptrChainTypes.size() - 1; i >= 0; i--) {
 			Pointer origPtr = ptrChainTypes.get(i);
 			result = new PointerDataType(result,
-				origPtr.isDynamicallySized() ? -1 : origPtr.getLength(), dataTypeManager);
+				origPtr.hasLanguageDependantLength() ? -1 : origPtr.getLength(), dataTypeManager);
 		}
 
 		return result;
@@ -1321,7 +1355,6 @@ public class DWARFDataTypeImporter {
 
 	static class DWARFDataType {
 		DataType dataType;
-		boolean isEmptyArrayType;
 		DWARFNameInfo dni;
 		DWARFSourceInfo dsi;
 		Set<Long> offsets = new HashSet<>();
@@ -1348,5 +1381,6 @@ public class DWARFDataTypeImporter {
 			return offsets.stream().sorted().map(Long::toHexString).collect(
 				Collectors.joining(","));
 		}
+
 	}
 }

@@ -17,7 +17,7 @@ package ghidra.program.database.data;
 
 import java.io.IOException;
 
-import db.Record;
+import db.DBRecord;
 import ghidra.docking.settings.Settings;
 import ghidra.docking.settings.SettingsDefinition;
 import ghidra.program.database.DBObjectCache;
@@ -55,7 +55,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 	 * @param record
 	 */
 	public PointerDB(DataTypeManagerDB dataMgr, DBObjectCache<DataTypeDB> cache,
-			PointerDBAdapter adapter, Record record) {
+			PointerDBAdapter adapter, DBRecord record) {
 		super(dataMgr, cache, record);
 		this.adapter = adapter;
 	}
@@ -108,7 +108,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 	@Override
 	protected boolean refresh() {
 		try {
-			Record rec = adapter.getRecord(key);
+			DBRecord rec = adapter.getRecord(key);
 			if (rec != null) {
 				record = rec;
 				return super.refresh();
@@ -126,7 +126,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 			return this;
 		}
 		// don't clone referenced data-type to avoid potential circular reference
-		return new PointerDataType(getDataType(), isDynamicallySized() ? -1 : getLength(), dtm);
+		return new PointerDataType(getDataType(), hasLanguageDependantLength() ? -1 : getLength(), dtm);
 	}
 
 	@Override
@@ -148,7 +148,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 				DataType dt = getDataType();
 				if (dt == null) {
 					displayName = PointerDataType.POINTER_NAME;
-					if (!isDynamicallySized()) {
+					if (!hasLanguageDependantLength()) {
 						displayName += Integer.toString(getLength() * 8);
 					}
 				}
@@ -180,7 +180,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 	}
 
 	@Override
-	public boolean isDynamicallySized() {
+	public boolean hasLanguageDependantLength() {
 		lock.acquire();
 		try {
 			checkIsValid();
@@ -213,7 +213,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 		try {
 			checkIsValid();
 			StringBuffer sbuf = new StringBuffer();
-			if (!isDynamicallySized()) {
+			if (!hasLanguageDependantLength()) {
 				sbuf.append(Integer.toString(getLength() * 8));
 				sbuf.append("-bit ");
 			}
@@ -291,10 +291,10 @@ class PointerDB extends DataTypeDB implements Pointer {
 
 		Pointer p = (Pointer) dt;
 		DataType otherDataType = p.getDataType();
-		if (isDynamicallySized() != p.isDynamicallySized()) {
+		if (hasLanguageDependantLength() != p.hasLanguageDependantLength()) {
 			return false;
 		}
-		if (!isDynamicallySized() && (getLength() != p.getLength())) {
+		if (!hasLanguageDependantLength() && (getLength() != p.getLength())) {
 			return false;
 		}
 
@@ -447,7 +447,7 @@ class PointerDB extends DataTypeDB implements Pointer {
 
 	@Override
 	public Pointer newPointer(DataType dataType) {
-		if (isDynamicallySized()) {
+		if (hasLanguageDependantLength()) {
 			return new PointerDataType(dataType, dataMgr);
 		}
 		return new PointerDataType(dataType, getLength(), dataMgr);

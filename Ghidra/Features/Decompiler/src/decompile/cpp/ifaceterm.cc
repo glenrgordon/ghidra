@@ -16,8 +16,9 @@
 #include "ifaceterm.hh"
 
 IfaceTerm::IfaceTerm(const string &prmpt,istream &is,ostream &os)
-  : IfaceStatus(prmpt,is,os)
+  : IfaceStatus(prmpt,os)
 {
+  sptr = &is;
 #ifdef __TERMINAL__
   struct termios ittypass;
 
@@ -50,6 +51,11 @@ IfaceTerm::IfaceTerm(const string &prmpt,istream &is,ostream &os)
 IfaceTerm::~IfaceTerm(void)
 
 {
+  while(!inputstack.empty()) {
+    delete sptr;
+    sptr = inputstack.back();
+    inputstack.pop_back();
+  }
 #ifdef __TERMINAL__
   if (is_terminal) {
     tcsetattr(ifd,TCSANOW,&itty); // Restore original terminal settings
@@ -57,9 +63,16 @@ IfaceTerm::~IfaceTerm(void)
 #endif
 }
 
+/// Respond to a TAB key press and try to 'complete' any existing tokens.
+/// The method is handed the current state of the command-line in a string, and
+/// it updates the command-line in place.
+///
+/// \param line is current command-line and will hold the final completion
+/// \param cursor is the current position of the cursor
+/// \return the (possibly new) position of the cursor, after completion
 int4 IfaceTerm::doCompletion(string &line,int4 cursor)
 
-{				// Try to complete the current command
+{
   vector<string> fullcommand;
   istringstream s(line);
   string tok;
@@ -229,3 +242,26 @@ void IfaceTerm::readLine(string &line)
   } while(val != '\n');
 }
 
+void IfaceTerm::pushScript(istream *iptr,const string &newprompt)
+
+{
+  inputstack.push_back(sptr);
+  sptr = iptr;
+  IfaceStatus::pushScript(iptr,newprompt);
+}
+
+void IfaceTerm::popScript(void)
+
+{
+  delete sptr;
+  sptr = inputstack.back();
+  inputstack.pop_back();
+  IfaceStatus::popScript();
+}
+
+bool IfaceTerm::isStreamFinished(void) const
+
+{
+  if (done||inerror) return true;
+  return sptr->eof();
+}

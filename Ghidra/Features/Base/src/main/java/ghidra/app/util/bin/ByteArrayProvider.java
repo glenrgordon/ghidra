@@ -17,8 +17,10 @@ package ghidra.app.util.bin;
 
 import java.io.*;
 
+import ghidra.formats.gfilesystem.FSRL;
+
 /**
- * An implementation of {@link ByteProvider} where the underlying bytes are supplied by a static 
+ * An implementation of {@link ByteProvider} where the underlying bytes are supplied by a
  * byte array.
  * <p>
  * NOTE: Use of this class is discouraged when the byte array could be large.
@@ -26,6 +28,7 @@ import java.io.*;
 public class ByteArrayProvider implements ByteProvider {
 	private byte[] srcBytes;
 	private String name;
+	private FSRL fsrl;
 
 	/**
 	 * Constructs a {@link ByteArrayProvider} using the specified byte array
@@ -33,7 +36,18 @@ public class ByteArrayProvider implements ByteProvider {
 	 * @param bytes the underlying byte array
 	 */
 	public ByteArrayProvider(byte[] bytes) {
+		this(bytes, null);
+	}
+
+	/**
+	 * Constructs a {@link ByteArrayProvider} using the specified byte array
+	 * 
+	 * @param bytes the underlying byte array
+	 * @param fsrl FSRL identity of the file
+	 */
+	public ByteArrayProvider(byte[] bytes, FSRL fsrl) {
 		this.srcBytes = bytes;
+		this.fsrl = fsrl;
 	}
 
 	/**
@@ -52,6 +66,21 @@ public class ByteArrayProvider implements ByteProvider {
 		// don't do anything for now
 	}
 
+	/**
+	 * Releases the byte storage of this instance.
+	 * <p>
+	 * This is separate from the normal close() to avoid changing existing
+	 * behavior of this class. 
+	 */
+	public void hardClose() {
+		srcBytes = new byte[0];
+	}
+
+	@Override
+	public FSRL getFSRL() {
+		return fsrl;
+	}
+
 	@Override
 	public File getFile() {
 		return null;
@@ -59,12 +88,12 @@ public class ByteArrayProvider implements ByteProvider {
 
 	@Override
 	public String getName() {
-		return name;
+		return fsrl != null ? fsrl.getName() : name;
 	}
 
 	@Override
 	public String getAbsolutePath() {
-		return "";
+		return fsrl != null ? fsrl.getPath() : "";
 	}
 
 	@Override

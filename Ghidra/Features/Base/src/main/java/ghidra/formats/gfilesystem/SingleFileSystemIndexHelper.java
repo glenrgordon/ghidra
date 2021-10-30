@@ -60,6 +60,16 @@ public class SingleFileSystemIndexHelper {
 	}
 
 	/**
+	 * Returns true if the specified file is the payload file.
+	 * 
+	 * @param file GFile to test
+	 * @return boolean true if it is the payload file
+	 */
+	public boolean isPayloadFile(GFile file) {
+		return payloadFile.equals(file);
+	}
+
+	/**
 	 * Returns true if this object has been {@link #clear()}'ed.
 	 *
 	 * @return boolean true if data has been cleared.
@@ -131,7 +141,7 @@ public class SingleFileSystemIndexHelper {
 	 * the payload file.
 	 */
 	public GFile lookup(String path) {
-		if (path.equals("/")) {
+		if (path == null || path.equals("/")) {
 			return rootDir;
 		}
 		else if (path.equals(payloadFile.getFSRL().getPath())) {

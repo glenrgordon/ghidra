@@ -205,20 +205,24 @@ public class ElfRelocationTable implements ElfFileSection, ByteArrayConverter {
 
 		try {
 			int relocationIndex = 0;
-			long remainingRelocations = LEB128.decode(reader, true);
-			long offset = LEB128.decode(reader, true);
-			long addend = 0;
+			long remainingRelocations = LEB128.readAsLong(reader, true); // reloc_count
+			long offset = LEB128.readAsLong(reader, true); // reloc_baseOffset
 
 			while (remainingRelocations > 0) {
 
-				long groupSize = LEB128.decode(reader, true);
+				// start new group
+				long addend = 0;
+
+				// group_size
+				long groupSize = LEB128.readAsLong(reader, true);
 				if (groupSize > remainingRelocations) {
 					Msg.warn(this, "Group relocation count " + groupSize +
 						" exceeded total count " + remainingRelocations);
 					break;
 				}
 
-				long groupFlags = LEB128.decode(reader, true);
+				// group_flags
+				long groupFlags = LEB128.readAsLong(reader, true);
 				boolean groupedByInfo =
 					(groupFlags & AndroidElfRelocationGroup.RELOCATION_GROUPED_BY_INFO_FLAG) != 0;
 				boolean groupedByDelta = (groupFlags &
@@ -228,32 +232,34 @@ public class ElfRelocationTable implements ElfFileSection, ByteArrayConverter {
 				boolean groupHasAddend =
 					(groupFlags & AndroidElfRelocationGroup.RELOCATION_GROUP_HAS_ADDEND_FLAG) != 0;
 
-				long groupOffsetDelta = groupedByDelta ? LEB128.decode(reader, true) : 0;
-				long groupRInfo = groupedByInfo ? LEB128.decode(reader, true) : 0;
+				// group_offsetDelta (optional)
+				long groupOffsetDelta = groupedByDelta ? LEB128.readAsLong(reader, true) : 0;
+
+				// group_info (optional)
+				long groupRInfo = groupedByInfo ? LEB128.readAsLong(reader, true) : 0;
 
 				if (groupedByAddend && groupHasAddend) {
-					addend += LEB128.decode(reader, true);
+					// group_addend (optional)
+					addend += LEB128.readAsLong(reader, true);
 				}
 
 				for (int i = 0; i < groupSize; i++) {
-					offset += groupedByDelta ? groupOffsetDelta : LEB128.decode(reader, true);
+					// reloc_offset (optional)
+					offset += groupedByDelta ? groupOffsetDelta : LEB128.readAsLong(reader, true);
 
-					long info = groupedByInfo ? groupRInfo : LEB128.decode(reader, true);
+					// reloc_info (optional)
+					long info = groupedByInfo ? groupRInfo : LEB128.readAsLong(reader, true);
 
 					long rAddend = 0;
 					if (groupHasAddend) {
 						if (!groupedByAddend) {
-							addend += LEB128.decode(reader, true);
+							// reloc_addend (optional)
+							addend += LEB128.readAsLong(reader, true);
 						}
 						rAddend = addend;
 					}
-
 					relocations.add(ElfRelocation.createElfRelocation(reader.getFactory(),
 						elfHeader, relocationIndex++, addendTypeReloc, offset, info, rAddend));
-				}
-
-				if (!groupHasAddend) {
-					addend = 0;
 				}
 
 				remainingRelocations -= groupSize;

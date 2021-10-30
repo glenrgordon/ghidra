@@ -189,7 +189,7 @@ Varnode *Funcdata::newVarnodeSpace(AddrSpace *spc)
 
 {
   Datatype *ct = glb->types->getBase(sizeof(spc),TYPE_UNKNOWN);
-  
+
   Varnode *vn = vbank.create(sizeof(spc),glb->createConstFromSpace(spc),ct);
   assignHigh(vn);
   return vn;
@@ -291,31 +291,31 @@ void Funcdata::destroyVarnode(Varnode *vn)
 
 /// Check if the given storage range is a potential laned register.
 /// If so, record the storage with the matching laned register record.
-/// \param s is the size of the storage range in bytes
+/// \param sz is the size of the storage range in bytes
 /// \param addr is the starting address of the storage range
-void Funcdata::checkForLanedRegister(int4 size,const Address &addr)
+void Funcdata::checkForLanedRegister(int4 sz,const Address &addr)
 
 {
-  const LanedRegister *lanedRegister  = glb->getLanedRegister(addr,size);
+  const LanedRegister *lanedRegister  = glb->getLanedRegister(addr,sz);
   if (lanedRegister == (const LanedRegister *)0)
     return;
   VarnodeData storage;
   storage.space = addr.getSpace();
   storage.offset = addr.getOffset();
-  storage.size = size;
+  storage.size = sz;
   lanedMap[storage] = lanedRegister;
 }
 
 /// Look up the Symbol visible in \b this function's Scope and return the HighVariable
 /// associated with it.  If the Symbol doesn't exist or there is no Varnode holding at least
 /// part of the value of the Symbol, NULL is returned.
-/// \param name is the name to search for
+/// \param nm is the name to search for
 /// \return the matching HighVariable or NULL
-HighVariable *Funcdata::findHigh(const string &name) const
+HighVariable *Funcdata::findHigh(const string &nm) const
 
 {
   vector<Symbol *> symList;
-  localmap->queryByName(name,symList);
+  localmap->queryByName(nm,symList);
   if (symList.empty()) return (HighVariable *)0;
   Symbol *sym = symList[0];
   Varnode *vn = findLinkedVarnode(sym->getFirstWholeMap());
@@ -357,7 +357,7 @@ Varnode *Funcdata::setInputVarnode(Varnode *vn)
       }
     }
   }
-  
+
   vn = vbank.setInput(vn);
   setVarnodeProperties(vn);
   uint4 effecttype = funcp.hasEffect(vn->getAddr(),vn->getSize());
@@ -377,11 +377,11 @@ Varnode *Funcdata::setInputVarnode(Varnode *vn)
 /// op off of the new single input.  If an overlapping Varnode isn't fully contained
 /// an exception is thrown.
 /// \param addr is the starting address of the range
-/// \param size is the number of bytes in the range
-void Funcdata::adjustInputVarnodes(const Address &addr,int4 size)
+/// \param sz is the number of bytes in the range
+void Funcdata::adjustInputVarnodes(const Address &addr,int4 sz)
 
 {
-  Address endaddr = addr + (size-1);
+  Address endaddr = addr + (sz-1);
   vector<Varnode *> inlist;
   VarnodeDefSet::const_iterator iter,enditer;
   iter = vbank.beginDef(Varnode::input,addr);
@@ -393,11 +393,11 @@ void Funcdata::adjustInputVarnodes(const Address &addr,int4 size)
       throw LowlevelError("Cannot properly adjust input varnodes");
     inlist.push_back(vn);
   }
-  
+
   for(uint4 i=0;i<inlist.size();++i) {
     Varnode *vn = inlist[i];
-    int4 sa = addr.justifiedContain(size,vn->getAddr(),vn->getSize(),false);
-    if ((!vn->isInput())||(sa < 0)||(size<=vn->getSize()))
+    int4 sa = addr.justifiedContain(sz,vn->getAddr(),vn->getSize(),false);
+    if ((!vn->isInput())||(sa < 0)||(sz<=vn->getSize()))
       throw LowlevelError("Bad adjustment to input varnode");
     PcodeOp *subop = newOp(2,getAddress());
     opSetOpcode(subop,CPUI_SUBPIECE);
@@ -405,12 +405,12 @@ void Funcdata::adjustInputVarnodes(const Address &addr,int4 size)
     Varnode *newvn = newVarnodeOut(vn->getSize(),vn->getAddr(),subop);
     // newvn must not be free in order to give all vn's descendants
     opInsertBegin(subop,(BlockBasic *)bblocks.getBlock(0));
-    totalReplace(vn,newvn); 
+    totalReplace(vn,newvn);
     deleteVarnode(vn); // Get rid of old input before creating new input
     inlist[i] = newvn;
   }
   // Now that all the intersecting inputs have been pulled out, we can create the new input
-  Varnode *invn = newVarnode(size,addr);
+  Varnode *invn = newVarnode(sz,addr);
   invn = setInputVarnode(invn);
   // The new input may cause new heritage and "Heritage AFTER dead removal" errors
   // So tell heritage to ignore it
@@ -434,22 +434,22 @@ bool Funcdata::descend2Undef(Varnode *vn)
   BlockBasic *inbl;
   Varnode *badconst;
   list<PcodeOp *>::const_iterator iter;
-  int4 i,size;
+  int4 i,sz;
   bool res;
 
   res = false;
-  size = vn->getSize();
+  sz = vn->getSize();
   iter = vn->beginDescend();
   while(iter != vn->endDescend()) {
     op = *iter++;		// Move to next in list before deletion
     if (op->getParent()->isDead()) continue;
     if (op->getParent()->sizeIn()!=0) res = true;
     i = op->getSlot(vn);
-    badconst = newConstant(size,0xBADDEF);
+    badconst = newConstant(sz,0xBADDEF);
     if (op->code()==CPUI_MULTIEQUAL) { // Cannot put constant directly into MULTIEQUAL
       inbl = (BlockBasic *) op->getParent()->getIn(i);
       copyop = newOp(1,inbl->getStart());
-      Varnode *inputvn = newUniqueOut(size,copyop);
+      Varnode *inputvn = newUniqueOut(sz,copyop);
       opSetOpcode(copyop,CPUI_COPY);
       opSetInput(copyop,badconst,0);
       opInsertEnd(copyop,inbl);
@@ -457,7 +457,7 @@ bool Funcdata::descend2Undef(Varnode *vn)
     }
     else if (op->code()==CPUI_INDIRECT) { // Cannot put constant directly into INDIRECT
       copyop = newOp(1,op->getAddr());
-      Varnode *inputvn = newUniqueOut(size,copyop);
+      Varnode *inputvn = newUniqueOut(sz,copyop);
       opSetOpcode(copyop,CPUI_COPY);
       opSetInput(copyop,badconst,0);
       opInsertBefore(copyop,op);
@@ -546,7 +546,7 @@ bool Funcdata::fillinReadOnly(Varnode *vn)
     vn->clearFlags(Varnode::readonly); // Treat as writeable
     return true;
   }
-  
+
   if (vn->getSpace()->isBigEndian()) { // Big endian
     res = 0;
     for(int4 i=0;i<vn->getSize();++i) {
@@ -731,38 +731,35 @@ void Funcdata::clearDeadVarnodes(void)
 void Funcdata::calcNZMask(void)
 
 {
-  vector<PcodeOp *> opstack;
-  vector<int4> slotstack;
+  vector<PcodeOpNode> opstack;
   list<PcodeOp *>::const_iterator oiter;
 
   for(oiter=beginOpAlive();oiter!=endOpAlive();++oiter) {
     PcodeOp *op = *oiter;
     if (op->isMark()) continue;
-    opstack.push_back(op);
-    slotstack.push_back(0);
+    opstack.push_back(PcodeOpNode(op,0));
     op->setMark();
 
     do {
       // Get next edge
-      op = opstack.back();
-      int4 slot = slotstack.back();
-      if (slot >= op->numInput()) { // If no edge left
-	Varnode *outvn = op->getOut();
+      PcodeOpNode &node( opstack.back() );
+      if (node.slot >= node.op->numInput()) { // If no edge left
+	Varnode *outvn = node.op->getOut();
 	if (outvn != (Varnode *)0) {
-	  outvn->nzm = op->getNZMaskLocal(true);
+	  outvn->nzm = node.op->getNZMaskLocal(true);
 	}
 	opstack.pop_back();	// Pop a level
-	slotstack.pop_back();
 	continue;
       }
-      slotstack.back() = slot + 1; // Advance to next input
+      int4 oldslot = node.slot;
+      node.slot += 1; // Advance to next input
       // Determine if we want to traverse this edge
-      if (op->code() == CPUI_MULTIEQUAL) {
-	if (op->getParent()->isLoopIn(slot)) // Clip looping edges
+      if (node.op->code() == CPUI_MULTIEQUAL) {
+	if (node.op->getParent()->isLoopIn(oldslot)) // Clip looping edges
 	  continue;
       }
       // Traverse edge indicated by slot
-      Varnode *vn = op->getIn(slot);
+      Varnode *vn = node.op->getIn(oldslot);
       if (!vn->isWritten()) {
 	if (vn->isConstant())
 	  vn->nzm = vn->getOffset();
@@ -773,32 +770,32 @@ void Funcdata::calcNZMask(void)
 	}
       }
       else if (!vn->getDef()->isMark()) { // If haven't traversed before
-	opstack.push_back(vn->getDef());
-	slotstack.push_back(0);
+	opstack.push_back(PcodeOpNode(vn->getDef(),0));
 	vn->getDef()->setMark();
       }
     } while(!opstack.empty());
   }
 
+  vector<PcodeOp *> worklist;
   // Clear marks and push ops with looping edges onto worklist
   for(oiter=beginOpAlive();oiter!=endOpAlive();++oiter) {
     PcodeOp *op = *oiter;
     op->clearMark();
     if (op->code() == CPUI_MULTIEQUAL)
-      opstack.push_back(op);
+      worklist.push_back(op);
   }
 
   // Continue to propagate changes along all edges
-  while(!opstack.empty()) {
-    PcodeOp *op = opstack.back();
-    opstack.pop_back();
+  while(!worklist.empty()) {
+    PcodeOp *op = worklist.back();
+    worklist.pop_back();
     Varnode *vn = op->getOut();
     if (vn == (Varnode *)0) continue;
     uintb nzmask = op->getNZMaskLocal(false);
     if (nzmask != vn->nzm) {
       vn->nzm = nzmask;
       for(oiter=vn->beginDescend();oiter!=vn->endDescend();++oiter)
-	opstack.push_back(*oiter);
+	worklist.push_back(*oiter);
     }
   }
 }
@@ -819,7 +816,7 @@ bool Funcdata::syncVarnodesWithSymbols(const ScopeLocal *lm,bool typesyes)
   VarnodeLocSet::const_iterator iter,enditer;
   Datatype *ct;
   SymbolEntry *entry;
-  uint4 flags;
+  uint4 fl;
 
   iter = vbank.beginLoc(lm->getSpaceId());
   enditer = vbank.endLoc(lm->getSpaceId());
@@ -828,7 +825,7 @@ bool Funcdata::syncVarnodesWithSymbols(const ScopeLocal *lm,bool typesyes)
     entry = lm->findOverlap(vnexemplar->getAddr(),vnexemplar->getSize());
     ct = (Datatype *)0;
     if (entry != (SymbolEntry *)0) {
-      flags = entry->getAllFlags();
+      fl = entry->getAllFlags();
       if (entry->getSize() >= vnexemplar->getSize()) {
 	if (typesyes) {
 	  uintb off = (vnexemplar->getOffset() - entry->getAddr().getOffset()) + entry->getOffset();
@@ -846,7 +843,7 @@ bool Funcdata::syncVarnodesWithSymbols(const ScopeLocal *lm,bool typesyes)
 	// getting put in a bigger register
 	// Don't try to figure out type
 	// Don't keep typelock and namelock
-	flags &= ~((uint4)(Varnode::typelock|Varnode::namelock));
+	fl &= ~((uint4)(Varnode::typelock|Varnode::namelock));
 	// we do particularly want to keep the nolocalalias
       }
     }
@@ -855,12 +852,12 @@ bool Funcdata::syncVarnodesWithSymbols(const ScopeLocal *lm,bool typesyes)
 		      vnexemplar->getUsePoint(*this))) {
 	// This is technically an error, there should be some
 	// kind of symbol, if we are in scope
-	flags = Varnode::mapped | Varnode::addrtied;
+	fl = Varnode::mapped | Varnode::addrtied;
       }
       else
-	flags = 0;
+	fl = 0;
     }
-    if (syncVarnodesWithSymbol(iter,flags,ct))
+    if (syncVarnodesWithSymbol(iter,fl,ct))
 	updateoccurred = true;
   }
   return updateoccurred;
@@ -920,10 +917,10 @@ Symbol *Funcdata::handleSymbolConflict(SymbolEntry *entry,Varnode *vn)
 /// If the given data-type is non-null, an attempt is made to update all the Varnodes
 /// to this data-type. The \b typelock and \b namelock properties cannot be changed here.
 /// \param iter points to the first Varnode in the set
-/// \param flags holds the new set of boolean properties
+/// \param fl holds the new set of boolean properties
 /// \param ct is the given data-type to set (or NULL)
 /// \return \b true if at least one Varnode was modified
-bool Funcdata::syncVarnodesWithSymbol(VarnodeLocSet::const_iterator &iter,uint4 flags,Datatype *ct)
+bool Funcdata::syncVarnodesWithSymbol(VarnodeLocSet::const_iterator &iter,uint4 fl,Datatype *ct)
 
 {
   VarnodeLocSet::const_iterator enditer;
@@ -936,13 +933,13 @@ bool Funcdata::syncVarnodesWithSymbol(VarnodeLocSet::const_iterator &iter,uint4 
 				// as we cannot set it here if it is clear
 				// We can CLEAR but not SET the addrtied flag
 				// If addrtied is cleared, so should addrforce
-  if ((flags&Varnode::addrtied)==0) // Is the addrtied flags cleared
+  if ((fl&Varnode::addrtied)==0) // Is the addrtied flags cleared
     mask |= Varnode::addrtied | Varnode::addrforce;
   // We can set the nolocalalias flag, but not clear it
   // If nolocalalias is set, then addrforce should be cleared
-  if ((flags&Varnode::nolocalalias)!=0)
+  if ((fl&Varnode::nolocalalias)!=0)
     mask |= Varnode::nolocalalias | Varnode::addrforce;
-  flags &= mask;
+  fl &= mask;
 
   vn = *iter;
   enditer = vbank.endLoc(vn->getSize(),vn->getAddr());
@@ -952,17 +949,17 @@ bool Funcdata::syncVarnodesWithSymbol(VarnodeLocSet::const_iterator &iter,uint4 
     vnflags = vn->getFlags();
     if (vn->mapentry != (SymbolEntry *)0) {		// If there is already an attached SymbolEntry (dynamic)
       uint4 localMask = mask & ~Varnode::mapped;	// Make sure 'mapped' bit is unchanged
-      uint4 localFlags = flags & localMask;
+      uint4 localFlags = fl & localMask;
       if ((vnflags & localMask) != localFlags) {
 	updateoccurred = true;
 	vn->setFlags(localFlags);
 	vn->clearFlags((~localFlags)&localMask);
       }
     }
-    else if ((vnflags & mask) != flags) { // We have a change
+    else if ((vnflags & mask) != fl) { // We have a change
       updateoccurred = true;
-      vn->setFlags(flags);
-      vn->clearFlags((~flags)&mask);
+      vn->setFlags(fl);
+      vn->clearFlags((~fl)&mask);
     }
     if (ct != (Datatype *)0) {
       if (vn->updateType(ct,false,false))
@@ -1026,13 +1023,13 @@ Symbol *Funcdata::linkSymbol(Varnode *vn)
 {
   HighVariable *high = vn->getHigh();
   SymbolEntry *entry;
-  uint4 flags = 0;
+  uint4 fl = 0;
   Symbol *sym = high->getSymbol();
   if (sym != (Symbol *)0) return sym; // Symbol already assigned
 
   Address usepoint = vn->getUsePoint(*this);
   // Find any entry overlapping base address
-  entry = localmap->queryProperties(vn->getAddr(), 1, usepoint, flags);
+  entry = localmap->queryProperties(vn->getAddr(), 1, usepoint, fl);
   if (entry != (SymbolEntry *) 0) {
     sym = handleSymbolConflict(entry, vn);
   }
@@ -1210,6 +1207,10 @@ bool Funcdata::attemptDynamicMappingLate(SymbolEntry *entry,DynamicHash &dhash)
     return false;
   if (vn->getSymbolEntry() == entry) return false; // Already applied it
   Symbol *sym = entry->getSymbol();
+  if (sym->getCategory() == 1) {	// Equate symbol does not depend on size
+    vn->setSymbolEntry(entry);
+    return true;
+  }
   if (vn->getSize() != entry->getSize()) {
     ostringstream s;
     s << "Unable to use symbol ";
@@ -1414,7 +1415,7 @@ void Funcdata::mapGlobals(void)
   VarnodeLocSet::const_iterator iter,enditer;
   Varnode *vn,*maxvn;
   Datatype *ct;
-  uint4 flags;
+  uint4 fl;
   vector<Varnode *> uncoveredVarnodes;
   bool inconsistentuse = false;
 
@@ -1451,11 +1452,11 @@ void Funcdata::mapGlobals(void)
     else
       ct = glb->types->getBase(endaddr.getOffset()-addr.getOffset(),TYPE_UNKNOWN);
 
-    flags = 0;
+    fl = 0;
     // Assume existing symbol is addrtied, so use empty usepoint
     Address usepoint;
     // Find any entry overlapping base address
-    entry = localmap->queryProperties(addr,1,usepoint,flags);
+    entry = localmap->queryProperties(addr,1,usepoint,fl);
     if (entry==(SymbolEntry *)0) {
       Scope *discover = localmap->discoverScope(addr,ct->getSize(),usepoint);
       if (discover == (Scope *)0)
@@ -1475,6 +1476,30 @@ void Funcdata::mapGlobals(void)
     warningHeader("Globals starting with '_' overlap smaller symbols at the same address");
 }
 
+/// \brief Return \b true if the alternate path looks more valid than the main path.
+///
+/// Two different paths from a common Varnode each terminate at a CALL, CALLIND, or RETURN.
+/// Evaluate which path most likely represents actual parameter/return value passing,
+/// based on traversal information about each path.
+/// \param vn is the Varnode terminating the \e alternate path
+/// \param flags indicates traversals for both paths
+/// \return \b true if the alternate path is preferred
+bool Funcdata::isAlternatePathValid(const Varnode *vn,uint4 flags)
+
+{
+  if ((flags & (traverse_indirect | traverse_indirectalt)) == traverse_indirect)
+    // If main path traversed an INDIRECT but the alternate did not
+    return true;	// Main path traversed INDIRECT, alternate did not
+  if ((flags & (traverse_indirect | traverse_indirectalt)) == traverse_indirectalt)
+    return false;	// Alternate path traversed INDIRECT, main did not
+  if ((flags & traverse_actionalt) != 0)
+    return true;	// Alternate path traversed a dedicated COPY
+  if (vn->loneDescend() == (PcodeOp*)0) return false;
+  const PcodeOp *op = vn->getDef();
+  if (op == (PcodeOp*)0) return true;
+  return !op->isMarker();	// MULTIEQUAL or INDIRECT indicates multiple values
+}
+
 /// \brief Test for legitimate double use of a parameter trial
 ///
 /// The given trial is a \e putative input to first CALL, but can also trace its data-flow
@@ -1483,9 +1508,10 @@ void Funcdata::mapGlobals(void)
 /// \param opmatch is the first CALL linked to the trial
 /// \param op is the second CALL
 /// \param vn is the Varnode parameter for the second CALL
+/// \param fl indicates what p-code ops were crossed to reach \e vn
 /// \param trial is the given parameter trial
 /// \return \b true for a legitimate double use
-bool Funcdata::checkCallDoubleUse(const PcodeOp *opmatch,const PcodeOp *op,const Varnode *vn,const ParamTrial &trial) const
+bool Funcdata::checkCallDoubleUse(const PcodeOp *opmatch,const PcodeOp *op,const Varnode *vn,uint4 fl,const ParamTrial &trial) const
 
 {
   int4 j = op->getSlot(vn);
@@ -1511,10 +1537,16 @@ bool Funcdata::checkCallDoubleUse(const PcodeOp *opmatch,const PcodeOp *op,const
       }
     }
   }
-  
+
   if (fc->isInputActive()) {
     const ParamTrial &curtrial( fc->getActiveInput()->getTrialForInputVarnode(j) );
-    if ((!curtrial.isChecked())||(!curtrial.isActive())) return true;
+    if (curtrial.isChecked()) {
+      if (curtrial.isActive())
+	return false;
+    }
+    else if (isAlternatePathValid(vn,fl))
+      return false;
+    return true;
   }
   return false;
 }
@@ -1526,28 +1558,31 @@ bool Funcdata::checkCallDoubleUse(const PcodeOp *opmatch,const PcodeOp *op,const
 /// \param invn is the given Varnode
 /// \param opmatch is the putative CALL op using the Varnode for parameter passing
 /// \param trial is the parameter trial object associated with the Varnode
+/// \param mainFlags are flags describing traversals along the \e main path, from \e invn to \e opmatch
 /// \return \b true if the Varnode seems only to be used as parameter to \b opmatch
-bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamTrial &trial) const
+bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamTrial &trial,uint4 mainFlags) const
 
 {
-  vector<const Varnode *> varlist;
+  vector<TraverseNode> varlist;
   list<PcodeOp *>::const_iterator iter;
   const Varnode *vn,*subvn;
   const PcodeOp *op;
   int4 i;
   bool res = true;
 
+  varlist.reserve(64);
   invn->setMark();		// Marks prevent infinite loops
-  varlist.push_back(invn);
-  
-  i = 0;
-  while(i < varlist.size()) {
-    vn = varlist[i++];
+  varlist.emplace_back(invn,mainFlags);
+
+  for(i=0;i < varlist.size();++i) {
+    vn = varlist[i].vn;
+    uint4 baseFlags = varlist[i].flags;
     for(iter=vn->descend.begin();iter!=vn->descend.end();++iter) {
       op = *iter;
       if (op == opmatch) {
 	if (op->getIn(trial.getSlot())==vn) continue;
       }
+      uint4 curFlags = baseFlags;
       switch(op->code()) {
       case CPUI_BRANCH:		// These ops define a USE of a variable
       case CPUI_CBRANCH:
@@ -1558,17 +1593,39 @@ bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamT
 	break;
       case CPUI_CALL:
       case CPUI_CALLIND:
-	if (checkCallDoubleUse(opmatch,op,vn,trial)) continue;
+	if (checkCallDoubleUse(opmatch,op,vn,curFlags,trial)) continue;
 	res = false;
+	break;
+      case CPUI_INDIRECT:
+	curFlags |= Funcdata::traverse_indirectalt;
+	break;
+      case CPUI_COPY:
+	if ((op->getOut()->getSpace()->getType()!=IPTR_INTERNAL)&&!op->isIncidentalCopy()&&!vn->isIncidentalCopy()) {
+	  curFlags |= Funcdata::traverse_actionalt;
+	}
 	break;
       case CPUI_RETURN:
 	if (opmatch->code()==CPUI_RETURN) { // Are we in a different return
 	  if (op->getIn(trial.getSlot())==vn) // But at the same slot
 	    continue;
 	}
+	else if (activeoutput != (ParamActive *)0) {	// Are we in the middle of analyzing returns
+	  if (op->getIn(0) != vn) {		// Unless we hold actual return value
+	    if (!isAlternatePathValid(vn,curFlags))
+	      continue;				// Don't consider this a "use"
+	  }
+	}
 	res = false;
 	break;
+      case CPUI_MULTIEQUAL:
+      case CPUI_PIECE:
+      case CPUI_SUBPIECE:
+      case CPUI_INT_SEXT:
+      case CPUI_INT_ZEXT:
+      case CPUI_CAST:
+	break;
       default:
+	curFlags |= Funcdata::traverse_actionalt;
 	break;
       }
       if (!res) break;
@@ -1579,7 +1636,7 @@ bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamT
 	  break;
 	}
 	if (!subvn->isMark()) {
-	  varlist.push_back(subvn);
+	  varlist.emplace_back(subvn,curFlags);
 	  subvn->setMark();
 	}
       }
@@ -1587,7 +1644,7 @@ bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamT
     if (!res) break;
   }
   for(i=0;i<varlist.size();++i)
-    varlist[i]->clearMark();
+    varlist[i].vn->clearMark();
   return res;
 }
 
@@ -1599,9 +1656,10 @@ bool Funcdata::onlyOpUse(const Varnode *invn,const PcodeOp *opmatch,const ParamT
 /// \param invn is the given trial Varnode to test
 /// \param op is the given CALL or RETURN
 /// \param trial is the associated parameter trial object
+/// \param mainFlags describes traversals along the path from \e invn to \e op
 /// \return \b true if the Varnode is only used for the CALL/RETURN
 bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
-			     const PcodeOp *op,ParamTrial &trial) const
+			     const PcodeOp *op,ParamTrial &trial,uint4 mainFlags) const
 
 {
   int4 i;
@@ -1613,9 +1671,9 @@ bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
     if (!invn->isTypeLock()) return false;
 				// If the input is typelocked
 				// this is as good as being written
-    return onlyOpUse(invn,op,trial); // Test if varnode is only used in op
+    return onlyOpUse(invn,op,trial,mainFlags); // Test if varnode is only used in op
   }
-  
+
   const PcodeOp *def = invn->getDef();
   switch(def->code()) {
   case CPUI_INDIRECT:
@@ -1623,7 +1681,7 @@ bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
     // as an "only use"
     if (def->isIndirectCreation())
       return false;
-    return ancestorOpUse(maxlevel-1,def->getIn(0),op,trial);
+    return ancestorOpUse(maxlevel-1,def->getIn(0),op,trial,mainFlags | Funcdata::traverse_indirect);
   case CPUI_MULTIEQUAL:
 				// Check if there is any ancestor whose only
 				// use is in this op
@@ -1631,7 +1689,7 @@ bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
     def->setMark();		// Mark that this MULTIEQUAL is on the path
 				// Note: onlyOpUse is using Varnode::setMark
     for(i=0;i<def->numInput();++i) {
-      if (ancestorOpUse(maxlevel-1,def->getIn(i),op,trial)) {
+      if (ancestorOpUse(maxlevel-1,def->getIn(i),op,trial, mainFlags)) {
 	def->clearMark();
 	return true;
       }
@@ -1640,13 +1698,12 @@ bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
     return false;
   case CPUI_COPY:
     if ((invn->getSpace()->getType()==IPTR_INTERNAL)||def->isIncidentalCopy()||def->getIn(0)->isIncidentalCopy()) {
-      if (!ancestorOpUse(maxlevel-1,def->getIn(0),op,trial)) return false;
-      return true;
+      return ancestorOpUse(maxlevel-1,def->getIn(0),op,trial,mainFlags);
     }
     break;
   case CPUI_PIECE:
     // Concatenation tends to be artificial, so recurse through the least significant part
-    return ancestorOpUse(maxlevel-1,def->getIn(1),op,trial);
+    return ancestorOpUse(maxlevel-1,def->getIn(1),op,trial,mainFlags);
   case CPUI_SUBPIECE:
     // This is a rather kludgy way to get around where a DIV (or other similar) instruction
     // causes a register that looks like the high precision piece of the function return
@@ -1667,7 +1724,7 @@ bool Funcdata::ancestorOpUse(int4 maxlevel,const Varnode *invn,
     break;
   }
 				// This varnode must be top ancestor at this point
-  return onlyOpUse(invn,op,trial); // Test if varnode is only used in op
+  return onlyOpUse(invn,op,trial,mainFlags); // Test if varnode is only used in op
 }
 
 /// \return \b true if there are two input flows, one of which is a normal \e solid flow

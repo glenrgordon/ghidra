@@ -288,21 +288,17 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 
 	@Override
 	public Program openProgram(DomainFile df, Component parent) {
-		return openProgram(df, -1, OPEN_CURRENT, parent);
+		return openProgram(df, -1, OPEN_CURRENT);
 	}
 
 	@Override
-	public Program openProgram(final DomainFile df, final int version) {
+	public Program openProgram(DomainFile df, int version) {
 		return openProgram(df, version, OPEN_CURRENT);
 	}
 
 	@Override
-	public Program openProgram(final DomainFile df, final int version, final int state) {
-		return openProgram(df, version, state, tool.getToolFrame());
-	}
+	public Program openProgram(DomainFile domainFile, int version, int state) {
 
-	private Program openProgram(final DomainFile domainFile, final int version, final int state,
-			final Component parent) {
 		if (domainFile == null) {
 			throw new IllegalArgumentException("Domain file cannot be null");
 		}
@@ -312,15 +308,12 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 			return null;
 		}
 
-		AtomicReference<Program> ref = new AtomicReference<>();
-		Runnable r = () -> {
-			ref.set(doOpenProgram(domainFile, version, state));
+		Program program = Swing.runNow(() -> {
+			Program p = doOpenProgram(domainFile, version, state);
 			updateActions();
-		};
+			return p;
+		});
 
-		SystemUtilities.runSwingNow(r);
-
-		Program program = ref.get();
 		if (program != null) {
 			Msg.info(this, "Opened program in " + tool.getName() + " tool: " + domainFile);
 		}
@@ -523,17 +516,24 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 		int subMenuGroupOrder = 1;
 
 		openAction = new ActionBuilder("Open File", getName())
-				.onAction(c -> open())
 				.menuPath(ToolConstants.MENU_FILE, "&Open...")
 				.menuGroup(OPEN_GROUP, Integer.toString(subMenuGroupOrder++))
 				.keyBinding("ctrl O")
+				.onAction(c -> open())
 				.buildAndInstall(tool);
+
+		//		.withContext(ProgramActionContext.class)
+		//		.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
+		// openAction doesn't really use a context, but we want it to be in windows that
+		// have providers that use programs. 
+		openAction.addToWindowWhen(ProgramActionContext.class);
 
 		closeAction = new ActionBuilder("Close File", getName())
 				.menuPath(ToolConstants.MENU_FILE, "&Close")
 				.menuGroup(OPEN_GROUP, Integer.toString(subMenuGroupOrder++))
 				.withContext(ProgramActionContext.class)
 				.supportsDefaultToolContext(true)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.onAction(c -> closeProgram(c.getProgram(), false))
 				.keyBinding("ctrl W")
 				.buildAndInstall(tool);
@@ -542,12 +542,16 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 				.menuPath(ToolConstants.MENU_FILE, "Close &Others")
 				.menuGroup(OPEN_GROUP, Integer.toString(subMenuGroupOrder++))
 				.enabled(false)
+				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.onAction(c -> closeOtherPrograms(false))
 				.buildAndInstall(tool);
 
 		closeAllAction = new ActionBuilder("Close All", getName())
 				.menuPath(ToolConstants.MENU_FILE, "Close &All")
 				.menuGroup(OPEN_GROUP, Integer.toString(subMenuGroupOrder++))
+				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.onAction(c -> closeAllPrograms(false))
 				.enabled(false)
 				.buildAndInstall(tool);
@@ -561,6 +565,7 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 				.toolBarGroup(ToolConstants.TOOLBAR_GROUP_ONE)
 				.keyBinding("ctrl S")
 				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.supportsDefaultToolContext(true)
 				.enabledWhen(c -> c.getProgram() != null && c.getProgram().isChanged())
 				.onAction(c -> programSaveMgr.saveProgram(c.getProgram()))
@@ -570,6 +575,7 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 				.menuPath(ToolConstants.MENU_FILE, "Save &As...")
 				.menuGroup(SAVE_GROUP, Integer.toString(subMenuGroupOrder++))
 				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.supportsDefaultToolContext(true)
 				.onAction(c -> programSaveMgr.saveAs(c.getProgram()))
 				.buildAndInstall(tool);
@@ -578,6 +584,8 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 				.menuPath(ToolConstants.MENU_FILE, "Save All")
 				.description("Save All Programs")
 				.menuGroup(SAVE_GROUP, Integer.toString(subMenuGroupOrder++))
+				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.onAction(c -> programSaveMgr.saveChangedPrograms())
 				.buildAndInstall(tool);
 
@@ -587,6 +595,7 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 				.menuGroup(ToolConstants.TOOL_OPTIONS_MENU_GROUP,
 					ToolConstants.TOOL_OPTIONS_MENU_GROUP + "b")
 				.withContext(ProgramActionContext.class)
+				.inWindow(ActionBuilder.When.CONTEXT_MATCHES)
 				.supportsDefaultToolContext(true)
 				.onAction(c -> showProgramOptions(c.getProgram()))
 				.buildAndInstall(tool);

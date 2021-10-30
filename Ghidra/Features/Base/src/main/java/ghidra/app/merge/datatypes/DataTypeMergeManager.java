@@ -47,7 +47,7 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	// Each of the following is a choice or possible resolution when merging data types.
 	static final int CANCELED = -2; // user canceled the merge operation
-	static final int ASK_USER = -1;// prompt the user to choose resolution 
+	static final int ASK_USER = -1;// prompt the user to choose resolution
 	static final int OPTION_LATEST = 0; // Latest 
 	static final int OPTION_MY = 1; // My change 
 	static final int OPTION_ORIGINAL = 2; // Original
@@ -96,7 +96,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	 * @param myDomainObject the program requesting to be checked in.
 	 * @param originalDomainObject the program that was checked out.
 	 * @param latestDomainObject the latest checked-in version of the program.
-	 * @param latestChanges the address set of changes between original and latest versioned program.  
+	 * @param latestChanges the address set of changes between original and latest versioned program.
 	 * @param myChanges the address set of changes between original and my modified program.
 	 */
 	public DataTypeMergeManager(DomainObjectMergeManager mergeManager,
@@ -132,7 +132,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	public void apply() {
 		if (catMergePanel != null && catMergePanel.isVisible()) {
 			conflictOption = catMergePanel.getSelectedOption();
-			// If the "Use For All" check box is selected 
+			// If the "Use For All" check box is selected
 			// then save the option chosen for this conflict type.
 			if (catMergePanel.getUseForAll()) {
 				categoryChoice = conflictOption;
@@ -140,7 +140,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 		else if (dtMergePanel != null && dtMergePanel.isVisible()) {
 			conflictOption = dtMergePanel.getSelectedOption();
-			// If the "Use For All" check box is selected 
+			// If the "Use For All" check box is selected
 			// then save the option chosen for this conflict type.
 			if (dtMergePanel.getUseForAll()) {
 				dataTypeChoice = conflictOption;
@@ -148,7 +148,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 		else {
 			conflictOption = archiveMergePanel.getSelectedOption();
-			// If the "Use For All" check box is selected 
+			// If the "Use For All" check box is selected
 			// then save the option chosen for this conflict type.
 			if (archiveMergePanel.getUseForAll()) {
 				sourceArchiveChoice = conflictOption;
@@ -259,7 +259,7 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	/**
 	 * For JUnit testing only, set the option for resolving a conflict.
-	 * @param option forced conflict resolution option 
+	 * @param option forced conflict resolution option
 	 */
 	void setConflictResolution(int option) {
 		conflictOption = option;
@@ -268,11 +268,11 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	private void processSourceArchiveChanges() throws CancelledException {
 		conflictOption = OPTION_MY;
-		for (int i = 0; i < myArchiveChangeList.size(); i++) {
+		for (Long element : myArchiveChangeList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = myArchiveChangeList.get(i).longValue();
+			long id = element.longValue();
 
 			updateSourceArchive(id);
 		}
@@ -318,11 +318,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	private void processSourceArchiveAdditions() throws CancelledException {
-		for (int i = 0; i < myArchiveAddedList.size(); i++) {
+		for (Long element : myArchiveAddedList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = myArchiveAddedList.get(i).longValue();
+			long id = element.longValue();
 
 			UniversalID universalID = new UniversalID(id);
 			SourceArchive mySourceArchive = dtms[MY].getSourceArchive(universalID);
@@ -381,11 +381,11 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	private void processSourceArchiveConflicts() throws CancelledException {
 
-		for (int i = 0; i < archiveConflictList.size(); i++) {
+		for (Long element : archiveConflictList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long sourceArchiveID = archiveConflictList.get(i).longValue();
+			long sourceArchiveID = element.longValue();
 
 			++currentConflictIndex;
 			handleSourceArchiveConflict(sourceArchiveID, currentConflictIndex);
@@ -412,11 +412,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	 * @throws CancelledException if task cancelled
 	 */
 	private void processCategoriesAdded() throws CancelledException {
-		for (int i = 0; i < myCatAddedList.size(); i++) {
+		for (Long element : myCatAddedList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = myCatAddedList.get(i).longValue();
+			long id = element.longValue();
 			Category myCat = dtms[MY].getCategory(id);
 			CategoryPath myPath = myCat.getCategoryPath();
 			if (dtms[RESULT].containsCategory(myPath)) {
@@ -432,11 +432,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	 */
 	private void processCategoryConflicts() throws CancelledException {
 
-		for (int i = 0; i < catConflictList.size(); i++) {
+		for (Long element : catConflictList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = catConflictList.get(i).longValue();
+			long id = element.longValue();
 
 			++currentConflictIndex;
 			handleCategoryConflict(id, currentConflictIndex);
@@ -460,11 +460,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	private void processCategoryChanges() throws CancelledException {
-		for (int i = 0; i < myCatChangeList.size(); i++) {
+		for (Long element : myCatChangeList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = myCatChangeList.get(i).longValue();
+			long id = element.longValue();
 
 			processCategoryRenamed(id);
 			processCategoryMoved(id);
@@ -473,10 +473,10 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	private void processCategoriesDeleted() throws CancelledException {
-		for (int i = 0; i < myCatChangeList.size(); i++) {
+		for (Long element : myCatChangeList) {
 			currentMonitor.checkCanceled();
 
-			long id = myCatChangeList.get(i).longValue();
+			long id = element.longValue();
 			processCategoryDeleted(id);
 		}
 	}
@@ -499,8 +499,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		if (fixUpList.size() > 0) {
 			StringBuffer sb = new StringBuffer();
 			sb.append("The following data types are unresolved:\n");
-			for (int i = 0; i < fixUpList.size(); i++) {
-				FixUpInfo info = fixUpList.get(i);
+			for (FixUpInfo info : fixUpList) {
 				DataTypeManager dtm = info.getDataTypeManager();
 				DataType dt = dtm.getDataType(info.id);
 				DataType compDt = dtm.getDataType(info.compID);
@@ -549,7 +548,7 @@ public class DataTypeMergeManager implements MergeResolver {
 				changeSourceArchive(id);
 			}
 
-			// Make sure the change time is updated (even if keeping the Latest version) 
+			// Make sure the change time is updated (even if keeping the Latest version)
 			// since a conflict was resolved for the data type.
 			DataType resultDt = dtms[RESULT].getDataType(id);
 			if (resultDt != null) {
@@ -688,7 +687,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Update the data type name/category path in RESULT if it exists. 
+	 * Update the data type name/category path in RESULT if it exists.
 	 * If it does not exist, add it to RESULT.
 	 * @param id id of data type
 	 * @param dt data type to use as the source name and category path
@@ -752,7 +751,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	/**
 	 * Set category path.  If name conflict occurs within new category
 	 * the specified dt will remain within its current category
-	 * @param dt datatype whoose category is to changed
+	 * @param dt datatype whose category is to changed
 	 * @param newPath new category path
 	 */
 	private void setCategoryPath(DataType dt, CategoryPath newPath) {
@@ -843,7 +842,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	 * 
 	 * @param dataTypeID the ID (key) of the data type to be added.
 	 * @param dataType the data type to be added.
-	 * @param resolvedDataTypes table which maps the dataTypeID to the resulting data type within 
+	 * @param resolvedDataTypes table which maps the dataTypeID to the resulting data type within
 	 * this data type manager.
 	 * @return the resulting data type in this data type manager.
 	 */
@@ -889,7 +888,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Get the resolved data type from the given table; 
+	 * Get the resolved data type from the given table;
 	 * If the data type has not been resolved yet, then use the one from
 	 * the results if the id was not added in MY program.
 	 * @param id id of data type
@@ -907,12 +906,12 @@ public class DataTypeMergeManager implements MergeResolver {
 		DataType resolvedDt = resolvedDataTypes.get(baseID);
 		if (resolvedDt == null) {
 			// Haven't resolved this yet.
-			// use dt from results 
+			// use dt from results
 			if (!myDtAddedList.contains(Long.valueOf(baseID))) {
 				resolvedDt = dtms[RESULT].getDataType(baseID);
 				if (resolvedDt == null) {
 					if (origDtConflictList.contains(Long.valueOf(baseID))) {
-						// was deleted, but add it back so we can create 
+						// was deleted, but add it back so we can create
 						// data types depending on it; will get resolved later
 						resolvedDt = addDataType(baseID, baseDt, resolvedDataTypes);
 					}
@@ -948,7 +947,7 @@ public class DataTypeMergeManager implements MergeResolver {
 			}
 			if (resolvedDt != null) {
 				return PointerDataType.getPointer(resolvedDt,
-					pointerDt.isDynamicallySized() ? -1 : pointerDt.getLength());
+					pointerDt.hasLanguageDependantLength() ? -1 : pointerDt.getLength());
 			}
 		}
 		return null;
@@ -1095,66 +1094,6 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 	}
 
-	private void updateFlexArray(long sourceDtID, Structure sourceDt, Structure destStruct,
-			Map<Long, DataType> resolvedDataTypes) {
-
-		DataTypeComponent flexDtc = sourceDt.getFlexibleArrayComponent();
-		if (flexDtc == null) {
-			return;
-		}
-
-		DataTypeManager sourceDTM = sourceDt.getDataTypeManager();
-
-		DataType sourceCompDt = flexDtc.getDataType();
-		String comment = flexDtc.getComment();
-		long sourceComponentID = sourceDTM.getID(sourceCompDt);
-
-		// Try to get a mapping of the source data type to a result data type.
-		DataType resultCompDt = getResolvedComponent(sourceComponentID, resolvedDataTypes);
-
-		if (resultCompDt == null) {
-			// We didn't have a map entry for the data type.
-
-			if (!myDtAddedList.contains(Long.valueOf(sourceComponentID))) {
-				// Not added so should be in result if it wasn't deleted there.
-				DataType rDt = dtms[RESULT].getDataType(sourceComponentID);
-				if (rDt != null) {
-					resultCompDt = rDt;
-				}
-			}
-			if (resultCompDt == null) {
-				// Not added/resolved yet
-				// put an entry in the fixup list
-				fixUpList.add(new FixUpInfo(sourceDtID, sourceComponentID, Integer.MAX_VALUE,
-					resolvedDataTypes));
-				fixUpIDSet.add(sourceDtID);
-			}
-		}
-		try {
-			if (resultCompDt != null) {
-				// There is a matching component data type in the result.
-				try {
-					// If I have compDt, it should now be from result DTM.
-					destStruct.setFlexibleArrayComponent(resultCompDt, flexDtc.getFieldName(),
-						comment);
-				}
-				catch (IllegalArgumentException e) {
-					displayError(destStruct, e);
-					DataType badDt = Undefined1DataType.dataType;
-					comment = "Couldn't add " + resultCompDt.getDisplayName() + " here. " +
-						e.getMessage() + " " + ((comment != null) ? (" " + comment) : "");
-					destStruct.setFlexibleArrayComponent(badDt, flexDtc.getFieldName(), comment);
-				}
-			}
-			else {
-				destStruct.clearFlexibleArrayComponent();
-			}
-		}
-		catch (IllegalArgumentException e) {
-			displayError(destStruct, e);
-		}
-	}
-
 	private void updateStructure(long sourceDtID, Structure sourceDt, Structure destStruct,
 			Map<Long, DataType> resolvedDataTypes) {
 
@@ -1169,7 +1108,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		updateAlignment(sourceDt, destStruct);
 
 		DataTypeManager sourceDTM = sourceDt.getDataTypeManager();
-		boolean aligned = sourceDt.isInternallyAligned();
+		boolean aligned = sourceDt.isPackingEnabled();
 
 		// Add each of the defined components back in.
 		DataTypeComponent[] comps = sourceDt.getDefinedComponents();
@@ -1216,7 +1155,9 @@ public class DataTypeMergeManager implements MergeResolver {
 					}
 					else {
 						// must have been deleted in LATEST
-						// put an entry in the fixup list if this is a conflict
+						// put an entry in the fixup list if this is a conflict.
+						// NOTE: This may also be caused by a replaced datatype but
+						// we have no indication as to what the replacment was
 						deletedInLatest = true;
 					}
 				}
@@ -1335,8 +1276,6 @@ public class DataTypeMergeManager implements MergeResolver {
 		if (!aligned) {
 			adjustStructureSize(destStruct, sourceDt.getLength());
 		}
-
-		updateFlexArray(sourceDtID, sourceDt, destStruct, resolvedDataTypes);
 	}
 
 	/**
@@ -1346,7 +1285,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	 */
 	private static void adjustStructureSize(Structure struct, int preferredSize) {
 
-		DataTypeComponent dtc = struct.getComponentAt(preferredSize);
+		DataTypeComponent dtc = struct.getComponentContaining(preferredSize);
 		if (dtc == null) {
 			struct.growStructure(preferredSize - struct.getLength());
 			return;
@@ -1483,17 +1422,25 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	private void updateAlignment(Composite sourceDt, Composite destinationDt) {
 		if (sourceDt.isDefaultAligned()) {
-			destinationDt.setToDefaultAlignment();
+			destinationDt.setToDefaultAligned();
 		}
 		else if (sourceDt.isMachineAligned()) {
-			destinationDt.setToMachineAlignment();
+			destinationDt.setToMachineAligned();
 		}
 		else {
-			destinationDt.setMinimumAlignment(sourceDt.getMinimumAlignment());
+			destinationDt.setExplicitMinimumAlignment(sourceDt.getExplicitMinimumAlignment());
 		}
-		destinationDt.setPackingValue(sourceDt.getPackingValue());
-		boolean aligned = sourceDt.isInternallyAligned();
-		destinationDt.setInternallyAligned(aligned);
+		if (sourceDt.isPackingEnabled()) {
+			if (sourceDt.hasExplicitPackingValue()) {
+				destinationDt.setExplicitPackingValue(sourceDt.getExplicitPackingValue());
+			}
+			else {
+				destinationDt.setToDefaultPacking();
+			}
+		}
+		else {
+			destinationDt.setPackingEnabled(false);
+		}
 	}
 
 	private void updateComposite(long sourceDtID, Composite sourceDt, Composite destDt,
@@ -1599,11 +1546,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	 */
 	private void processDataTypeChanges() throws CancelledException {
 
-		for (int i = 0; i < myDtChangeList.size(); i++) {
+		for (Long element : myDtChangeList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long id = myDtChangeList.get(i).longValue();
+			long id = element.longValue();
 
 			DataType dt = dtms[MY].getDataType(id);
 			if ((dt instanceof Pointer) || (dt instanceof Array) || (dt instanceof BuiltIn)) {
@@ -1636,7 +1583,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Process categories that were moved in MY program, but are not 
+	 * Process categories that were moved in MY program, but are not
 	 * conflicts, i.e., not renamed, moved, or deleted in LATEST.
 	 * @param id category ID
 	 */
@@ -1661,7 +1608,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Process categories that were deleted in MY program, but are not 
+	 * Process categories that were deleted in MY program, but are not
 	 * conflicts, i.e., not renamed, moved, or deleted in LATEST.
 	 * @param id category ID
 	 */
@@ -1670,7 +1617,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		if (myCat == null) {
 			Category resultCat = dtms[RESULT].getCategory(id);
 			if (resultCat != null) {
-				// check added data types that have this category path as 
+				// check added data types that have this category path as
 				// the parent
 				if (!isParent(resultCat.getCategoryPath())) {
 					resultCat.getParent().removeCategory(resultCat.getName(), currentMonitor);
@@ -1681,8 +1628,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	private boolean isParent(CategoryPath catPath) {
-		for (int i = 0; i < myDtAddedList.size(); i++) {
-			Long id = myDtAddedList.get(i);
+		for (Long id : myDtAddedList) {
 			DataType dt = dtms[MY].getDataType(id.longValue());
 			if (catPath.equals(dt.getCategoryPath())) {
 				return true;
@@ -1716,7 +1662,7 @@ public class DataTypeMergeManager implements MergeResolver {
 				throw new AssertException("Got DuplicateNameException");
 			}
 			catch (IllegalArgumentException e) {
-				// cannot move category 
+				// cannot move category
 				return;
 			}
 		}
@@ -1864,11 +1810,15 @@ public class DataTypeMergeManager implements MergeResolver {
 	private boolean compositeDataTypeWasChanged(Composite c1, Composite c2) {
 		DataTypeManager dtm1 = c1.getDataTypeManager();
 		DataTypeManager dtm2 = c2.getDataTypeManager();
-		if (c1.isInternallyAligned() != c2.isInternallyAligned() ||
-			c1.isDefaultAligned() != c2.isDefaultAligned() ||
-			c1.isMachineAligned() != c2.isMachineAligned() ||
-			c1.getMinimumAlignment() != c2.getMinimumAlignment() ||
-			c1.getPackingValue() != c2.getPackingValue()) {
+
+		PackingType packingType = c1.getPackingType();
+		AlignmentType alignmentType = c1.getAlignmentType();
+
+		if ((packingType != c2.getPackingType()) || (alignmentType != c2.getAlignmentType()) ||
+			(packingType == PackingType.EXPLICIT &&
+				c1.getExplicitPackingValue() != c2.getExplicitPackingValue()) ||
+			(alignmentType == AlignmentType.EXPLICIT &&
+				c1.getExplicitMinimumAlignment() != c2.getExplicitMinimumAlignment())) {
 			return true;
 		}
 
@@ -1881,21 +1831,11 @@ public class DataTypeMergeManager implements MergeResolver {
 		boolean checkOffsets = false;
 
 		if (c1 instanceof Structure) {
-			if (!((Structure) c1).isInternallyAligned()) {
+			if (!((Structure) c1).isPackingEnabled()) {
 				if (c1.getNumComponents() != c2.getNumComponents()) {
 					return true;
 				}
 				checkOffsets = true;
-			}
-			DataTypeComponent flexDtc1 = ((Structure) c1).getFlexibleArrayComponent();
-			DataTypeComponent flexDtc2 = ((Structure) c2).getFlexibleArrayComponent();
-			if (flexDtc1 != null && flexDtc2 != null) {
-				if (isChangedComponent(flexDtc1, flexDtc2, dtm1, dtm2, false)) {
-					return true;
-				}
-			}
-			else if (flexDtc1 != null || flexDtc2 != null) {
-				return true;
 			}
 		}
 
@@ -2100,7 +2040,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	private void deleteLatestCategory(Category latestCat) {
 		// delete the category from results program if the
 		// paths on the data types in LATEST are different
-		// from path on the data types in MY; 
+		// from path on the data types in MY;
 		DataType[] dts = latestCat.getDataTypes();
 		boolean doDelete = true;
 		if (dts.length > 0) {
@@ -2225,10 +2165,10 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	private void processDataTypesDeleted() throws CancelledException {
-		for (int i = 0; i < myDtChangeList.size(); i++) {
+		for (Long element : myDtChangeList) {
 			currentMonitor.checkCanceled();
 
-			long id = myDtChangeList.get(i).longValue();
+			long id = element.longValue();
 			processDataTypeDeleted(id);
 		}
 	}
@@ -2237,11 +2177,11 @@ public class DataTypeMergeManager implements MergeResolver {
 	 * 
 	 */
 	private void processDataTypesAdded() throws CancelledException {
-		for (int i = 0; i < myDtAddedList.size(); i++) {
+		for (Long element : myDtAddedList) {
 			currentMonitor.checkCanceled();
 			currentMonitor.setProgress(++progressIndex);
 
-			long myDtKey = myDtAddedList.get(i).longValue();
+			long myDtKey = element.longValue();
 			DataType myDt = dtms[MY].getDataType(myDtKey);
 
 			if (equivalentDataTypeFound(myDtKey, myDt)) {
@@ -2264,11 +2204,11 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	/**
 	 * See if there is a data type in the result file that matches My data type based on
-	 * name, path and contents. 
+	 * name, path and contents.
 	 * If there is a data type that is the same then return true.
 	 * @param myDtID the database ID (key) for My data type.
 	 * @param myDt My data type.
-	 * @return true if the same named and equivalent data type is found in the result 
+	 * @return true if the same named and equivalent data type is found in the result
 	 * data type manager.
 	 */
 	private boolean equivalentDataTypeFound(long myDtID, DataType myDt) {
@@ -2282,8 +2222,9 @@ public class DataTypeMergeManager implements MergeResolver {
 			UniversalID resultDtUniversalID = resultDt.getUniversalID();
 			UniversalID myDtUniversalID = myDt.getUniversalID();
 			// UniversalID can be null if data type is BuiltIn.
-			if (!resultSourceArchive.getSourceArchiveID().equals(
-				mySourceArchive.getSourceArchiveID()) ||
+			if (!resultSourceArchive.getSourceArchiveID()
+					.equals(
+						mySourceArchive.getSourceArchiveID()) ||
 				!Objects.equals(resultDtUniversalID, myDtUniversalID)) {
 				return false;
 			}
@@ -2297,7 +2238,7 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	private void cleanUpDataTypes() {
 		// clean up data types
-		List<Long> keys = new ArrayList<Long>(cleanupPlaceHolderList.keySet());
+		List<Long> keys = new ArrayList<>(cleanupPlaceHolderList.keySet());
 		for (long key : keys) {
 			CleanUpInfo cleanUpInfo = cleanupPlaceHolderList.get(key);
 			cleanUpInfo.cleanUp();
@@ -2376,7 +2317,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Process fixup for aligned structure component or trailing flexible array
+	 * Process fixup for aligned structure component
 	 * @param info fixup info
 	 * @param struct result structure
 	 * @param dt component datatype
@@ -2384,35 +2325,15 @@ public class DataTypeMergeManager implements MergeResolver {
 	 */
 	private boolean fixUpAlignedStructureComponent(FixUpInfo info, Structure struct, DataType dt) {
 		int ordinal = info.index;
-		boolean isFlexArrayFixup = (info.index == Integer.MAX_VALUE);
 
 		DataTypeComponent dtc = null;
-		if (isFlexArrayFixup) {
-			dtc = struct.getFlexibleArrayComponent();
-		}
-		else {
-			if (ordinal >= 0 || ordinal < struct.getNumComponents()) {
-				dtc = struct.getComponent(ordinal);
-			}
+		if (ordinal >= 0 || ordinal < struct.getNumComponents()) {
+			dtc = struct.getComponent(ordinal);
 		}
 		if (dtc == null) {
 			return false;
 		}
-		if (isFlexArrayFixup) {
-			try {
-				struct.setFlexibleArrayComponent(dt, dtc.getFieldName(), dtc.getComment());
-			}
-			catch (IllegalArgumentException e) {
-				displayError(struct, e);
-				DataType badDt = Undefined1DataType.dataType;
-				String comment = dtc.getComment();
-				comment = "Couldn't add " + dt.getDisplayName() + "[ ] here. " + e.getMessage() +
-					" " + ((comment != null) ? (" " + comment) : "");
-				struct.replace(ordinal, badDt, dtc.getLength(), dtc.getFieldName(), comment);
-				struct.setFlexibleArrayComponent(badDt, dtc.getFieldName(), comment);
-			}
-		}
-		else if (dtc.isBitFieldComponent()) {
+		if (dtc.isBitFieldComponent()) {
 			if (BitFieldDataType.isValidBaseDataType(dt)) {
 				// replace bitfield base datatype - silent if updated type is not a valid base type
 				BitFieldDataType bfDt = (BitFieldDataType) dtc.getDataType();
@@ -2448,13 +2369,13 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Process fixup for unaligned structure component
+	 * Process fixup for non-packed structure component
 	 * @param info fixup info
 	 * @param struct result structure
 	 * @param dt component datatype
 	 * @return false if component not found, else true
 	 */
-	private boolean fixUpUnalignedStructureComponent(FixUpInfo info, Structure struct,
+	private boolean fixUpNonPackedStructureComponent(FixUpInfo info, Structure struct,
 			DataType dt) {
 		int offset = info.index;
 		DataTypeComponent dtc = struct.getComponentAt(offset);
@@ -2534,13 +2455,10 @@ public class DataTypeMergeManager implements MergeResolver {
 
 			DataType compDt = resolve(info.compID, info.getDataTypeManager(), info.ht);
 
-			boolean isFlexArrayFixup = (info.index == Integer.MAX_VALUE);
-
 			if (compDt != null) {
-				if (struct.isInternallyAligned() || isFlexArrayFixup) {
+				if (struct.isPackingEnabled()) {
 					if (!fixUpAlignedStructureComponent(info, struct, compDt)) {
-						String msg =
-							isFlexArrayFixup ? "flex-array component" : ("component " + info.index);
+						String msg = "component " + info.index;
 						Msg.warn(this, "Structure Merge: Couldn't get " + msg + " in " +
 							struct.getPathName() + " data type during fix up.");
 						return false; // Don't remove this FixUpInfo from the fixupList so the user will get notified.
@@ -2548,7 +2466,7 @@ public class DataTypeMergeManager implements MergeResolver {
 					return true;
 				}
 
-				if (!fixUpUnalignedStructureComponent(info, struct, compDt)) {
+				if (!fixUpNonPackedStructureComponent(info, struct, compDt)) {
 					Msg.warn(this, "Structure Merge: Couldn't get component at offset " +
 						info.index + " in " + struct.getPathName());
 					return false;
@@ -2557,10 +2475,7 @@ public class DataTypeMergeManager implements MergeResolver {
 			}
 
 			// Datatype failed to resolved - check to see if we have a placeholder
-			else if (isFlexArrayFixup) {
-				struct.clearFlexibleArrayComponent();
-			}
-			else if (struct.isInternallyAligned()) {
+			else if (struct.isPackingEnabled()) {
 				int ordinal = info.index;
 				int numComponents = struct.getNumComponents();
 				if (ordinal >= 0 && ordinal < numComponents) {
@@ -2592,14 +2507,14 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Determines the number of contiguous undefined bytes in this structure starting 
+	 * Determines the number of contiguous undefined bytes in this structure starting
 	 * at the indicated component ordinal.
 	 * @param struct the structure to check.
 	 * @param ordinal the ordinal of the component where checking for undefined bytes should begin.
 	 * @return the number of contiguous undefined bytes or 0.
 	 */
 	private int getNumUndefinedBytes(Structure struct, int ordinal) {
-		if (struct.isInternallyAligned()) {
+		if (struct.isPackingEnabled()) {
 			return 0;
 		}
 		int numComponents = struct.getNumComponents();
@@ -2735,11 +2650,6 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 	}
 
-	/**
-	 * @param compID
-	 * @param dataTypeManager
-	 * @return
-	 */
 	private DataType resolve(long id, DataTypeManager dtm,
 			Map<Long, DataType> resolvedDataTypes) {
 		DataType dt = getResolvedComponent(id, resolvedDataTypes);
@@ -3029,9 +2939,9 @@ public class DataTypeMergeManager implements MergeResolver {
 	}
 
 	/**
-	 * Processes my data types that were added and determines whether each is actually a 
-	 * conflict, an added data type, or a changed data type relative to the Latest check in. 
-	 * @param myDtAdds
+	 * Processes my data types that were added and determines whether each is actually a
+	 * conflict, an added data type, or a changed data type relative to the Latest check in.
+	 * @param myDtAdds the data type IDs
 	 */
 	private void processAddIDs(long[] myDtAdds) {
 		myDtAddedList = new ArrayList<>();
@@ -3280,10 +3190,10 @@ public class DataTypeMergeManager implements MergeResolver {
 
 	private static int getComponentFixupIndex(DataTypeComponent dtc) {
 		Composite composite = (Composite) dtc.getParent();
-		if (composite.isInternallyAligned() || (composite instanceof Union)) {
+		if (composite.isPackingEnabled() || (composite instanceof Union)) {
 			return dtc.getOrdinal();
 		}
-		return dtc.getOffset();
+		return dtc.getOffset(); // TODO: use of offset could be problematic with shared offset
 	}
 
 	/**
@@ -3293,7 +3203,7 @@ public class DataTypeMergeManager implements MergeResolver {
 	private class FixUpInfo {
 		long id;
 		long compID;
-		int index;
+		int index; // TODO: index as offset could be problematic with shared offset
 		Map<Long, DataType> ht;
 
 		// bitfield info
@@ -3305,9 +3215,8 @@ public class DataTypeMergeManager implements MergeResolver {
 		 * or components were resolved.
 		 * @param id id of data type needed to be fixed up
 		 * @param compID id of either component or base type
-		 * @param index offset into unaligned structure, or ordinal into union or aligned 
+		 * @param index offset into non-packed structure, or ordinal into union or packed
 		 * structure; or parameter/return ordinal; for other data types index is not used (specify -1).
-		 * For structure trailing flex-array specify {@link Integer#MAX_VALUE}.
 		 * @param resolvedDataTypes hashtable used for resolving the data type
 		 */
 		FixUpInfo(long id, long compID, int index,
@@ -3337,7 +3246,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 
 		/**
-		 * Find unaligned structure bitfield component at or after specified component
+		 * Find non-packed structure bitfield component at or after specified component
 		 * which matches this info's bitfield data.
 		 * @param struct structure
 		 * @param dtc structure component contained within struct
@@ -3360,7 +3269,7 @@ public class DataTypeMergeManager implements MergeResolver {
 				if (nextOrdinal > maxOrdinal) {
 					break;
 				}
-				struct.getComponent(nextOrdinal);
+				dtc = struct.getComponent(nextOrdinal);
 			}
 			return null;
 		}
@@ -3416,7 +3325,7 @@ public class DataTypeMergeManager implements MergeResolver {
 
 		/**
 		 * 
-		 * @param index offset into unaligned structure, or ordinal into union or aligned 
+		 * @param index offset into non-packed structure, or ordinal into union or packed
 		 * structure; for other data types, offset is not used (specify -1)
 		 * @param resolvedDataTypes hashtable used for resolving the data type
 		 */
@@ -3470,7 +3379,7 @@ public class DataTypeMergeManager implements MergeResolver {
 		}
 
 		private void cleanUpStructure(int[] indexArray, Structure dt) {
-			boolean aligned = dt.isInternallyAligned();
+			boolean aligned = dt.isPackingEnabled();
 			Arrays.sort(indexArray);
 			for (int i = indexArray.length - 1; i >= 0; i--) {
 				if (aligned) {

@@ -22,9 +22,8 @@ import docking.widgets.fieldpanel.support.FieldLocation;
 import ghidra.GhidraOptions;
 import ghidra.app.decompiler.*;
 import ghidra.app.decompiler.component.ClangTextField;
-import ghidra.app.plugin.core.hover.AbstractDataTypeHover;
+import ghidra.app.plugin.core.hover.AbstractConfigurableHover;
 import ghidra.app.util.ToolTipUtils;
-import ghidra.framework.options.Options;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.listing.Program;
@@ -32,12 +31,14 @@ import ghidra.program.model.pcode.HighVariable;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.util.ProgramLocation;
 
-public class DataTypeDecompilerHover extends AbstractDataTypeHover
+public class DataTypeDecompilerHover extends AbstractConfigurableHover
 		implements DecompilerHoverService {
 
 	private static final String NAME = "Data Type Display";
 	private static final String DESCRIPTION =
 		"Show data type contents when hovering over a type name.";
+
+	// note: this is relative to other DecompilerHovers; a higher priority gets called first
 	private static final int PRIORITY = 20;
 
 	protected DataTypeDecompilerHover(PluginTool tool) {
@@ -45,18 +46,18 @@ public class DataTypeDecompilerHover extends AbstractDataTypeHover
 	}
 
 	@Override
-	public void initializeOptions() {
-		options = tool.getOptions(GhidraOptions.CATEGORY_DECOMPILER_POPUPS);
-		options.registerOption(NAME, true, null, DESCRIPTION);
-		setOptions(options, NAME);
-		options.addOptionsChangeListener(this);
+	protected String getName() {
+		return NAME;
 	}
 
 	@Override
-	public void setOptions(Options options, String optionName) {
-		if (optionName.equals(NAME)) {
-			enabled = options.getBoolean(NAME, true);
-		}
+	protected String getDescription() {
+		return DESCRIPTION;
+	}
+
+	@Override
+	protected String getOptionsCategory() {
+		return GhidraOptions.CATEGORY_DECOMPILER_POPUPS;
 	}
 
 	@Override

@@ -72,14 +72,15 @@ public class ProgramDataTypeManager extends DataTypeManagerDB
 		this.program = p;
 		dataOrganization = p.getCompilerSpec().getDataOrganization();
 		removeOldFileNameList();
+		if (upgrade) {
+			removeOldFileNameList();
+		}
 	}
 
 	private void removeOldFileNameList() {
-		if (upgrade) {
-			Options options = program.getOptions(Program.PROGRAM_INFO);
-			if (options.contains(OLD_DT_ARCHIVE_FILENAMES)) {
-				options.removeOption(OLD_DT_ARCHIVE_FILENAMES);
-			}
+		Options options = program.getOptions(Program.PROGRAM_INFO);
+		if (options.contains(OLD_DT_ARCHIVE_FILENAMES)) {
+			options.removeOption(OLD_DT_ARCHIVE_FILENAMES);
 		}
 	}
 
@@ -93,6 +94,7 @@ public class ProgramDataTypeManager extends DataTypeManagerDB
 			throws IOException, CancelledException {
 		if (openMode == DBConstants.UPGRADE) {
 			doSourceArchiveUpdates(program.getCompilerSpec(), monitor);
+			migrateOldFlexArrayComponentsIfRequired(monitor);
 		}
 	}
 
@@ -130,12 +132,13 @@ public class ProgramDataTypeManager extends DataTypeManagerDB
 	}
 
 	@Override
-	public void dataTypeChanged(DataType dt) {
-		super.dataTypeChanged(dt);
+	public void dataTypeChanged(DataType dt, boolean isAutoChange) {
+		super.dataTypeChanged(dt, isAutoChange);
 		if (!isCreatingDataType()) {
 			program.getCodeManager().invalidateCache(false);
 			program.getFunctionManager().invalidateCache(false);
-			program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_CHANGED, null, dt);
+			program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_CHANGED,
+				isAutoChange, null, dt);
 		}
 	}
 
@@ -149,7 +152,8 @@ public class ProgramDataTypeManager extends DataTypeManagerDB
 	protected void dataTypeReplaced(long existingDtID, DataTypePath existingPath,
 			DataType replacementDt) {
 		super.dataTypeReplaced(existingDtID, existingPath, replacementDt);
-		program.dataTypeChanged(existingDtID, ChangeManager.DOCR_DATA_TYPE_REPLACED, existingPath,
+		program.dataTypeChanged(existingDtID, ChangeManager.DOCR_DATA_TYPE_REPLACED, true,
+			existingPath,
 			replacementDt);
 	}
 
@@ -157,20 +161,20 @@ public class ProgramDataTypeManager extends DataTypeManagerDB
 	protected void dataTypeDeleted(long deletedID, DataTypePath deletedDataTypePath) {
 		super.dataTypeDeleted(deletedID, deletedDataTypePath);
 		program.dataTypeChanged(deletedID, ChangeManager.DOCR_DATA_TYPE_REMOVED,
-			deletedDataTypePath, null);
+			false, deletedDataTypePath, null);
 	}
 
 	@Override
 	protected void dataTypeMoved(DataType dt, DataTypePath oldPath, DataTypePath newPath) {
 		super.dataTypeMoved(dt, oldPath, newPath);
 		Category category = getCategory(oldPath.getCategoryPath());
-		program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_MOVED, category, dt);
+		program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_MOVED, false, category, dt);
 	}
 
 	@Override
 	protected void dataTypeNameChanged(DataType dt, String oldName) {
 		super.dataTypeNameChanged(dt, oldName);
-		program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_RENAMED, oldName, dt);
+		program.dataTypeChanged(getID(dt), ChangeManager.DOCR_DATA_TYPE_RENAMED, false, oldName, dt);
 	}
 
 	@Override

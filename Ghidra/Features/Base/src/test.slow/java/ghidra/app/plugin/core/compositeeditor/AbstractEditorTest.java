@@ -38,6 +38,7 @@ import docking.widgets.fieldpanel.support.FieldRange;
 import docking.widgets.fieldpanel.support.FieldSelection;
 import ghidra.app.plugin.core.datamgr.DataTypeManagerPlugin;
 import ghidra.app.plugin.core.datamgr.util.DataTypeChooserDialog;
+import ghidra.app.plugin.core.stackeditor.StackEditorModel;
 import ghidra.app.plugin.core.stackeditor.StackFrameDataType;
 import ghidra.app.services.DataTypeManagerService;
 import ghidra.app.util.datatype.DataTypeSelectionEditor;
@@ -47,7 +48,6 @@ import ghidra.framework.plugintool.util.PluginException;
 import ghidra.program.database.ProgramBuilder;
 import ghidra.program.model.data.*;
 import ghidra.program.model.data.Composite;
-import ghidra.program.model.data.Composite.AlignmentType;
 import ghidra.program.model.data.Enum;
 import ghidra.program.model.listing.Program;
 import ghidra.test.AbstractGhidraHeadedIntegrationTest;
@@ -213,8 +213,7 @@ public abstract class AbstractEditorTest extends AbstractGhidraHeadedIntegration
 	}
 
 	protected CycleGroupAction getCycleGroup(DataType dt) {
-		for (int cycleIndex = 0; cycleIndex < cycles.size(); cycleIndex++) {
-			CycleGroupAction action = cycles.get(cycleIndex);
+		for (CycleGroupAction action : cycles) {
 			CycleGroup group = action.getCycleGroup();
 			DataType[] types = group.getDataTypes();
 			for (DataType type : types) {
@@ -227,8 +226,7 @@ public abstract class AbstractEditorTest extends AbstractGhidraHeadedIntegration
 	}
 
 	protected FavoritesAction getFavorite(String name) {
-		for (int favIndex = 0; favIndex < favorites.size(); favIndex++) {
-			FavoritesAction action = favorites.get(favIndex);
+		for (FavoritesAction action : favorites) {
 			if (action.getDataType().getDisplayName().equals(name)) {
 				return action;
 			}
@@ -332,13 +330,17 @@ public abstract class AbstractEditorTest extends AbstractGhidraHeadedIntegration
 	}
 
 	protected void invoke(final DockingActionIf action) {
+		invoke(action, true);
+	}
+
+	protected void invoke(final DockingActionIf action, boolean wait) {
 		assertNotNull(action);
 		boolean isEnabled = runSwing(() -> action.isEnabled());
 		if (!isEnabled) {
 			Msg.debug(this, "Calling actionPerformed() on a disabled action: " + action.getName(),
 				ReflectionUtilities.createJavaFilteredThrowable());
 		}
-		runSwing(() -> action.actionPerformed(new ActionContext()), false);
+		runSwing(() -> action.actionPerformed(new ActionContext()), wait);
 		waitForSwing();
 	}
 
@@ -441,6 +443,14 @@ public abstract class AbstractEditorTest extends AbstractGhidraHeadedIntegration
 	protected void insertAtPoint(DataType dt, int row, int col) {
 		runSwing(() -> getPanel().insertAtPoint(getPoint(row, col), dt), false);
 		waitForSwing();
+	}
+
+	protected DataType getDataTypeAtRow(int row) {
+		return runSwing(() -> {
+			DataTypeInstance instance =
+				(DataTypeInstance) model.getValueAt(row, StackEditorModel.DATATYPE);
+			return instance.getDataType();
+		});
 	}
 
 	/**
@@ -811,20 +821,30 @@ public abstract class AbstractEditorTest extends AbstractGhidraHeadedIntegration
 			actionEnablement);
 	}
 
-	protected void assertIsInternallyAligned(boolean aligned) {
-		assertEquals(aligned, ((CompEditorModel) model).isAligned());
+	protected void assertIsPackingEnabled(boolean aligned) {
+		assertEquals(aligned, ((CompEditorModel) model).isPackingEnabled());
 	}
 
-	protected void assertPackingValue(int value) {
-		assertEquals(value, ((CompEditorModel) model).getPackingValue());
+	protected void assertDefaultPacked() {
+		assertEquals(PackingType.DEFAULT, ((CompEditorModel) model).getPackingType());
 	}
 
-	protected void assertMinimumAlignmentType(AlignmentType alignmentType) {
-		assertEquals(alignmentType, ((CompEditorModel) model).getMinimumAlignmentType());
+	protected void assertPacked(int pack) {
+		assertEquals(PackingType.EXPLICIT, ((CompEditorModel) model).getPackingType());
+		assertEquals(pack, ((CompEditorModel) model).getExplicitPackingValue());
 	}
 
-	protected void assertMinimumAlignmentValue(int value) {
-		assertEquals(value, ((CompEditorModel) model).getMinimumAlignment());
+	protected void assertIsDefaultAligned() {
+		assertEquals(AlignmentType.DEFAULT, ((CompEditorModel) model).getAlignmentType());
+	}
+
+	protected void assertIsMachineAligned() {
+		assertEquals(AlignmentType.MACHINE, ((CompEditorModel) model).getAlignmentType());
+	}
+
+	protected void assertExplicitAlignment(int alignment) {
+		assertEquals(AlignmentType.EXPLICIT, ((CompEditorModel) model).getAlignmentType());
+		assertEquals(alignment, ((CompEditorModel) model).getExplicitMinimumAlignment());
 	}
 
 	protected void assertActualAlignment(int value) {

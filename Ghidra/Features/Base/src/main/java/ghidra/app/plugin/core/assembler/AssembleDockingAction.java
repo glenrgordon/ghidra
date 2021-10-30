@@ -37,7 +37,6 @@ import ghidra.app.plugin.assembler.Assembler;
 import ghidra.app.plugin.assembler.Assemblers;
 import ghidra.app.plugin.core.assembler.AssemblyDualTextField.*;
 import ghidra.app.plugin.core.codebrowser.CodeViewerProvider;
-import ghidra.app.util.PluginConstants;
 import ghidra.app.util.viewer.field.ListingField;
 import ghidra.app.util.viewer.listingpanel.ListingModelAdapter;
 import ghidra.app.util.viewer.listingpanel.ListingPanel;
@@ -47,6 +46,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.mem.MemoryAccessException;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.util.ProgramLocation;
 import ghidra.util.HelpLocation;
 import ghidra.util.Msg;
@@ -67,7 +67,7 @@ public class AssembleDockingAction extends DockingAction {
 	private FieldPanel codepane;
 	private ListingPanel listpane;
 	private Map<Language, CachingSwingWorker<Assembler>> cache =
-		LazyMap.lazyMap(new HashMap<>(), (Language lang) -> new AssemblerConstructorWorker(lang));
+		LazyMap.lazyMap(new HashMap<>(), language -> new AssemblerConstructorWorker(language));
 
 	private Map<Language, Boolean> shownWarning = DefaultedMap.defaultedMap(new HashMap<>(), false);
 
@@ -77,7 +77,7 @@ public class AssembleDockingAction extends DockingAction {
 	private Language lang;
 	private Assembler assembler;
 	private final MyListener listener = new MyListener();
-	private PluginTool tool;
+	//private PluginTool tool;
 
 	// Callback to keep the autocompleter positioned under the fields
 	private FieldPanelOverLayoutListener autoCompleteMover = (FieldPanelOverLayoutEvent ev) -> {
@@ -153,28 +153,9 @@ public class AssembleDockingAction extends DockingAction {
 		}
 	}
 
-	/**
-	 * Create the action, allocating its resources and settings its default menu and key data
-	 */
 	public AssembleDockingAction(PluginTool tool, String name, String owner) {
 		this(name, owner);
-		this.tool = tool;
-	}
-
-	@Override
-	public void dispose() {
-		super.dispose();
-		input.dispose();
-	}
-
-	protected void onFirstInvocation() {
-		ComponentProvider prov = tool.getComponentProvider(PluginConstants.CODE_BROWSER);
-		cv = (CodeViewerProvider) prov;
-		listpane = cv.getListingPanel();
-		codepane = listpane.getFieldPanel();
-
-		fieldLayoutManager = new FieldPanelOverLayoutManager(codepane);
-		codepane.setLayout(fieldLayoutManager);
+		//this.tool = tool;
 
 		// If I lose focus, cancel the assembly
 		input.addFocusListener(new FocusListener() {
@@ -188,13 +169,39 @@ public class AssembleDockingAction extends DockingAction {
 				cancel();
 			}
 		});
+
 		input.getMnemonicField().setBorder(BorderFactory.createLineBorder(Color.RED, 2));
 		input.getOperandsField().setBorder(BorderFactory.createLineBorder(Color.RED, 2));
 		input.getAssemblyField().setBorder(BorderFactory.createLineBorder(Color.RED, 2));
 
 		input.getAutocompleter().addAutocompletionListener(listener);
 		input.addKeyListener(listener);
+	}
 
+	@Override
+	public void dispose() {
+		super.dispose();
+		input.dispose();
+	}
+
+	protected void prepareLayout(ActionContext context) {
+		ComponentProvider prov = context.getComponentProvider();
+		if (cv == prov) {
+			return;
+		}
+
+		if (cv != null) {
+			codepane.setLayout(null);
+			fieldLayoutManager.removeLayoutListener(autoCompleteMover);
+		}
+
+		// we are only added to the popup for a ListingActionContext that has a CodeViewerProvider
+		cv = (CodeViewerProvider) prov;
+		listpane = cv.getListingPanel();
+		codepane = listpane.getFieldPanel();
+
+		fieldLayoutManager = new FieldPanelOverLayoutManager(codepane);
+		codepane.setLayout(fieldLayoutManager);
 		fieldLayoutManager.addLayoutListener(autoCompleteMover);
 	}
 
@@ -220,14 +227,14 @@ public class AssembleDockingAction extends DockingAction {
 	 * Retrieve the location in the code viewer's {@link FieldPanel} for the field at the given
 	 * address having the given header text
 	 * 
-	 * @param addr the address
+	 * @param address the address
 	 * @param fieldName the name of the field
 	 * @return if found, the {@link FieldLocation}, otherwise {@code null}
 	 */
-	protected FieldLocation findFieldLocation(Address addr, String fieldName) {
-		Layout layout = listpane.getLayout(addr);
+	protected FieldLocation findFieldLocation(Address address, String fieldName) {
+		Layout layout = listpane.getLayout(address);
 		ListingModelAdapter adapter = (ListingModelAdapter) codepane.getLayoutModel();
-		BigInteger index = adapter.getAddressIndexMap().getIndex(addr);
+		BigInteger index = adapter.getAddressIndexMap().getIndex(address);
 		int count = layout.getNumFields();
 		for (int i = 0; i < count; i++) {
 			ListingField field = (ListingField) layout.getField(i);
@@ -264,14 +271,23 @@ public class AssembleDockingAction extends DockingAction {
 
 	@Override
 	public void actionPerformed(ActionContext context) {
-		if (cv == null) {
-			onFirstInvocation();
+		if (!(context instanceof ListingActionContext)) {
+			return;
 		}
+		prepareLayout(context);
+		if (cv.isReadOnly()) {
+			return;
+		}
+		ListingActionContext lac = (ListingActionContext) context;
 
-		ProgramLocation cur = cv.getLocation();
+		ProgramLocation cur = lac.getLocation();
 
 		prog = cur.getProgram();
 		addr = cur.getAddress();
+		MemoryBlock block = prog.getMemory().getBlock(addr);
+		if (block == null || !block.isInitialized()) {
+			return;
+		}
 		lang = prog.getLanguage();
 
 		AssemblyRating rating =
@@ -351,11 +367,31 @@ public class AssembleDockingAction extends DockingAction {
 
 	@Override
 	public boolean isAddToPopup(ActionContext context) {
-		// currently on work on the listing
-		Object obj = context.getContextObject();
-		if (obj instanceof ListingActionContext) {
-			return true;
+
+		// currently only works on a listing that has a CodeViewerProvider
+		if (!(context instanceof ListingActionContext)) {
+			return false;
 		}
-		return false;
+
+		ListingActionContext lac = (ListingActionContext) context;
+		ComponentProvider cp = lac.getComponentProvider();
+		if (!(cp instanceof CodeViewerProvider)) {
+			return false;
+		}
+
+		CodeViewerProvider codeViewer = (CodeViewerProvider) cp;
+		if (codeViewer.isReadOnly()) {
+			return false;
+		}
+
+		Program program = lac.getProgram();
+		if (program == null) {
+			return false;
+		}
+		MemoryBlock block = program.getMemory().getBlock(lac.getAddress());
+		if (block == null || !block.isInitialized()) {
+			return false;
+		}
+		return true;
 	}
 }

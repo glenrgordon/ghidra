@@ -51,7 +51,6 @@ import ghidra.framework.options.ToolOptions;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.framework.plugintool.util.OptionsService;
 import ghidra.graph.viewer.*;
-import ghidra.graph.viewer.layout.LayoutProvider;
 import ghidra.program.model.address.*;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.symbol.*;
@@ -332,7 +331,8 @@ public class FGController implements ProgramLocationListener, ProgramSelectionLi
 	}
 
 	private boolean shouldSaveVertexChanges() {
-		return functionGraphOptions.getNavigationHistoryChoice() == NavigationHistoryChoices.VERTEX_CHANGES;
+		return functionGraphOptions
+				.getNavigationHistoryChoice() == NavigationHistoryChoices.VERTEX_CHANGES;
 	}
 
 	@Override
@@ -634,6 +634,10 @@ public class FGController implements ProgramLocationListener, ProgramSelectionLi
 		viewSettings.setLocation(location);
 	}
 
+	public void optionsChanged() {
+		view.optionsChanged();
+	}
+
 	public void refreshDisplayWithoutRebuilding() {
 		view.refreshDisplayWithoutRebuilding();
 	}
@@ -670,12 +674,9 @@ public class FGController implements ProgramLocationListener, ProgramSelectionLi
 			return;
 		}
 
-		@SuppressWarnings("rawtypes")
-		Class<? extends LayoutProvider> previousLayoutClass = previousLayout.getClass();
-		@SuppressWarnings("rawtypes")
-		Class<? extends LayoutProvider> newLayoutClass = newLayout.getClass();
-
-		if (previousLayoutClass == newLayoutClass) {
+		String previousLayoutName = previousLayout.getLayoutName();
+		String newLayoutName = newLayout.getLayoutName();
+		if (previousLayoutName.equals(newLayoutName)) {
 			view.relayout();
 		}
 		else {

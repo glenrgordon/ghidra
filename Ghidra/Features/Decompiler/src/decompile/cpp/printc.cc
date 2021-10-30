@@ -199,9 +199,9 @@ void PrintC::pushSymbolScope(const Symbol *symbol)
   }
 }
 
-/// Emit the elements of the given function's namespace path that distinguish it within
+/// Emit the elements of the given symbol's namespace path that distinguish it within
 /// the current scope.
-/// \param fd is the given function
+/// \param symbol is the given Symbol
 void PrintC::emitSymbolScope(const Symbol *symbol)
 
 {
@@ -251,9 +251,9 @@ void PrintC::pushTypeStart(const Datatype *ct,bool noident)
 
   if (ct->getName().size()==0) {	// Check for anonymous type
     // We could support a struct or enum declaration here
-    string name = genericTypeName(ct);
+    string nm = genericTypeName(ct);
     pushOp(tok,(const PcodeOp *)0);
-    pushAtom(Atom(name,typetoken,EmitXml::type_color,ct));
+    pushAtom(Atom(nm,typetoken,EmitXml::type_color,ct));
   }
   else {
     pushOp(tok,(const PcodeOp *)0);
@@ -514,8 +514,8 @@ void PrintC::opCall(const PcodeOp *op)
   if (callpoint->getSpace()->getType()==IPTR_FSPEC) {
     fc = FuncCallSpecs::getFspecFromConst(callpoint->getAddr());
     if (fc->getName().size()==0) {
-      string name = genericFunctionName(fc->getEntryAddress());
-      pushAtom(Atom(name,functoken,EmitXml::funcname_color,op,(const Funcdata *)0));
+      string nm = genericFunctionName(fc->getEntryAddress());
+      pushAtom(Atom(nm,functoken,EmitXml::funcname_color,op,(const Funcdata *)0));
     }
     else {
       Funcdata *fd = fc->getFuncdata();
@@ -621,9 +621,9 @@ void PrintC::opConstructor(const PcodeOp *op,bool withNew)
   if (dt->getMetatype() == TYPE_PTR) {
     dt = ((TypePointer *)dt)->getPtrTo();
   }
-  string name = dt->getName();
+  string nm = dt->getName();
   pushOp(&function_call,op);
-  pushAtom(Atom(name,optoken,EmitXml::funcname_color,op));
+  pushAtom(Atom(nm,optoken,EmitXml::funcname_color,op));
   // implied vn's pushed on in reverse order for efficiency
   // see PrintLanguage::pushVnImplied
   if (op->numInput()>3) {	// Multiple (non-this) parameters
@@ -1035,19 +1035,19 @@ void PrintC::opNewOp(const PcodeOp *op)
       // Array allocation form
       pushOp(&new_op,op);
       pushAtom(Atom("new",optoken,EmitXml::keyword_color,op,outvn));
-      string name;
+      string nm;
       if (outvn == (const Varnode *)0) {	// Its technically possible, for new result to be unused
-	name = "<unused>";
+	nm = "<unused>";
       }
       else {
 	Datatype *dt = outvn->getType();
 	while (dt->getMetatype() == TYPE_PTR) {
 	  dt = ((TypePointer *)dt)->getPtrTo();
 	}
-	name = dt->getName();
+	nm = dt->getName();
       }
       pushOp(&subscript,op);
-      pushAtom(Atom(name,optoken,EmitXml::type_color,op));
+      pushAtom(Atom(nm,optoken,EmitXml::type_color,op));
       pushVnImplied(vn1,op,mods);
       return;
     }
@@ -1099,7 +1099,7 @@ void PrintC::push_integer(uintb val,int4 sz,bool sign,
       displayFormat = sym->getDisplayFormat();
     }
   }
-  if (sign) { // Print the constant as signed
+  if (sign && displayFormat != Symbol::force_char) { // Print the constant as signed
     uintb mask = calc_mask(sz);
     uintb flip = val^mask;
     print_negsign = (flip < val);
@@ -1136,21 +1136,14 @@ void PrintC::push_integer(uintb val,int4 sz,bool sign,
   else if (displayFormat == Symbol::force_oct)
     t << oct << '0' << val;
   else if (displayFormat == Symbol::force_char) {
-    int4 internalSize = 4;
-    if (val < 256)
-      internalSize = 1;
-    else if (val < 65536)
-      internalSize = 2;
-    if ((internalSize==1)&&((val<7)||(val>0x7e)||((val>13)&&(val<0x20)))) { // not a good character constant
-      t << dec << val;		// Just emit as decimal
-    }
-    else {
-      if (doEmitWideCharPrefix() && internalSize > 1)
-        t << 'L';			// Print symbol indicating wide character
-      t << '\'';			// char is surrounded with single quotes
+    if (doEmitWideCharPrefix() && sz > 1)
+      t << 'L';			// Print symbol indicating wide character
+    t << '\'';			// char is surrounded with single quotes
+    if (sz == 1 && val >= 0x80)
+      printCharHexEscape(t,(int4)val);
+    else
       printUnicode(t,(int4)val);
-      t << '\'';
-    }
+    t << '\'';
   }
   else {	// Must be Symbol::force_bin
     t << "0b";
@@ -1270,15 +1263,8 @@ void PrintC::printUnicode(ostream &s,int4 onechar) const
       s << "\\\'";
       return;
     }
-    // Generic unicode escape
-    if (onechar < 256) {
-      s << "\\x" << setfill('0') << setw(2) << hex << onechar;
-    }
-    else if (onechar < 65536) {
-      s << "\\x" << setfill('0') << setw(4) << hex << onechar;
-    }
-    else
-      s << "\\x" << setfill('0') << setw(8) << hex << onechar;
+    // Generic escape code
+    printCharHexEscape(s, onechar);
     return;
   }
   StringManager::writeUtf8(s, onechar);		// emit normally
@@ -1319,6 +1305,22 @@ void PrintC::pushBoolConstant(uintb val,const TypeBase *ct,
 bool PrintC::doEmitWideCharPrefix(void) const
 {
   return true;
+}
+
+/// Print the given value using the standard character hexadecimal escape sequence.
+/// \param s is the stream to write to
+/// \param val is the given value
+void PrintC::printCharHexEscape(ostream &s,int4 val)
+
+{
+  if (val < 256) {
+    s << "\\x" << setfill('0') << setw(2) << hex << val;
+  }
+  else if (val < 65536) {
+    s << "\\x" << setfill('0') << setw(4) << hex << val;
+  }
+  else
+    s << "\\x" << setfill('0') << setw(8) << hex << val;
 }
 
 /// \brief Print a quoted (unicode) string at the given address.
@@ -1397,28 +1399,50 @@ void PrintC::resetDefaultsPrintC(void)
 /// \param ct is data-type attached to the value
 /// \param vn is the Varnode holding the value
 /// \param op is the PcodeOp using the value
-void PrintC::pushCharConstant(uintb val,const TypeChar *ct,const Varnode *vn,const PcodeOp *op)
+void PrintC::pushCharConstant(uintb val,const Datatype *ct,const Varnode *vn,const PcodeOp *op)
 
 {
-  ostringstream t;
+  uint4 displayFormat = 0;
+  bool isSigned = (ct->getMetatype() == TYPE_INT);
+  if ((vn != (const Varnode *)0)&&(!vn->isAnnotation())) {
+    Symbol *sym = vn->getHigh()->getSymbol();
+    if (sym != (Symbol *)0) {
+      if (sym->isNameLocked() && (sym->getCategory() == 1)) {
+	if (pushEquate(val,vn->getSize(),(EquateSymbol *)sym,vn,op))
+	  return;
+      }
+      displayFormat = sym->getDisplayFormat();
+      if (displayFormat == Symbol::force_bin || displayFormat == Symbol::force_dec || displayFormat == Symbol::force_oct) {
+        push_integer(val, ct->getSize(), isSigned, vn, op);
+        return;
+      }
+    }
+  }
   if ((ct->getSize()==1)&&(val >= 0x80)) {
     // For byte characters, the encoding is assumed to be ASCII, UTF-8, or some other
     // code-page that extends ASCII. At 0x80 and above, we cannot treat the value as a
     // unicode code-point. Its either part of a multi-byte UTF-8 encoding or an unknown
-    // code-page value. In either case, we print it as an integer.
-    push_integer(val,1,true,vn,op);
+    // code-page value. In either case, we print as an integer or an escape sequence.
+    if (displayFormat != Symbol::force_hex && displayFormat != Symbol::force_char) {
+      push_integer(val, 1, isSigned, vn, op);
+      return;
+    }
+    displayFormat = Symbol::force_hex;	// Fallthru but force a hex representation
   }
-  else {
-    // From here we assume, the constant value is a direct unicode code-point.
-    // The value could be an illegal code-point (surrogates or beyond the max code-point),
-    // but this will just be emitted as an escape sequence.
-    if (doEmitWideCharPrefix() && ct->getSize() > 1)
-      t << 'L';			// Print symbol indicating wide character
-    t << '\'';			// char is surrounded with single quotes
+  ostringstream t;
+  // From here we assume, the constant value is a direct unicode code-point.
+  // The value could be an illegal code-point (surrogates or beyond the max code-point),
+  // but this will just be emitted as an escape sequence.
+  if (doEmitWideCharPrefix() && ct->getSize() > 1)
+    t << 'L';		// Print symbol indicating wide character
+  t << '\'';			// char is surrounded with single quotes
+  if (displayFormat == Symbol::force_hex) {
+    printCharHexEscape(t,(int4)val);
+  }
+  else
     printUnicode(t,(int4)val);
-    t << '\'';
-    pushAtom(Atom(t.str(),vartoken,EmitXml::const_color,op,vn));
-  }
+  t << '\'';
+  pushAtom(Atom(t.str(),vartoken,EmitXml::const_color,op,vn));
 }
 
 /// \brief Push an enumerated value to the RPN stack
@@ -1618,7 +1642,7 @@ bool PrintC::pushEquate(uintb val,int4 sz,const EquateSymbol *sym,const Varnode 
 void PrintC::pushAnnotation(const Varnode *vn,const PcodeOp *op)
 
 {
-  const Scope *scope = op->getParent()->getFuncdata()->getScopeLocal();
+  const Scope *symScope = op->getParent()->getFuncdata()->getScopeLocal();
   int4 size = 0;
   if (op->code() == CPUI_CALLOTHER) {
   // This construction is for volatile CALLOTHERs where the input annotation is the original address
@@ -1639,9 +1663,9 @@ void PrintC::pushAnnotation(const Varnode *vn,const PcodeOp *op)
   }
   SymbolEntry *entry;
   if (size != 0)
-    entry = scope->queryContainer(vn->getAddr(),size,op->getAddr());
+    entry = symScope->queryContainer(vn->getAddr(),size,op->getAddr());
   else {
-    entry = scope->queryContainer(vn->getAddr(),1,op->getAddr());
+    entry = symScope->queryContainer(vn->getAddr(),1,op->getAddr());
     if (entry != (SymbolEntry *)0)
       size = entry->getSize();
     else
@@ -1725,7 +1749,7 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
       const TypeField *field;
       field = ((TypeStruct *)ct)->getField(off,sz,&off);
       if (field != (const TypeField *)0) {
-	stack.push_back(PartialSymbolEntry());
+	stack.emplace_back();
 	PartialSymbolEntry &entry( stack.back() );
 	entry.token = &object_member;
 	entry.field = field;
@@ -1740,7 +1764,7 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
       int4 el;
       Datatype *arrayof = ((TypeArray *)ct)->getSubEntry(off,sz,&off,&el);
       if (arrayof != (Datatype *)0) {
-	stack.push_back(PartialSymbolEntry());
+	stack.emplace_back();
 	PartialSymbolEntry &entry( stack.back() );
 	entry.token = &subscript;
 	ostringstream s;
@@ -1761,7 +1785,7 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
       succeeded = true;
     }
     if (!succeeded) {		// Subtype was not good
-      stack.push_back(PartialSymbolEntry());
+      stack.emplace_back();
       PartialSymbolEntry &entry(stack.back());
       entry.token = &object_member;
       ostringstream s;
@@ -1805,8 +1829,8 @@ void PrintC::pushMismatchSymbol(const Symbol *sym,int4 off,int4 sz,
 
   // We prepend an underscore to indicate a close
   // but not quite match
-    string name = '_'+sym->getName();
-    pushAtom(Atom(name,vartoken,EmitXml::var_color,op,vn));
+    string nm = '_'+sym->getName();
+    pushAtom(Atom(nm,vartoken,EmitXml::var_color,op,vn));
   }
   else
     pushUnnamedLocation(vn->getAddr(),vn,op);
@@ -2211,15 +2235,15 @@ void PrintC::emitVarDeclStatement(const Symbol *sym)
   emit->print(";");
 }
 
-bool PrintC::emitScopeVarDecls(const Scope *scope,int4 cat)
+bool PrintC::emitScopeVarDecls(const Scope *symScope,int4 cat)
 
 {
   bool notempty = false;
   
   if (cat >= 0) {		// If a category is specified
-    int4 sz = scope->getCategorySize(cat);
+    int4 sz = symScope->getCategorySize(cat);
     for(int4 i=0;i<sz;++i) {
-      Symbol *sym = scope->getCategorySymbol(cat,i);
+      Symbol *sym = symScope->getCategorySymbol(cat,i);
       // Slightly different handling for categorized symbols (cat=1 is dynamic symbols)
       if (sym->getName().size() == 0) continue;
       if (sym->isNameUndefined()) continue;
@@ -2228,8 +2252,8 @@ bool PrintC::emitScopeVarDecls(const Scope *scope,int4 cat)
     }
     return notempty;
   }
-  MapIterator iter = scope->begin();
-  MapIterator enditer = scope->end();
+  MapIterator iter = symScope->begin();
+  MapIterator enditer = symScope->end();
   for(;iter!=enditer;++iter) {
     const SymbolEntry *entry = *iter;
     if (entry->isPiece()) continue; // Don't do a partial entry
@@ -2247,8 +2271,8 @@ bool PrintC::emitScopeVarDecls(const Scope *scope,int4 cat)
     notempty = true;
     emitVarDeclStatement(sym);
   }
-  list<SymbolEntry>::const_iterator iter_d = scope->beginDynamic();
-  list<SymbolEntry>::const_iterator enditer_d = scope->endDynamic();
+  list<SymbolEntry>::const_iterator iter_d = symScope->beginDynamic();
+  list<SymbolEntry>::const_iterator enditer_d = symScope->endDynamic();
   for(;iter_d!=enditer_d;++iter_d) {
     const SymbolEntry *entry = &(*iter_d);
     if (entry->isPiece()) continue; // Don't do a partial entry
@@ -2302,15 +2326,15 @@ void PrintC::emitFunctionDeclaration(const Funcdata *fd)
 
 /// For the given scope and all of its children that are not \e function scopes,
 /// emit a variable declaration for each symbol.
-/// \param scope is the given scope
-void PrintC::emitGlobalVarDeclsRecursive(Scope *scope)
+/// \param symScope is the given scope
+void PrintC::emitGlobalVarDeclsRecursive(Scope *symScope)
 
 {
-  if (!scope->isGlobal()) return;
-  emitScopeVarDecls(scope,-1);
+  if (!symScope->isGlobal()) return;
+  emitScopeVarDecls(symScope,-1);
   ScopeMap::const_iterator iter,enditer;
-  iter = scope->childrenBegin();
-  enditer = scope->childrenEnd();
+  iter = symScope->childrenBegin();
+  enditer = symScope->childrenEnd();
   for(;iter!=enditer;++iter) {
     emitGlobalVarDeclsRecursive((*iter).second);
   }
@@ -2572,60 +2596,145 @@ void PrintC::emitBlockCondition(const BlockCondition *bl)
   }
 }
 
+void PendingBrace::callback(EmitXml *emit)
+
+{
+  emit->print("{");
+  indentId = emit->startIndent();
+}
+
 void PrintC::emitBlockIf(const BlockIf *bl)
 
 {
   const PcodeOp *op;
+  PendingBrace pendingBrace;
+
+  if (isSet(pending_brace))
+    emit->setPendingPrint(&pendingBrace);
 
 				// if block never prints final branch
 				// so no_branch and only_branch don't matter
 				// and shouldn't be passed automatically to
 				// the subblocks
   pushMod();
-  unsetMod(no_branch|only_branch);
+  unsetMod(no_branch|only_branch|pending_brace);
 
   pushMod();
   setMod(no_branch);
-  bl->getBlock(0)->emit(this);
+  FlowBlock *condBlock = bl->getBlock(0);
+  condBlock->emit(this);
   popMod();
-  emit->tagLine();
-  op = bl->getBlock(0)->lastOp();
+  emitCommentBlockTree(condBlock);
+  if (emit->hasPendingPrint(&pendingBrace))	// If we issued a brace but it did not emit
+    emit->cancelPendingPrint();			// Cancel the brace in order to have "else if" syntax
+  else
+    emit->tagLine();				// Otherwise start the "if" on a new line
+
+  op = condBlock->lastOp();
   emit->tagOp("if",EmitXml::keyword_color,op);
   emit->spaces(1);
   pushMod();
   setMod(only_branch);
-  bl->getBlock(0)->emit(this);
+  condBlock->emit(this);
   popMod();
   if (bl->getGotoTarget() != (FlowBlock *)0) {
     emit->spaces(1);
-    emitGotoStatement(bl->getBlock(0),bl->getGotoTarget(),bl->getGotoType());
-    popMod();
-    return;
+    emitGotoStatement(condBlock,bl->getGotoTarget(),bl->getGotoType());
   }
-  
-  setMod(no_branch);
-  emit->spaces(1);
-  int4 id = emit->startIndent();
-  emit->print("{");
-  int4 id1 = emit->beginBlock(bl->getBlock(1));
-  bl->getBlock(1)->emit(this);
-  emit->endBlock(id1);
-  emit->stopIndent(id);
-  emit->tagLine();
-  emit->print("}");
-  if (bl->getSize()==3) {
-    emit->tagLine();
-    emit->print("else",EmitXml::keyword_color);
+  else {
+    setMod(no_branch);
     emit->spaces(1);
     int4 id = emit->startIndent();
     emit->print("{");
-    int4 id2 = emit->beginBlock(bl->getBlock(2));
-    bl->getBlock(2)->emit(this);
-    emit->endBlock(id2);
+    int4 id1 = emit->beginBlock(bl->getBlock(1));
+    bl->getBlock(1)->emit(this);
+    emit->endBlock(id1);
     emit->stopIndent(id);
     emit->tagLine();
     emit->print("}");
+    if (bl->getSize() == 3) {
+      emit->tagLine();
+      emit->print("else",EmitXml::keyword_color);
+      emit->spaces(1);
+      FlowBlock *elseBlock = bl->getBlock(2);
+      if (elseBlock->getType() == FlowBlock::t_if) {
+	// Attempt to merge the "else" and "if" syntax
+	setMod(pending_brace);
+	int4 id2 = emit->beginBlock(elseBlock);
+	elseBlock->emit(this);
+	emit->endBlock(id2);
+      }
+      else {
+	int4 id2 = emit->startIndent();
+	emit->print("{");
+	int4 id3 = emit->beginBlock(elseBlock);
+	elseBlock->emit(this);
+	emit->endBlock(id3);
+	emit->stopIndent(id2);
+	emit->tagLine();
+	emit->print("}");
+      }
+    }
   }
+  popMod();
+  if (pendingBrace.getIndentId() >= 0) {
+    emit->stopIndent(pendingBrace.getIndentId());
+    emit->tagLine();
+    emit->print("}");
+  }
+}
+
+/// Print the loop using the keyword \e for, followed by a semicolon separated
+///   - Initializer statement
+///   - Condition statment
+///   - Iterate statement
+///
+/// Then print the body of the loop
+void PrintC::emitForLoop(const BlockWhileDo *bl)
+
+{
+  const PcodeOp *op;
+  int4 indent;
+
+  pushMod();
+  unsetMod(no_branch|only_branch);
+  emitAnyLabelStatement(bl);
+  FlowBlock *condBlock = bl->getBlock(0);
+  emitCommentBlockTree(condBlock);
+  emit->tagLine();
+  op = condBlock->lastOp();
+  emit->tagOp("for",EmitXml::keyword_color,op);
+  emit->spaces(1);
+  int4 id1 = emit->openParen('(');
+  pushMod();
+  setMod(comma_separate);
+  op = bl->getInitializeOp();		// Emit the (optional) initializer statement
+  if (op != (PcodeOp *)0) {
+    int4 id3 = emit->beginStatement(op);
+    emitExpression(op);
+    emit->endStatement(id3);
+  }
+  emit->print(";");
+  emit->spaces(1);
+  condBlock->emit(this);		// Emit the conditional statement
+  emit->print(";");
+  emit->spaces(1);
+  op = bl->getIterateOp();		// Emit the iterator statement
+  int4 id4 = emit->beginStatement(op);
+  emitExpression(op);
+  emit->endStatement(id4);
+  popMod();
+  emit->closeParen(')',id1);
+  emit->spaces(1);
+  indent = emit->startIndent();
+  emit->print("{");
+  setMod(no_branch); // Dont print goto at bottom of clause
+  int4 id2 = emit->beginBlock(bl->getBlock(1));
+  bl->getBlock(1)->emit(this);
+  emit->endBlock(id2);
+  emit->stopIndent(indent);
+  emit->tagLine();
+  emit->print("}");
   popMod();
 }
 
@@ -2634,17 +2743,23 @@ void PrintC::emitBlockWhileDo(const BlockWhileDo *bl)
 {
   const PcodeOp *op;
   int4 indent;
+
+  if (bl->getIterateOp() != (PcodeOp *)0) {
+    emitForLoop(bl);
+    return;
+  }
 				// whiledo block NEVER prints final branch
   pushMod();
   unsetMod(no_branch|only_branch);
   emitAnyLabelStatement(bl);
-  emit->tagLine();
-  op = bl->getBlock(0)->lastOp();
+  FlowBlock *condBlock = bl->getBlock(0);
+  op = condBlock->lastOp();
   if (bl->hasOverflowSyntax()) {
     // Print conditional block as
     //     while( true ) {
     //       conditionbody ...
     //       if (conditionalbranch) break;
+    emit->tagLine();
     emit->tagOp("while",EmitXml::keyword_color,op);
     int4 id1 = emit->openParen('(');
     emit->spaces(1);
@@ -2656,27 +2771,30 @@ void PrintC::emitBlockWhileDo(const BlockWhileDo *bl)
     emit->print("{");
     pushMod();
     setMod(no_branch);
-    bl->getBlock(0)->emit(this);
+    condBlock->emit(this);
     popMod();
+    emitCommentBlockTree(condBlock);
     emit->tagLine();
     emit->tagOp("if",EmitXml::keyword_color,op);
     emit->spaces(1);
     pushMod();
     setMod(only_branch);
-    bl->getBlock(0)->emit(this);
+    condBlock->emit(this);
     popMod();
     emit->spaces(1);
-    emitGotoStatement(bl->getBlock(0),(const FlowBlock *)0,FlowBlock::f_break_goto);
+    emitGotoStatement(condBlock,(const FlowBlock *)0,FlowBlock::f_break_goto);
   }
   else {
     // Print conditional block "normally" as
     //     while(condition) {
+    emitCommentBlockTree(condBlock);
+    emit->tagLine();
     emit->tagOp("while",EmitXml::keyword_color,op);
     emit->spaces(1);
     int4 id1 = emit->openParen('(');
     pushMod();
     setMod(comma_separate);
-    bl->getBlock(0)->emit(this);
+    condBlock->emit(this);
     popMod();
     emit->closeParen(')',id1);
     emit->spaces(1);
@@ -2805,8 +2923,8 @@ void PrintC::emitLabel(const FlowBlock *bl)
   uintb off = addr.getOffset();
   if (!bb->hasSpecialLabel()) {
     if (bb->getType() == FlowBlock::t_basic) {
-      const Scope *scope = ((const BlockBasic *)bb)->getFuncdata()->getScopeLocal();
-      Symbol *sym = scope->queryCodeLabel(addr);
+      const Scope *symScope = ((const BlockBasic *)bb)->getFuncdata()->getScopeLocal();
+      Symbol *sym = symScope->queryCodeLabel(addr);
       if (sym != (Symbol *)0) {
 	emit->tagLabel(sym->getName().c_str(),EmitXml::no_color,spc,off);
 	return;
@@ -2867,9 +2985,36 @@ void PrintC::emitCommentGroup(const PcodeOp *inst)
   commsorter.setupOpList(inst);
   while(commsorter.hasNext()) {
     Comment *comm = commsorter.getNext();
+    if (comm->isEmitted()) continue;
     if ((instr_comment_type & comm->getType())==0) continue;
     emitLineComment(-1,comm);
   }
+}
+
+/// With the control-flow hierarchy, print any comments associated with basic blocks in
+/// the specified subtree.  Used where statements from multiple basic blocks are printed on
+/// one line and a normal comment would get printed in the middle of this line.
+/// \param bl is the root of the control-flow subtree
+void PrintC::emitCommentBlockTree(const FlowBlock *bl)
+
+{
+  if (bl == (const FlowBlock *)0) return;
+  FlowBlock::block_type btype = bl->getType();
+  if (btype == FlowBlock::t_copy) {
+    bl = bl->subBlock(0);
+    btype = bl->getType();
+  }
+  if (btype == FlowBlock::t_plain) return;
+  if (bl->getType() != FlowBlock::t_basic) {
+    const BlockGraph *rootbl = (const BlockGraph *)bl;
+    int4 size = rootbl->getSize();
+    for(int4 i=0;i<size;++i) {
+      emitCommentBlockTree(rootbl->subBlock(i));
+    }
+    return;
+  }
+  commsorter.setupBlockList(bl);
+  emitCommentGroup((const PcodeOp *)0);	// Emit any comments for the block
 }
 
 /// Collect all comment lines marked as \e header for the function and
@@ -2882,6 +3027,7 @@ void PrintC::emitCommentFuncHeader(const Funcdata *fd)
   commsorter.setupHeader(CommentSorter::header_basic);
   while(commsorter.hasNext()) {
     Comment *comm = commsorter.getNext();
+    if (comm->isEmitted()) continue;
     if ((head_comment_type & comm->getType())==0) continue;
     emitLineComment(0,comm);
     extralinebreak = true;
@@ -2893,6 +3039,7 @@ void PrintC::emitCommentFuncHeader(const Funcdata *fd)
     commsorter.setupHeader(CommentSorter::header_unplaced);
     while(commsorter.hasNext()) {
       Comment *comm = commsorter.getNext();
+      if (comm->isEmitted()) continue;
       if (!extralinebreak) {
 	Comment label(Comment::warningheader,fd->getAddress(),fd->getAddress(),0,
 		      "Comments that could not be placed in the function body:");

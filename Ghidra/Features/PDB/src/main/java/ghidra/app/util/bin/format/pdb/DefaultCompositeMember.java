@@ -234,8 +234,11 @@ public class DefaultCompositeMember extends CompositeMember {
 			// transform last member into flexible array
 			Structure struct = (Structure) memberDataType;
 			Array array = (Array) m.getDataType();
-			struct.setFlexibleArrayComponent(array.getDataType(), m.getName(), m.memberComment); // use unmodified comment
-			struct.delete(struct.getNumComponents() - 1);
+			// TODO: there may be a more direct approach since we now handle zero-length array instantiation
+			struct.delete(struct.getNumComponents() - 1); // delete placeholder component
+			struct.insertAtOffset(m.memberOffset,
+				new ArrayDataType(array.getDataType(), 0, 1, dataTypeManager), 0, m.getName(),
+				m.memberComment); // use unmodified comment
 		}
 	}
 
@@ -266,7 +269,7 @@ public class DefaultCompositeMember extends CompositeMember {
 	}
 
 	/**
-	 * Adjust unaligned structure following member reconstruction.
+	 * Adjust non-packed structure following member reconstruction.
 	 * @param preferredSize preferred size
 	 */
 	private void adjustSize(int preferredSize) {
@@ -286,7 +289,7 @@ public class DefaultCompositeMember extends CompositeMember {
 			return;
 		}
 
-		DataTypeComponent dtc = struct.getComponentAt(preferredSize);
+		DataTypeComponent dtc = struct.getComponentContaining(preferredSize);
 		if (dtc == null) {
 			return;
 		}
@@ -325,18 +328,21 @@ public class DefaultCompositeMember extends CompositeMember {
 		Composite copy = (Composite) composite.copy(dataTypeManager);
 
 		int pack = 0;
-		copy.setPackingValue(pack);
+		copy.setToDefaultPacking();
 
 		boolean alignOK = isGoodAlignment(copy, preferredSize);
-		if (!alignOK) {
-			pack = 1;
-			copy.setPackingValue(pack);
-			alignOK = isGoodAlignment(copy, preferredSize);
-		}
 		if (alignOK) {
-			composite.setPackingValue(pack);
+			composite.setToDefaultPacking();
 		}
-		else if (errorConsumer != null && !isClass) { // don't complain about Class structs which always fail
+		else {
+			pack = 1;
+			copy.setExplicitPackingValue(pack);
+			alignOK = isGoodAlignment(copy, preferredSize);
+			if (alignOK) {
+				composite.setExplicitPackingValue(pack);
+			}
+		}
+		if (!alignOK && errorConsumer != null && !isClass) { // don't complain about Class structs which always fail
 			String anonymousStr = parent != null ? " anonymous " : "";
 			errorConsumer.accept("PDB " + anonymousStr + memberType +
 				" reconstruction failed to align " + composite.getPathName());
@@ -352,11 +358,11 @@ public class DefaultCompositeMember extends CompositeMember {
 		if (alignOK && isStructureContainer()) {
 			// verify that components did not move
 			Structure struct = (Structure) memberDataType;
-			DataTypeComponent[] unalignedComponents = struct.getDefinedComponents();
+			DataTypeComponent[] nonPackedComponents = struct.getDefinedComponents();
 			int index = 0;
 			for (DataTypeComponent dtc : testComposite.getComponents()) {
-				DataTypeComponent unalignedDtc = unalignedComponents[index++];
-				if (!isComponentUnchanged(dtc, unalignedDtc)) {
+				DataTypeComponent nonPackedDtc = nonPackedComponents[index++];
+				if (!isComponentUnchanged(dtc, nonPackedDtc)) {
 					alignOK = false;
 					break;
 				}
@@ -365,18 +371,18 @@ public class DefaultCompositeMember extends CompositeMember {
 		return alignOK;
 	}
 
-	private boolean isComponentUnchanged(DataTypeComponent dtc, DataTypeComponent unalignedDtc) {
-		if (unalignedDtc.getOffset() != dtc.getOffset() ||
-			unalignedDtc.getLength() != dtc.getLength() ||
-			unalignedDtc.isBitFieldComponent() != dtc.isBitFieldComponent()) {
+	private boolean isComponentUnchanged(DataTypeComponent dtc, DataTypeComponent nonPackedDtc) {
+		if (nonPackedDtc.getOffset() != dtc.getOffset() ||
+			nonPackedDtc.getLength() != dtc.getLength() ||
+			nonPackedDtc.isBitFieldComponent() != dtc.isBitFieldComponent()) {
 			return false;
 		}
 		if (dtc.isBitFieldComponent()) {
 			// both components are bit fields
 			BitFieldDataType bitfieldDt = (BitFieldDataType) dtc.getDataType();
-			BitFieldDataType unalignedBitfieldDt = (BitFieldDataType) unalignedDtc.getDataType();
-			if (bitfieldDt.getBitOffset() != unalignedBitfieldDt.getBitOffset() ||
-				bitfieldDt.getBitSize() != unalignedBitfieldDt.getBitSize()) {
+			BitFieldDataType nonPackedBitfieldDt = (BitFieldDataType) nonPackedDtc.getDataType();
+			if (bitfieldDt.getBitOffset() != nonPackedBitfieldDt.getBitOffset() ||
+				bitfieldDt.getBitSize() != nonPackedBitfieldDt.getBitSize()) {
 				return false;
 			}
 		}
@@ -1007,7 +1013,7 @@ public class DefaultCompositeMember extends CompositeMember {
 		}
 		else if (isStructureContainer()) {
 			Structure struct = (Structure) memberDataType;
-			// TODO: complicated by bitfields
+			// TODO: complicated by bitfields where multiple components may occupy same byte
 			struct.deleteAtOffset(newContainerMember.getOffset());
 			struct.insertAtOffset(newContainerMember.getOffset(), newContainerMember.getDataType(),
 				newContainerMember.getLength());

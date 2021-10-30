@@ -16,6 +16,11 @@
 #include "type.hh"
 #include "funcdata.hh"
 
+sub_metatype Datatype::base2sub[11] = {
+    SUB_STRUCT, SUB_ARRAY, SUB_PTR, SUB_FLOAT, SUB_CODE, SUB_BOOL,
+    SUB_UINT_PLAIN, SUB_INT_PLAIN, SUB_UNKNOWN, SUB_SPACEBASE, SUB_VOID
+};
+
 // Some default routines for displaying data
 
 /// Display an array of bytes as a hex dump at a given address.
@@ -130,36 +135,31 @@ Datatype *Datatype::nearestArrayedComponentBackward(uintb off,uintb *newoff,int4
   return (TypeArray *)0;
 }
 
-// Compare \b this with another data-type.
-/// 0 (equality) means the data-types are functionally equivalent (even if names differ)
-/// Smaller types come earlier. More specific types come earlier.
+/// Order \b this with another data-type, in a way suitable for the type propagation algorithm.
+/// Bigger types come earlier. More specific types come earlier.
 /// \param op is the data-type to compare with \b this
 /// \param level is maximum level to descend when recursively comparing
 /// \return negative, 0, positive depending on ordering of types
 int4 Datatype::compare(const Datatype &op,int4 level) const
 
 {
-  return compareDependency(op);
+  if (size != op.size) return (op.size - size);
+  if (submeta != op.submeta) return (submeta < op.submeta) ? -1 : 1;
+  return 0;
 }
 
-/// Ordering of data-types for the main TypeFactory container.
-/// Comparison only goes down one-level in the component structure,
-/// before just comparing pointers.
+/// Sort data-types for the main TypeFactory container.  The sort needs to be based on
+/// the data-type structure so that an example data-type, constructed outside the factory,
+/// can be used to find the equivalent object inside the factory.  This means the
+/// comparison should not examine the data-type id. In practice, the comparison only needs
+/// to go down one level in the component structure before just comparing component pointers.
 /// \param op is the data-type to compare with \b this
 /// \return negative, 0, positive depending on ordering of types
 int4 Datatype::compareDependency(const Datatype &op) const
 
 {
   if (size != op.size) return (op.size-size);
-  if (metatype != op.metatype) return (metatype < op.metatype) ? -1 : 1;
-  uint4 fl = flags & (~coretype);
-  uint4 opfl = op.flags & (~coretype);
-  // We need to be careful here, we compare flags so that enum types are more specific than base int or uint,
-  // we also want UTF16 and UTF32 to be more specific than int, BUT
-  // we don't want char to be more specific than int1 because char is the default size 1 integer type.
-  fl ^= chartype;
-  opfl ^= chartype;
-  if (fl != opfl) return (opfl < fl) ? -1 : 1;
+  if (submeta != op.submeta) return (submeta < op.submeta) ? -1 : 1;
   return 0;
 }
 
@@ -309,16 +309,37 @@ void Datatype::saveXmlRef(ostream &s) const
   if ((id!=0)&&(metatype != TYPE_VOID)) {
     s << "<typeref";
     a_v(s,"name",name);
-    s << " id=\"0x" << hex << id << '\"';
+    if (isVariableLength()) {			// For a type with a "variable length" base
+      a_v_u(s,"id",hashSize(id,size));		// Emit the size independent version of the id
+      a_v_i(s,"size",size);			// but also emit size of this instance
+    }
+    else {
+      a_v_u(s,"id",id);
+    }
     s << "/>";
   }
   else
     saveXml(s);
 }
 
+/// Called only if the \b typedefImm field is non-null.  Write the data-type to the
+/// stream as a simple \<typedef> tag including only the names and ids of \b this and
+/// the data-type it typedefs.
+/// \param s is the output stream
+void Datatype::saveXmlTypedef(ostream &s) const
+
+{
+  s << "<def";
+  a_v(s,"name",name);
+  a_v_u(s,"id",id);
+  s << ">";
+  typedefImm->saveXmlRef(s);
+  s << "</def>";
+}
+
 /// A CPUI_PTRSUB must act on a pointer data-type where the given offset addresses a component.
 /// Perform this check.
-/// \param is the given offset
+/// \param offset is the given offset
 /// \return \b true if \b this is a suitable PTRSUB data-type
 bool Datatype::isPtrsubMatching(uintb offset) const
 
@@ -335,11 +356,11 @@ bool Datatype::isPtrsubMatching(uintb offset) const
       return false;
   }
   else {
-    int4 size = offset;
+    int4 sz = offset;
     int4 typesize = basetype->getSize();
     if ((basetype->metatype != TYPE_ARRAY)&&(basetype->metatype != TYPE_STRUCT))
       return false;	// Not a pointer to a structured type
-    else if ((typesize <= AddrSpace::addressToByteInt(size,wordsize))&&(typesize!=0))
+    else if ((typesize <= AddrSpace::addressToByteInt(sz,wordsize))&&(typesize!=0))
       return false;
   }
   return true;
@@ -352,13 +373,14 @@ void Datatype::restoreXmlBasic(const Element *el)
 
 {
   name = el->getAttributeValue("name");
-  istringstream i(el->getAttributeValue("size"));
-  i.unsetf(ios::dec | ios::hex | ios::oct);
+  istringstream s(el->getAttributeValue("size"));
+  s.unsetf(ios::dec | ios::hex | ios::oct);
   size = -1;
-  i >> size;
+  s >> size;
   if (size < 0)
     throw LowlevelError("Bad size for type "+name);
   metatype = string2metatype( el->getAttributeValue("metatype") );
+  submeta = base2sub[metatype];
   id = 0;
   for(int4 i=0;i<el->getNumAttributes();++i) {
     const string &attribName( el->getAttributeName(i) );
@@ -367,9 +389,9 @@ void Datatype::restoreXmlBasic(const Element *el)
 	flags |= coretype;
     }
     else if (attribName == "id") {
-      istringstream i1(el->getAttributeValue(i));
-      i1.unsetf(ios::dec | ios::hex | ios::oct);
-      i1 >> id;
+      istringstream s1(el->getAttributeValue(i));
+      s1.unsetf(ios::dec | ios::hex | ios::oct);
+      s1 >> id;
     }
     else if (attribName == "varlength") {
       if (xml_readbool(el->getAttributeValue(i)))
@@ -422,7 +444,7 @@ uint8 Datatype::hashName(const string &nm)
 /// The hashing is reversible by feeding the output ID back into this function with the same size.
 /// \param id is the given ID to (de)uniquify
 /// \param size is the instance size of the structure
-/// \param return the (de)uniquified id
+/// \return the (de)uniquified id
 uint8 Datatype::hashSize(uint8 id,int4 size)
 
 {
@@ -432,9 +454,20 @@ uint8 Datatype::hashSize(uint8 id,int4 size)
   return id;
 }
 
+void TypeChar::restoreXml(const Element *el,TypeFactory &typegrp)
+
+{
+  restoreXmlBasic(el);
+  submeta = (metatype == TYPE_INT) ? SUB_INT_CHAR : SUB_UINT_CHAR;
+}
+
 void TypeChar::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   a_v_b(s,"char",true);
@@ -460,17 +493,23 @@ void TypeUnicode::restoreXml(const Element *el,TypeFactory &typegrp)
   restoreXmlBasic(el);
   // Get endianness flag from architecture, rather than specific type encoding
   setflags();
+  submeta = (metatype == TYPE_INT) ? SUB_INT_UNICODE : SUB_UINT_UNICODE;
 }
 
 TypeUnicode::TypeUnicode(const string &nm,int4 sz,type_metatype m)
   : TypeBase(sz,m,nm)
 {
   setflags();			// Set special unicode UTF flags
+  submeta = (m == TYPE_INT) ? SUB_INT_UNICODE : SUB_UINT_UNICODE;
 }
 
 void TypeUnicode::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   a_v_b(s,"utf",true);
@@ -480,6 +519,10 @@ void TypeUnicode::saveXml(ostream &s) const
 void TypeVoid::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<void/>";
 }
 
@@ -493,12 +536,10 @@ void TypePointer::printRaw(ostream &s) const
 int4 TypePointer::compare(const Datatype &op,int4 level) const
 
 {
-  TypePointer *tp;
-
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
+  int4 res = Datatype::compare(op,level);
+  if (res != 0) return res;
   // Both must be pointers
-  tp = (TypePointer *) &op;
+  TypePointer *tp = (TypePointer *) &op;
   if (wordsize != tp->wordsize) return (wordsize < tp->wordsize) ? -1 : 1;
   level -= 1;
   if (level < 0) {
@@ -511,12 +552,10 @@ int4 TypePointer::compare(const Datatype &op,int4 level) const
 int4 TypePointer::compareDependency(const Datatype &op) const
 
 {
-  TypePointer *tp;
-
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
+  int4 res = Datatype::compareDependency(op);
+  if (res != 0) return res;
   // Both must be pointers
-  tp = (TypePointer *) &op;
+  TypePointer *tp = (TypePointer *) &op;
   if (wordsize != tp->wordsize) return (wordsize < tp->wordsize) ? -1 : 1;
   if (ptrto == tp->ptrto) return 0;
   return (ptrto < tp->ptrto) ? -1 : 1; // Compare the absolute pointers
@@ -525,6 +564,10 @@ int4 TypePointer::compareDependency(const Datatype &op) const
 void TypePointer::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   if (wordsize != 1)
@@ -549,6 +592,45 @@ void TypePointer::restoreXml(const Element *el,TypeFactory &typegrp)
     flags = ptrto->getInheritable();
 }
 
+/// \brief Find a sub-type pointer given an offset into \b this
+///
+/// Add a constant offset to \b this pointer.
+/// If there is a valid component at that offset, return a pointer
+/// to the data-type of the component or NULL otherwise.
+/// This routine only goes down one level at most. Pass back the
+/// renormalized offset relative to the new data-type
+/// \param off is a reference to the offset to add
+/// \param allowArrayWrap is \b true if the pointer should be treated as a pointer to an array
+/// \return a pointer datatype for the component or NULL
+TypePointer *TypePointer::downChain(uintb &off,bool allowArrayWrap,TypeFactory &typegrp)
+
+{
+  int4 ptrtoSize = ptrto->getSize();
+  if (off >= ptrtoSize) {	// Check if we are wrapping
+    if (ptrtoSize != 0 && !ptrto->isVariableLength()) {	// Check if pointed-to is wrappable
+      if (!allowArrayWrap)
+        return (TypePointer *)0;
+      intb signOff = (intb)off;
+      sign_extend(signOff,size*8-1);
+      signOff = signOff % ptrtoSize;
+      if (signOff < 0)
+	signOff = signOff + ptrtoSize;
+      off = signOff;
+      if (off == 0)		// If we've wrapped and are now at zero
+        return this;		// consider this going down one level
+    }
+  }
+
+  // If we know we have exactly one of an array, strip the array to get pointer to element
+  bool doStrip = (ptrto->getMetatype() != TYPE_ARRAY);
+  Datatype *pt = ptrto->getSubType(off,&off);
+  if (pt == (Datatype *)0)
+    return (TypePointer *)0;
+  if (doStrip)
+    return typegrp.getTypePointerStripArray(size, pt, wordsize);
+  return typegrp.getTypePointer(size,pt,wordsize);
+}
+
 void TypeArray::printRaw(ostream &s) const
 
 {
@@ -559,27 +641,23 @@ void TypeArray::printRaw(ostream &s) const
 int4 TypeArray::compare(const Datatype &op,int4 level) const
 
 {
-  TypeArray *ta;
-
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
+  int4 res = Datatype::compare(op,level);
+  if (res != 0) return res;
   level -= 1;
   if (level < 0) {
     if (id == op.getId()) return 0;
     return (id < op.getId()) ? -1 : 1;
   }
-  ta = (TypeArray *) &op;	// Both must be arrays
+  TypeArray *ta = (TypeArray *) &op;	// Both must be arrays
   return arrayof->compare(*ta->arrayof,level); // Compare array elements
 }
 
 int4 TypeArray::compareDependency(const Datatype &op) const
 
 {
-  TypeArray *ta;
-
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
-  ta = (TypeArray *) &op;	// Both must be arrays
+  int4 res = Datatype::compareDependency(op);
+  if (res != 0) return res;
+  TypeArray *ta = (TypeArray *) &op;	// Both must be arrays
   if (arrayof == ta->arrayof) return 0;
   return (arrayof < ta->arrayof) ? -1 : 1;
 }
@@ -613,6 +691,10 @@ Datatype *TypeArray::getSubEntry(int4 off,int4 sz,int4 *newoff,int4 *el) const
 void TypeArray::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   a_v_i(s,"arraysize",arraysize);
@@ -764,6 +846,9 @@ int4 TypeEnum::compareDependency(const Datatype &op) const
   const TypeEnum *te = (const TypeEnum *) &op;
   map<uintb,string>::const_iterator iter1,iter2;
 
+  if (namemap.size() != te->namemap.size()) {
+    return (namemap.size() < te->namemap.size()) ? -1 : 1;
+  }
   iter1 = namemap.begin();
   iter2 = te->namemap.begin();
   while(iter1 != namemap.end()) {
@@ -780,6 +865,10 @@ int4 TypeEnum::compareDependency(const Datatype &op) const
 void TypeEnum::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   a_v(s,"enum","true");
@@ -798,6 +887,7 @@ void TypeEnum::restoreXml(const Element *el,TypeFactory &typegrp)
 
 {
   restoreXmlBasic(el);
+  submeta = (metatype == TYPE_INT) ? SUB_INT_ENUM : SUB_UINT_ENUM;
   const List &list(el->getChildren());
   List::const_iterator iter;
   map<uintb,string> nmap;
@@ -979,9 +1069,8 @@ Datatype *TypeStruct::nearestArrayedComponentForward(uintb off,uintb *newoff,int
 
 int4 TypeStruct::compare(const Datatype &op,int4 level) const
 {
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
-
+  int4 res = Datatype::compare(op,level);
+  if (res != 0) return res;
   const TypeStruct *ts = (const TypeStruct *)&op;
   vector<TypeField>::const_iterator iter1,iter2;
 
@@ -1021,9 +1110,8 @@ int4 TypeStruct::compare(const Datatype &op,int4 level) const
 int4 TypeStruct::compareDependency(const Datatype &op) const
 
 {
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
-
+  int4 res = Datatype::compareDependency(op);
+  if (res != 0) return res;
   const TypeStruct *ts = (const TypeStruct *)&op;
   vector<TypeField>::const_iterator iter1,iter2;
 
@@ -1049,6 +1137,10 @@ int4 TypeStruct::compareDependency(const Datatype &op) const
 void TypeStruct::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   s << ">\n";
@@ -1177,9 +1269,6 @@ void TypeCode::setProperties(bool isConstructor,bool isDestructor)
 int4 TypeCode::compareBasic(const TypeCode *op) const
 
 {
-  if (size != op->getSize()) return (op->getSize() < size) ? -1 : 1;
-  if (metatype != op->getMetatype()) return (metatype < op->getMetatype()) ? -1 : 1;
-
   if (proto == (FuncProto *)0) {
     if (op->proto == (FuncProto *)0) return 0;
     return 1;
@@ -1201,10 +1290,10 @@ int4 TypeCode::compareBasic(const TypeCode *op) const
   int4 opnump = op->proto->numParams();
   if (nump != opnump)
     return (opnump < nump) ? -1 : 1;
-  uint4 flags = proto->getComparableFlags();
+  uint4 myflags = proto->getComparableFlags();
   uint4 opflags = op->proto->getComparableFlags();
-  if (flags != opflags)
-    return (flags < opflags) ? -1 : 1;
+  if (myflags != opflags)
+    return (myflags < opflags) ? -1 : 1;
 
   return 2;			// Carry on with comparison of parameters
 }
@@ -1220,8 +1309,10 @@ Datatype *TypeCode::getSubType(uintb off,uintb *newoff) const
 int4 TypeCode::compare(const Datatype &op,int4 level) const
 
 {
+  int4 res = Datatype::compare(op,level);
+  if (res != 0) return res;
   const TypeCode *tc = (const TypeCode *)&op;
-  int4 res = compareBasic(tc);
+  res = compareBasic(tc);
   if (res != 2) return res;
 
   level -= 1;
@@ -1250,8 +1341,10 @@ int4 TypeCode::compare(const Datatype &op,int4 level) const
 int4 TypeCode::compareDependency(const Datatype &op) const
 
 {
+  int4 res = Datatype::compareDependency(op);
+  if (res != 0) return res;
   const TypeCode *tc = (const TypeCode *)&op;
-  int4 res = compareBasic(tc);
+  res = compareBasic(tc);
   if (res != 2) return res;
 
   int4 nump = proto->numParams();
@@ -1276,6 +1369,10 @@ int4 TypeCode::compareDependency(const Datatype &op) const
 void TypeCode::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   s << ">\n";
@@ -1287,18 +1384,21 @@ void TypeCode::saveXml(ostream &s) const
 void TypeCode::restoreXml(const Element *el,TypeFactory &typegrp)
 
 {
+  const List &list(el->getChildren());
+  List::const_iterator iter;
+  iter = list.begin();
+  if (iter != list.end()) {
+    // Traditionally a <prototype> tag implies variable length, without a "varlength" attribute
+    flags |= variable_length;
+  }
   restoreXmlBasic(el);
   if (proto != (FuncProto *)0) {
     delete proto;
     proto = (FuncProto *)0;
   }
-  const List &list(el->getChildren());
-  List::const_iterator iter;
-  iter = list.begin();
   if (iter == list.end()) return; // No underlying prototype
   Architecture *glb = typegrp.getArch();
   factory = &typegrp;
-  flags |= variable_length;
   proto = new FuncProto();
   proto->setInternal( glb->defaultfp, typegrp.getTypeVoid() );
   proto->restoreXml(*iter,glb);
@@ -1368,8 +1468,8 @@ Datatype *TypeSpacebase::nearestArrayedComponentForward(uintb off,uintb *newoff,
 	return symbolType;
       }
     }
-    int4 size = AddrSpace::byteToAddressInt(smallest->getSize(), spaceid->getWordSize());
-    nextAddr = smallest->getAddr() + size;
+    int4 sz = AddrSpace::byteToAddressInt(smallest->getSize(), spaceid->getWordSize());
+    nextAddr = smallest->getAddr() + sz;
   }
   if (nextAddr < addr)
     return (Datatype *)0;		// Don't let the address wrap
@@ -1419,8 +1519,8 @@ int4 TypeSpacebase::compare(const Datatype &op,int4 level) const
 int4 TypeSpacebase::compareDependency(const Datatype &op) const
 
 {
-  if (size != op.getSize()) return (op.getSize()-size);
-  if (metatype != op.getMetatype()) return (metatype < op.getMetatype()) ? -1 : 1;
+  int4 res = Datatype::compareDependency(op);
+  if (res != 0) return res;
   TypeSpacebase *tsb = (TypeSpacebase *) &op;
   if (spaceid != tsb->spaceid) return (spaceid < tsb->spaceid) ? -1:1;
   if (localframe.isInvalid()) return 0; // Global space base
@@ -1447,6 +1547,10 @@ Address TypeSpacebase::getAddress(uintb off,int4 sz,const Address &point) const
 void TypeSpacebase::saveXml(ostream &s) const
 
 {
+  if (typedefImm != (Datatype *)0) {
+    saveXmlTypedef(s);
+    return;
+  }
   s << "<type";
   saveXmlBasic(s);
   a_v(s,"space",spaceid->getName());
@@ -1650,13 +1754,20 @@ Datatype *TypeFactory::findByIdLocal(const string &n,uint8 id) const
   return *iter;
 }
 
-/// Search for a Datatype by \b name and/or \b id. Derived classes may search outside this container.
+/// The id is expected to resolve uniquely.  Internally, different length instances
+/// of a variable length data-type are stored as separate Datatype objects. A non-zero
+/// size can be given to distinguish these cases.
+/// Derived classes may search outside this container.
 /// \param n is the name of the data-type
 /// \param id is the type id of the data-type
+/// \param sz is the given distinguishing size if non-zero
 /// \return the matching Datatype object
-Datatype *TypeFactory::findById(const string &n,uint8 id)
+Datatype *TypeFactory::findById(const string &n,uint8 id,int4 sz)
 
 {
+  if (sz > 0) {				// If the id is for a "variable length" base data-type
+    id = Datatype::hashSize(id, sz);	// Construct the id for the "sized" variant
+  }
   return findByIdLocal(n,id);
 }
 
@@ -1666,7 +1777,7 @@ Datatype *TypeFactory::findById(const string &n,uint8 id)
 Datatype *TypeFactory::findByName(const string &n)
 
 {
-  return findById(n,0);
+  return findById(n,0,0);
 }
 
 /// Find data-type without reference to name, using the functional comparators
@@ -1683,6 +1794,26 @@ Datatype *TypeFactory::findNoName(Datatype &ct)
   if (iter != tree.end())
     res = *iter;
   return res;
+}
+
+/// Internal method for finally inserting a new Datatype pointer
+/// \param newtype is the new pointer
+void TypeFactory::insert(Datatype *newtype)
+
+{
+  pair<DatatypeSet::iterator,bool> insres = tree.insert(newtype);
+  if (!insres.second) {
+    ostringstream s;
+    s << "Shared type id: " << hex << newtype->getId() << endl;
+    s << "  ";
+    newtype->printRaw(s);
+    s << " : ";
+    (*insres.first)->printRaw(s);
+    delete newtype;
+    throw LowlevelError(s.str());
+  }
+  if (newtype->id!=0)
+    nametree.insert(newtype);
 }
 
 /// Use quickest method (name or id is possible) to locate the matching data-type.
@@ -1710,18 +1841,7 @@ Datatype *TypeFactory::findAdd(Datatype &ct)
   }
 
   newtype = ct.clone();		// Add the new type to trees
-  pair<DatatypeSet::iterator,bool> insres = tree.insert(newtype);
-  if (!insres.second) {
-    ostringstream s;
-    s << "Shared type id: " << hex << newtype->getId() << endl;
-    s << "  ";
-    newtype->printRaw(s);
-    s << " : ";
-    (*insres.first)->printRaw(s);
-    throw LowlevelError(s.str());
-  }
-  if (newtype->id!=0)
-    nametree.insert(newtype);
+  insert(newtype);
   return newtype;
 }
 
@@ -1866,6 +1986,8 @@ void TypeFactory::orderRecurse(vector<Datatype *> &deporder,DatatypeSet &mark,
 {				// Make sure dependants of ct are in order, then add ct
   pair<DatatypeSet::iterator,bool> res = mark.insert(ct);
   if (!res.second) return;	// Already inserted before
+  if (ct->typedefImm != (Datatype *)0)
+    orderRecurse(deporder,mark,ct->typedefImm);
   int4 size = ct->numDepend();
   for(int4 i=0;i<size;++i)
     orderRecurse(deporder,mark,ct->getDepend(i));
@@ -2014,6 +2136,32 @@ TypeCode *TypeFactory::getTypeCode(const string &nm)
   return (TypeCode *) findAdd(tmp);
 }
 
+/// Find or create a data-type identical to the given data-type except for its name and id.
+/// If the name and id already describe an incompatible data-type, an exception is thrown.
+/// \param ct is the given data-type to clone
+/// \param name is the new name for the clone
+/// \param id is the new id for the clone (or 0)
+/// \return the (found or created) \e typedef data-type
+Datatype *TypeFactory::getTypedef(Datatype *ct,const string &name,uint8 id)
+
+{
+  if (id == 0)
+    id = Datatype::hashName(name);
+  Datatype *res = findByIdLocal(name, id);
+  if (res != (Datatype *)0) {
+    if (ct != res->getTypedef())
+      throw LowlevelError("Trying to create typedef of existing type: " + name);
+    return res;
+  }
+  res = ct->clone();		// Clone everything
+  res->name = name;		// But a new name
+  res->id = id;			// and new id
+  res->flags &= ~((uint4)Datatype::coretype);	// Not a core type
+  res->typedefImm = ct;
+  insert(res);
+  return res;
+}
+
 /// This creates a pointer to a given data-type.  If the given data-type is
 /// an array, the TYPE_ARRAY property is stripped off, and a pointer to
 /// the array element data-type is returned.
@@ -2039,6 +2187,22 @@ TypePointer *TypeFactory::getTypePointer(int4 s,Datatype *pt,uint4 ws)
 
 {
   TypePointer tmp(s,pt,ws);
+  return (TypePointer *) findAdd(tmp);
+}
+
+/// The given name is attached, which distinguishes the returned data-type from
+/// other unnamed (or differently named) pointers that otherwise have the same attributes.
+/// \param s is the size of the pointer
+/// \param pt is the pointed-to data-type
+/// \param ws is the wordsize associated with the pointer
+/// \param n is the given name to attach to the pointer
+/// \return the TypePointer object
+TypePointer *TypeFactory::getTypePointer(int4 s,Datatype *pt,uint4 ws,const string &n)
+
+{
+  TypePointer tmp(s,pt,ws);
+  tmp.name = n;
+  tmp.id = Datatype::hashName(n);
   return (TypePointer *) findAdd(tmp);
 }
 
@@ -2139,31 +2303,6 @@ void TypeFactory::destroyType(Datatype *ct)
   delete ct;
 }
 
-/// Add a constant offset to a pointer with known data-type.
-/// If there is a valid component at that offset, return a pointer
-/// to the data-type of the component or NULL otherwise.
-/// This routine only goes down one level at most. Pass back the
-/// renormalized offset relative to the new data-type
-/// \param ptrtype is the pointer data-type being added to
-/// \param off is a reference to the offset to add
-/// \return a pointer datatype for the component or NULL
-Datatype *TypeFactory::downChain(Datatype *ptrtype,uintb &off)
-
-{				// Change ptr->struct =>  ptr->substruct
-				// where substruct starts at offset off
-  if (ptrtype->metatype != TYPE_PTR) return (Datatype *)0;
-  TypePointer *ptype = (TypePointer *)ptrtype;
-  Datatype *pt = ptype->ptrto;
-  // If we know we have exactly one of an array, strip the array to get pointer to element
-  bool doStrip = (pt->getMetatype() != TYPE_ARRAY);
-  pt = pt->getSubType(off,&off);
-  if (pt == (Datatype *)0)
-    return (Datatype *)0;
-  if (doStrip)
-    return getTypePointerStripArray(ptype->size, pt, ptype->getWordSize());
-  return getTypePointer(ptype->size,pt,ptype->getWordSize());
-}
-
 /// The data-type propagation system can push around data-types that are \e partial or are
 /// otherwise unrepresentable in the source language.  This method substitutes those data-types
 /// with a concrete data-type that is representable, or returns the same data-type if is already concrete.
@@ -2191,18 +2330,25 @@ Datatype *TypeFactory::restoreXmlType(const Element *el)
   Datatype *ct;
   if (el->getName() == "typeref") {
     uint8 newid = 0;
+    int4 size = -1;
     int4 num = el->getNumAttributes();
     for(int4 i=0;i<num;++i) {
-      if (el->getAttributeName(i) == "id") {
+      const string &nm(el->getAttributeName(i));
+      if (nm == "id") {
 	istringstream s(el->getAttributeValue(i));
 	s.unsetf(ios::dec | ios::hex | ios::oct);
 	s >> newid;
+      }
+      else if (nm == "size") {		// A "size" attribute indicates a "variable length" base
+	istringstream s(el->getAttributeValue(i));
+	s.unsetf(ios::dec | ios::hex | ios::oct);
+	s >> size;
       }
     }
     const string &newname( el->getAttributeValue("name"));
     if (newid == 0)		// If there was no id, use the name hash
       newid = Datatype::hashName(newname);
-    ct = findById(newname,newid);
+    ct = findById(newname,newid,size);
     if (ct == (Datatype *)0)
       throw LowlevelError("Unable to resolve type: "+newname);
     return ct;
@@ -2297,6 +2443,37 @@ void TypeFactory::saveXmlCoreTypes(ostream &s) const
   s << "</coretypes>\n";
 }
 
+/// Scan the new id and name.  A subtag references the data-type being typedefed.
+/// Construct the new data-type based on the referenced data-type but with new name and id.
+/// \param el is the \<def> element
+/// \return the constructed typedef data-type
+Datatype *TypeFactory::restoreTypedef(const Element *el)
+
+{
+  uint8 id;
+  istringstream s1(el->getAttributeValue("id"));
+  s1.unsetf(ios::dec | ios::hex | ios::oct);
+  s1 >> id;
+  string nm = el->getAttributeValue("name");
+  Datatype *defedType = restoreXmlType( *el->getChildren().begin() );
+  if (defedType->isVariableLength())
+    id = Datatype::hashSize(id, defedType->size);
+  if (defedType->getMetatype() == TYPE_STRUCT) {
+    // Its possible that a typedef of a struct is recursively defined, in which case
+    // an incomplete version may already be in the container
+    TypeStruct *prev = (TypeStruct *)findByIdLocal(nm, id);
+    if (prev != (Datatype *)0) {
+      if (defedType != prev->getTypedef())
+        throw LowlevelError("Trying to create typedef of existing type: " + prev->name);
+      TypeStruct *defedStruct = (TypeStruct *)defedType;
+      if (prev->field.size() != defedStruct->field.size())
+	prev->field = defedStruct->field;
+      return prev;
+    }
+  }
+  return getTypedef(defedType, nm, id);
+}
+
 /// Restore a Datatype object from an XML \<type> tag. (Don't use for \<typeref> tags)
 /// The new Datatype is added to \b this container
 /// \param el is the XML element
@@ -2308,9 +2485,12 @@ Datatype *TypeFactory::restoreXmlTypeNoRef(const Element *el,bool forcecore)
   string metastring;
   Datatype *ct;
 
-  if (el->getNumAttributes() == 0) {
+  char c = el->getName()[0];
+  if (c != 't') {
     if (el->getName() == "void")
       return getTypeVoid();	// Automatically a coretype
+    if (el->getName() == "def")
+      return restoreTypedef(el);
   }
   metastring = el->getAttributeValue("metatype");
   type_metatype meta = string2metatype(metastring);

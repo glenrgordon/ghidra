@@ -15,22 +15,51 @@
  */
 package ghidra.app.context;
 
-import java.util.Set;
-
 import docking.ActionContext;
 import docking.action.DockingAction;
 import docking.action.KeyBindingType;
 
 public abstract class NavigatableContextAction extends DockingAction {
+	// means this action is applicable on navigable providers that restrict the program view such
+	// as the FunctionGraph or the Decompiler views.
+	private final boolean supportsRestrictedAddressSetContext;
 
+	/**
+	 * Constructor for actions that can work on any Navigatable
+	 * 
+	 * @param name the action's name
+	 * @param owner the action's owner
+	 */
 	public NavigatableContextAction(String name, String owner) {
-		super(name, owner);
-		setSupportsDefaultToolContext(true);
+		this(name, owner, true);
 	}
 
+	/**
+	 * Constructor for specifying if that the context works on {@link RestrictedAddressSetContext}
+	 * 
+	 * @param name the action's name
+	 * @param owner the action's owner
+	 * @param supportsRestrictedAddressSetContext true if this action can work on
+	 *  {@link RestrictedAddressSetContext}
+	 */
+	public NavigatableContextAction(String name, String owner,
+			boolean supportsRestrictedAddressSetContext) {
+		super(name, owner);
+		setSupportsDefaultToolContext(true);
+		this.supportsRestrictedAddressSetContext = supportsRestrictedAddressSetContext;
+	}
+
+	/**
+	 * Constructor when using a non-standard {@link KeyBindingType}
+	 * 
+	 * @param name the action's name
+	 * @param owner the action's owner
+	 * @param type the KeybindingType
+	 */
 	public NavigatableContextAction(String name, String owner, KeyBindingType type) {
 		super(name, owner, type);
 		setSupportsDefaultToolContext(true);
+		this.supportsRestrictedAddressSetContext = true;
 	}
 
 	@Override
@@ -50,6 +79,12 @@ public abstract class NavigatableContextAction extends DockingAction {
 
 	@Override
 	public final boolean isValidContext(ActionContext context) {
+		// If this method returns false, then when the user is in a restricted view, the action
+		// will be passed the global context instead of the current local context
+		if (!supportsRestrictedAddressSetContext &&
+			context instanceof RestrictedAddressSetContext) {
+			return false;
+		}
 		return context instanceof NavigatableActionContext;
 	}
 
@@ -71,14 +106,4 @@ public abstract class NavigatableContextAction extends DockingAction {
 	}
 
 	protected abstract void actionPerformed(NavigatableActionContext context);
-
-	@Override
-	public boolean shouldAddToWindow(boolean isMainWindow, Set<Class<?>> contextTypes) {
-		for (Class<?> class1 : contextTypes) {
-			if (NavigatableActionContext.class.isAssignableFrom(class1)) {
-				return true;
-			}
-		}
-		return false;
-	}
 }

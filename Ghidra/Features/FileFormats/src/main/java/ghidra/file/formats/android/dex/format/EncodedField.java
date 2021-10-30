@@ -15,17 +15,13 @@
  */
 package ghidra.file.formats.android.dex.format;
 
+import java.io.IOException;
+
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.StructConverter;
-import ghidra.file.formats.android.dex.util.Leb128;
-import ghidra.program.model.data.ArrayDataType;
-import ghidra.program.model.data.CategoryPath;
-import ghidra.program.model.data.DataType;
-import ghidra.program.model.data.Structure;
-import ghidra.program.model.data.StructureDataType;
+import ghidra.app.util.bin.format.dwarf4.LEB128;
+import ghidra.program.model.data.*;
 import ghidra.util.exception.DuplicateNameException;
-
-import java.io.IOException;
 
 public class EncodedField implements StructConverter {
 
@@ -37,37 +33,39 @@ public class EncodedField implements StructConverter {
 	private int accessFlags;
 	private int accessFlagsLength;// in bytes
 
-	public EncodedField( BinaryReader reader ) throws IOException {
-		_fileOffset = reader.getPointerIndex( );
+	public EncodedField(BinaryReader reader) throws IOException {
 
-		fieldIndexDifference = Leb128.readUnsignedLeb128( reader.readByteArray( reader.getPointerIndex( ), 5 ) );
-		fieldIndexDifferenceLength = Leb128.unsignedLeb128Size( fieldIndexDifference );
-		reader.readNextByteArray( fieldIndexDifferenceLength );// consume leb...
+		LEB128 leb128 = LEB128.readUnsignedValue(reader);
+		_fileOffset = leb128.getOffset();
+		fieldIndexDifference = leb128.asUInt32();
+		fieldIndexDifferenceLength = leb128.getLength();
 
-		accessFlags = Leb128.readUnsignedLeb128( reader.readByteArray( reader.getPointerIndex( ), 5 ) );
-		accessFlagsLength = Leb128.unsignedLeb128Size( accessFlags );
-		reader.readNextByteArray( accessFlagsLength );// consume leb...
+		leb128 = LEB128.readUnsignedValue(reader);
+		accessFlags = leb128.asUInt32();
+		accessFlagsLength = leb128.getLength();
 	}
 
-	public long getFileOffset( ) {
+	public long getFileOffset() {
 		return _fileOffset;
 	}
 
-	public int getFieldIndexDifference( ) {
+	public int getFieldIndexDifference() {
 		return fieldIndexDifference;
 	}
 
-	public int getAccessFlags( ) {
+	public int getAccessFlags() {
 		return accessFlags;
 	}
 
 	@Override
-	public DataType toDataType( ) throws DuplicateNameException, IOException {
+	public DataType toDataType() throws DuplicateNameException, IOException {
 		String name = "encoded_field_" + fieldIndexDifferenceLength + "_" + accessFlagsLength;
-		Structure structure = new StructureDataType( name, 0 );
-		structure.add( new ArrayDataType( BYTE, fieldIndexDifferenceLength, BYTE.getLength( ) ), "field_idx_diff", null );
-		structure.add( new ArrayDataType( BYTE, accessFlagsLength, BYTE.getLength( ) ), "accessFlags", null );
-		structure.setCategoryPath( new CategoryPath( "/dex/encoded_field" ) );
+		Structure structure = new StructureDataType(name, 0);
+		structure.add(new ArrayDataType(BYTE, fieldIndexDifferenceLength, BYTE.getLength()),
+			"field_idx_diff", null);
+		structure.add(new ArrayDataType(BYTE, accessFlagsLength, BYTE.getLength()), "accessFlags",
+			null);
+		structure.setCategoryPath(new CategoryPath("/dex/encoded_field"));
 		return structure;
 	}
 }

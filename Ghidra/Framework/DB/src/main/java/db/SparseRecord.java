@@ -18,7 +18,7 @@ package db;
 import java.io.IOException;
 import java.util.ArrayList;
 
-public class SparseRecord extends Record {
+public class SparseRecord extends DBRecord {
 
 	SparseRecord(Schema schema, Field key) {
 		super(schema, key);
@@ -100,6 +100,18 @@ public class SparseRecord extends Record {
 		boolean oldSparse = getField(colIndex).isNull();
 		boolean newSparse = newValue == 0;
 		return oldSparse != newSparse;
+	}
+
+	@Override
+	public void setField(int colIndex, Field value) {
+		if (value == null) {
+			if (!schema.isSparseColumn(colIndex)) {
+				throw new IllegalArgumentException("null value supported for sparse column only");
+			}
+			value = getField(colIndex).newField();
+			value.setNull();
+		}
+		super.setField(colIndex, value);
 	}
 
 	@Override

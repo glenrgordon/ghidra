@@ -26,11 +26,13 @@ import ghidra.util.exception.VersionException;
 class PointerDBAdapterV1 extends PointerDBAdapter {
 	final static int VERSION = 1;
 
-	static final int OLD_PTR_DT_ID_COL = 0;
-	static final int OLD_PTR_CATEGORY_COL = 1;
-	static final Schema V1_SCHEMA =
-		new Schema(VERSION, "Pointer ID", new Field[] { LongField.INSTANCE, LongField.INSTANCE },
-			new String[] { "Data Type ID", "Category ID" });
+	static final int V1_PTR_DT_ID_COL = 0;
+	static final int V1_PTR_CATEGORY_COL = 1;
+
+//  Keep for reference
+//	static final Schema V1_SCHEMA =
+//		new Schema(VERSION, "Pointer ID", new Field[] { LongField.INSTANCE, LongField.INSTANCE },
+//			new String[] { "Data Type ID", "Category ID" });
 
 	private Table table;
 
@@ -49,30 +51,30 @@ class PointerDBAdapterV1 extends PointerDBAdapter {
 	}
 
 	@Override
-	Record translateRecord(Record oldRec) {
+	public DBRecord translateRecord(DBRecord oldRec) {
 		if (oldRec == null) {
 			return null;
 		}
-		Record rec = PointerDBAdapter.SCHEMA.createRecord(oldRec.getKey());
-		rec.setLongValue(PTR_DT_ID_COL, oldRec.getLongValue(OLD_PTR_DT_ID_COL));
-		rec.setLongValue(PTR_CATEGORY_COL, oldRec.getLongValue(OLD_PTR_CATEGORY_COL));
+		DBRecord rec = PointerDBAdapter.SCHEMA.createRecord(oldRec.getKey());
+		rec.setLongValue(PTR_DT_ID_COL, oldRec.getLongValue(V1_PTR_DT_ID_COL));
+		rec.setLongValue(PTR_CATEGORY_COL, oldRec.getLongValue(V1_PTR_CATEGORY_COL));
 		rec.setByteValue(PTR_LENGTH_COL, (byte) -1);
 		return rec;
 	}
 
 	@Override
-	Record createRecord(long dataTypeID, long categoryID, int length) throws IOException {
+	DBRecord createRecord(long dataTypeID, long categoryID, int length) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	Record getRecord(long pointerID) throws IOException {
+	DBRecord getRecord(long pointerID) throws IOException {
 		return translateRecord(table.getRecord(pointerID));
 	}
 
 	@Override
 	RecordIterator getRecords() throws IOException {
-		return new TranslatedRecordIterator(table.iterator());
+		return new TranslatedRecordIterator(table.iterator(), this);
 	}
 
 	@Override
@@ -81,13 +83,13 @@ class PointerDBAdapterV1 extends PointerDBAdapter {
 	}
 
 	@Override
-	void updateRecord(Record record) throws IOException {
+	void updateRecord(DBRecord record) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	Field[] getRecordIdsInCategory(long categoryID) throws IOException {
-		return table.findRecords(new LongField(categoryID), OLD_PTR_CATEGORY_COL);
+		return table.findRecords(new LongField(categoryID), V1_PTR_CATEGORY_COL);
 	}
 
 	@Override

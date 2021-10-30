@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.data;
 
 import static org.junit.Assert.*;
 
 import org.junit.*;
+
+import com.google.common.collect.Sets;
 
 import generic.test.AbstractGTest;
 import ghidra.program.model.data.*;
@@ -169,7 +168,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   short   2   null   \"\"\n" + 
 			"   0   int:2(0)   1   bf1   \"bf1Comment\"\n" + 
@@ -179,7 +178,7 @@ public class UnionDBTest extends AbstractGTest {
 	}
 
 	@Test
-	public void testAlignedBitFieldUnion() throws Exception {
+	public void testPackedBitFieldUnion() throws Exception {
 
 		int cnt = union.getNumComponents();
 		for (int i = 0; i < cnt; i++) {
@@ -187,11 +186,11 @@ public class UnionDBTest extends AbstractGTest {
 		}
 		union.insertBitField(0, IntegerDataType.dataType, 2, "bf1", "bf1Comment");
 		union.insert(0, ShortDataType.dataType);
-		union.setInternallyAligned(true);
+		union.setPackingEnabled(true);
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Aligned\n" + 
+			"pack()\n" + 
 			"Union TestUnion {\n" + 
 			"   0   short   2   null   \"\"\n" + 
 			"   0   int:2(0)   1   bf1   \"bf1Comment\"\n" + 
@@ -208,7 +207,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -231,7 +230,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -255,7 +254,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -271,7 +270,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -294,7 +293,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -310,7 +309,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field1   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -358,6 +357,42 @@ public class UnionDBTest extends AbstractGTest {
 	}
 
 	@Test
+	public void testDeleteMany() throws Exception {
+		Structure struct = createStructure("struct_1", 0);
+		struct.add(new ByteDataType());
+		struct.add(new StringDataType(), 10);
+		union.add(struct);
+		assertEquals(11, union.getLength());
+
+		//@formatter:off
+		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
+			"pack(disabled)\n" + 
+			"Union TestUnion {\n" + 
+			"   0   byte   1   field1   \"Comment1\"\n" + 
+			"   0   word   2   null   \"Comment2\"\n" + 
+			"   0   dword   4   field3   \"\"\n" + 
+			"   0   byte   1   field4   \"Comment4\"\n" + 
+			"   0   struct_1   11   null   \"\"\n" + 
+			"}\n" + 
+			"Size = 11   Actual Alignment = 1", union);
+		//@formatter:on
+
+		union.delete(Sets.newHashSet(2, 4));
+
+		assertEquals(2, union.getLength());
+		//@formatter:off
+		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
+			"pack(disabled)\n" + 
+			"Union TestUnion {\n" + 
+			"   0   byte   1   field1   \"Comment1\"\n" + 
+			"   0   word   2   null   \"Comment2\"\n" + 
+			"   0   byte   1   field4   \"Comment4\"\n" + 
+			"}\n" + 
+			"Size = 2   Actual Alignment = 1", union);
+		//@formatter:on
+	}
+
+	@Test
 	public void testIsPartOf() {
 		Structure struct = createStructure("struct_1", 0);
 		struct.add(new ByteDataType());
@@ -388,7 +423,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/Replaced\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union Replaced {\n" + 
 			"   0   byte   1   field0   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 
@@ -403,7 +438,7 @@ public class UnionDBTest extends AbstractGTest {
 
 		//@formatter:off
 		CompositeTestUtils.assertExpectedComposite(this, "/TestUnion\n" + 
-			"Unaligned\n" + 
+			"pack(disabled)\n" + 
 			"Union TestUnion {\n" + 
 			"   0   byte   1   field0   \"Comment1\"\n" + 
 			"   0   word   2   null   \"Comment2\"\n" + 

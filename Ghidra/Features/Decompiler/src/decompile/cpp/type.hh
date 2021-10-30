@@ -45,6 +45,26 @@ enum type_metatype {
   TYPE_STRUCT = 0		///< Structure data-type, made up of component datatypes
 };
 
+enum sub_metatype {
+  SUB_VOID = 16,		///< Compare as a TYPE_VOID
+  SUB_SPACEBASE = 15,		///< Compare as a TYPE_SPACEBASE
+  SUB_UNKNOWN = 14,		///< Compare as a TYPE_UNKNOWN
+  SUB_INT_CHAR = 13,		///< Signed 1-byte character, sub-type of TYPE_INT
+  SUB_UINT_CHAR = 12,		///< Unsigned 1-byte character, sub-type of TYPE_UINT
+  SUB_INT_PLAIN = 11,		///< Compare as a plain TYPE_INT
+  SUB_UINT_PLAIN = 10,		///< Compare as a plain TYPE_UINT
+  SUB_INT_ENUM = 9,		///< Signed enum, sub-type of TYPE_INT
+  SUB_UINT_ENUM = 8,		///< Unsigned enum, sub-type of TYPE_UINT
+  SUB_INT_UNICODE = 7,		///< Signed wide character, sub-type of TYPE_INT
+  SUB_UINT_UNICODE = 6,		///< Unsigned wide character, sub-type of TYPE_UINT
+  SUB_BOOL = 5,			///< Compare as TYPE_BOOL
+  SUB_CODE = 4,			///< Compare as TYPE_CODE
+  SUB_FLOAT = 3,		///< Compare as TYPE_FLOAT
+
+  SUB_PTR = 2,			///< Compare as TYPE_PTR
+  SUB_ARRAY = 1,		///< Compare as TYPE_ARRAY
+  SUB_STRUCT = 0		///< Compare as TYPE_STRUCT
+};
 /// Convert type \b meta-type to name
 extern void metatype2string(type_metatype metatype,string &res);
 
@@ -61,6 +81,7 @@ struct DatatypeCompare;
 /// Used for symbols, function prototypes, type propagation etc.
 class Datatype {
 protected:
+  static sub_metatype base2sub[11];
   /// Boolean properties of datatypes
   enum {
     coretype = 1,		///< This is a basic type which will never be redefined
@@ -82,19 +103,25 @@ protected:
   int4 size;			///< Size (of variable holding a value of this type)
   string name;			///< Name of type
   type_metatype metatype;	///< Meta-type - type disregarding size
+  sub_metatype submeta;		///< Sub-type of of the meta-type, for comparisons
   uint4 flags;			///< Boolean properties of the type
   uint8 id;			///< A unique id for the type (or 0 if an id is not assigned)
+  Datatype *typedefImm;		///< The immediate data-type being typedefed by \e this
   void restoreXmlBasic(const Element *el);	///< Recover basic data-type properties
+  void saveXmlBasic(ostream &s) const;	///< Save basic data-type properties
+  void saveXmlTypedef(ostream &s) const;	///< Write \b this as a \e typedef tag to stream
   virtual void restoreXml(const Element *el,TypeFactory &typegrp);	///< Restore data-type from XML
+  virtual Datatype *clone(void) const=0;	///< Clone the data-type
   static uint8 hashName(const string &nm);	///< Produce a data-type id by hashing the type name
   static uint8 hashSize(uint8 id,int4 size);	///< Reversibly hash size into id
 public:
   /// Construct the base data-type copying low-level properties of another
-  Datatype(const Datatype &op) { size = op.size; name=op.name; metatype=op.metatype; flags=op.flags; id=op.id; }
+  Datatype(const Datatype &op) { size = op.size; name=op.name; metatype=op.metatype; submeta=op.submeta; flags=op.flags;
+    id=op.id; typedefImm=op.typedefImm; }
   /// Construct the base data-type providing size and meta-type
-  Datatype(int4 s,type_metatype m) { size=s; metatype=m; flags=0; id=0; }
+  Datatype(int4 s,type_metatype m) { size=s; metatype=m; submeta=base2sub[m]; flags=0; id=0; typedefImm=(Datatype *)0; }
   /// Construct the base data-type providing size, meta-type, and name
-  Datatype(int4 s,type_metatype m,const string &n) { name=n; size=s; metatype=m; flags=0; id=0; }
+  Datatype(int4 s,type_metatype m,const string &n) { name=n; size=s; metatype=m; submeta=base2sub[m]; flags=0; id=0; typedefImm=(Datatype *)0; }
   virtual ~Datatype(void) {}	///< Destructor
   bool isCoreType(void) const { return ((flags&coretype)!=0); }	///< Is this a core data-type
   bool isCharPrint(void) const { return ((flags&(chartype|utf16|utf32|opaque_string))!=0); }	///< Does this print as a 'char'
@@ -111,6 +138,7 @@ public:
   uint8 getId(void) const { return id; }			///< Get the type id
   int4 getSize(void) const { return size; }			///< Get the type size
   const string &getName(void) const { return name; }		///< Get the type name
+  Datatype *getTypedef(void) const { return typedefImm; }	///< Get the data-type immediately typedefed by \e this (or null)
   virtual void printRaw(ostream &s) const;			///< Print a description of the type to stream
   virtual Datatype *getSubType(uintb off,uintb *newoff) const; ///< Recover component data-type one-level down
   virtual Datatype *nearestArrayedComponentForward(uintb off,uintb *newoff,int4 *elSize) const;
@@ -118,13 +146,11 @@ public:
   virtual int4 numDepend(void) const { return 0; }	///< Return number of component sub-types
   virtual Datatype *getDepend(int4 index) const { return (Datatype *)0; }	///< Return the i-th component sub-type
   virtual void printNameBase(ostream &s) const { if (!name.empty()) s<<name[0]; } ///< Print name as short prefix
-  virtual int4 compare(const Datatype &op,int4 level) const; ///< Compare for functional equivalence
+  virtual int4 compare(const Datatype &op,int4 level) const; ///< Order types for propagation
   virtual int4 compareDependency(const Datatype &op) const; ///< Compare for storage in tree structure
-  virtual Datatype *clone(void) const=0;	///< Clone the data-type
   virtual void saveXml(ostream &s) const;	///< Serialize the data-type to XML
   int4 typeOrder(const Datatype &op) const { if (this==&op) return 0; return compare(op,10); }	///< Order this with -op- datatype
   int4 typeOrderBool(const Datatype &op) const;	///< Order \b this with -op-, treating \e bool data-type as special
-  void saveXmlBasic(ostream &s) const;	///< Save basic data-type properties
   void saveXmlRef(ostream &s) const;	///< Write an XML reference of \b this to stream
   bool isPtrsubMatching(uintb offset) const;	///< Is this data-type suitable as input to a CPUI_PTRSUB op
 };
@@ -183,11 +209,12 @@ public:
 class TypeChar : public TypeBase {
 protected:
   friend class TypeFactory;
+  virtual void restoreXml(const Element *el,TypeFactory &typegrp);
 public:
   /// Construct TypeChar copying properties from another data-type
   TypeChar(const TypeChar &op) : TypeBase(op) { flags |= Datatype::chartype; }
   /// Construct a char (always 1-byte) given a name
-  TypeChar(const string &n) : TypeBase(1,TYPE_INT,n) { flags |= Datatype::chartype; }
+  TypeChar(const string &n) : TypeBase(1,TYPE_INT,n) { flags |= Datatype::chartype; submeta = SUB_INT_CHAR; }
   virtual Datatype *clone(void) const { return new TypeChar(*this); }
   virtual void saveXml(ostream &s) const;
 };
@@ -248,6 +275,7 @@ public:
   virtual int4 compareDependency(const Datatype &op) const; // For tree structure
   virtual Datatype *clone(void) const { return new TypePointer(*this); }
   virtual void saveXml(ostream &s) const;
+  virtual TypePointer *downChain(uintb &off,bool allowArrayWrap,TypeFactory &typegrp);
 };
 
 /// \brief Datatype object representing an array of elements
@@ -294,9 +322,11 @@ public:
   /// Construct from another TypeEnum
   TypeEnum(const TypeEnum &op);
   /// Construct from a size and meta-type (TYPE_INT or TYPE_UINT)
-  TypeEnum(int4 s,type_metatype m) : TypeBase(s,m) { flags |= enumtype; }
+  TypeEnum(int4 s,type_metatype m) : TypeBase(s,m) {
+    flags |= enumtype; submeta = (m==TYPE_INT) ? SUB_INT_ENUM : SUB_UINT_ENUM; }
   /// Construct from a size, meta-type, and name
-  TypeEnum(int4 s,type_metatype m,const string &nm) : TypeBase(s,m,nm) { flags |= enumtype; }
+  TypeEnum(int4 s,type_metatype m,const string &nm) : TypeBase(s,m,nm) {
+    flags |= enumtype; submeta = (m==TYPE_INT) ? SUB_INT_ENUM : SUB_UINT_ENUM; }
   map<uintb,string>::const_iterator beginEnum(void) const { return namemap.begin(); }	///< Beginning of name map
   map<uintb,string>::const_iterator endEnum(void) const { return namemap.end(); }	///< End of name map
   bool getMatches(uintb val,vector<string> &matchname) const;	///< Recover the named representation
@@ -405,8 +435,10 @@ class TypeFactory {
   Datatype *typecache16;	///< Specially cached 16-byte float type
   Datatype *type_nochar;	///< Same dimensions as char but acts and displays as an INT
   Datatype *findNoName(Datatype &ct);	///< Find data-type (in this container) by function
+  void insert(Datatype *newtype);	///< Insert pointer into the cross-reference sets
   Datatype *findAdd(Datatype &ct);	///< Find data-type in this container or add it
   void orderRecurse(vector<Datatype *> &deporder,DatatypeSet &mark,Datatype *ct) const;	///< Write out dependency list
+  Datatype *restoreTypedef(const Element *el);		///< Restore a \<def> XML tag describing a typedef
   Datatype *restoreXmlTypeNoRef(const Element *el,bool forcecore);	///< Restore from an XML tag
   void clearCache(void);		///< Clear the common type cache
   TypeChar *getTypeChar(const string &n);	///< Create a default "char" type
@@ -415,7 +447,7 @@ class TypeFactory {
 protected:
   Architecture *glb;		///< The Architecture object that owns this TypeFactory
   Datatype *findByIdLocal(const string &nm,uint8 id) const;	///< Search locally by name and id
-  virtual Datatype *findById(const string &n,uint8 id);		///< Search by name and id
+  virtual Datatype *findById(const string &n,uint8 id,int4 sz);		///< Search by \e name and/or \e id
 public:
   TypeFactory(Architecture *g);	///< Construct a factory
   void setupSizes(void);	///< Derive some size information from Architecture
@@ -442,6 +474,7 @@ public:
   TypeCode *getTypeCode(void);					///< Get an "anonymous" function data-type
   TypePointer *getTypePointerStripArray(int4 s,Datatype *pt,uint4 ws);	///< Construct a pointer data-type, stripping an ARRAY level
   TypePointer *getTypePointer(int4 s,Datatype *pt,uint4 ws);	///< Construct an absolute pointer data-type
+  TypePointer *getTypePointer(int4 s,Datatype *pt,uint4 ws,const string &n);	///< Construct a named pointer data-type
   TypePointer *getTypePointerNoDepth(int4 s,Datatype *pt,uint4 ws);	///< Construct a depth limited pointer data-type
   TypeArray *getTypeArray(int4 as,Datatype *ao);		///< Construct an array data-type
   TypeStruct *getTypeStruct(const string &n);			///< Create an (empty) structure
@@ -450,8 +483,8 @@ public:
   TypeCode *getTypeCode(ProtoModel *model,Datatype *outtype,
 			const vector<Datatype *> &intypes,
 			bool dotdotdot);			///< Create a "function" datatype
+  Datatype *getTypedef(Datatype *ct,const string &name,uint8 id);	///< Create a new \e typedef data-type
   void destroyType(Datatype *ct);				///< Remove a data-type from \b this
-  Datatype *downChain(Datatype *ptrtype,uintb &off);		///< Find a sub-type matching a pointer and offset
   Datatype *concretize(Datatype *ct);				///< Convert given data-type to concrete form
   void dependentOrder(vector<Datatype *> &deporder) const;	///< Place all data-types in dependency order
   void saveXml(ostream &s) const;			///< Save \b this container to stream

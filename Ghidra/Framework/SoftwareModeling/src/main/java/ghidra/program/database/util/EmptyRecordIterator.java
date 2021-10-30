@@ -1,6 +1,5 @@
 /* ###
  * IP: GHIDRA
- * REVIEWED: YES
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- *
- */
 package ghidra.program.database.util;
 
 import java.io.IOException;
 
-import db.Record;
+import db.DBRecord;
 import db.RecordIterator;
 
 /**
  * Implementation of a RecordIterator that is always empty.
  */
+
 public class EmptyRecordIterator implements RecordIterator {
+	public static final RecordIterator INSTANCE = new EmptyRecordIterator();
 
 	/**
 	 * @see db.RecordIterator#hasNext()
@@ -46,14 +44,14 @@ public class EmptyRecordIterator implements RecordIterator {
 	/**
 	 * @see db.RecordIterator#next()
 	 */
-	public Record next() throws IOException {
+	public DBRecord next() throws IOException {
 		return null;
 	}
 
 	/**
 	 * @see db.RecordIterator#previous()
 	 */
-	public Record previous() throws IOException {
+	public DBRecord previous() throws IOException {
 		return null;
 	}
 
