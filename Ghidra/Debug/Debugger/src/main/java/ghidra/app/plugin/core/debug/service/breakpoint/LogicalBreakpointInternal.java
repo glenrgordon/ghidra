@@ -37,7 +37,7 @@ import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 import utilities.util.IDHashed;
 
-interface LogicalBreakpointInternal extends LogicalBreakpoint {
+public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 	public static class ProgramBreakpoint {
 		public static Set<TraceBreakpointKind> kindsFromBookmark(Bookmark mark) {
 			String[] parts = mark.getCategory().split(";");
@@ -93,6 +93,9 @@ interface LogicalBreakpointInternal extends LogicalBreakpoint {
 
 		@Override
 		public String toString() {
+			// volatile reads
+			Bookmark eBookmark = this.eBookmark;
+			Bookmark dBookmark = this.dBookmark;
 			if (eBookmark != null) {
 				return String.format("<enabled %s(%s) at %s in %s>", eBookmark.getTypeString(),
 					eBookmark.getCategory(), eBookmark.getAddress(), program.getName());
@@ -127,6 +130,9 @@ interface LogicalBreakpointInternal extends LogicalBreakpoint {
 		}
 
 		public void deleteFromProgram() {
+			// volatile reads
+			Bookmark eBookmark = this.eBookmark;
+			Bookmark dBookmark = this.dBookmark;
 			try (UndoableTransaction tid =
 				UndoableTransaction.start(program, "Clear breakpoint", false)) {
 				BookmarkManager bookmarkManager = program.getBookmarkManager();
@@ -193,6 +199,7 @@ interface LogicalBreakpointInternal extends LogicalBreakpoint {
 		}
 
 		public Bookmark getBookmark() {
+			Bookmark eBookmark = this.eBookmark;
 			if (eBookmark != null) {
 				return eBookmark;
 			}
