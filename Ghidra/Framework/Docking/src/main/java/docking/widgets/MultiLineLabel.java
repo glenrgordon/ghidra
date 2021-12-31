@@ -16,7 +16,7 @@
 package docking.widgets;
 
 import java.awt.*;
-
+import javax.accessibility.*;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -33,7 +33,7 @@ import utilities.util.reflection.ReflectionUtilities;
  * <p>
  */
 
-public class MultiLineLabel extends JPanel {
+public class MultiLineLabel extends JPanel implements Accessible {
 	/**
 	 * Indicator for left alignment.
 	 */
@@ -318,6 +318,55 @@ public class MultiLineLabel extends JPanel {
 		}
 	}
 
+	/**
+     * The {@code AccessibleContext} associated with this {@code Component}.
+     */
+	@SuppressWarnings("serial") // Not statically typed as Serializable
+	protected AccessibleContext accessibleContext = null;
+
+	/**
+	 * Gets the {@code AccessibleContext} associated
+	 * with this {@code Component}.
+	 * The method implemented by this base
+	 * class returns null.  Classes that extend {@code Component}
+	 * should implement this method to return the
+	 * {@code AccessibleContext} associated with the subclass.
+	 *
+	 *
+	 * @return the {@code AccessibleContext} of this
+	 *    {@code Component}
+	 * @since 1.3
+	 */
+	@Override
+	public AccessibleContext getAccessibleContext()
+	{
+		if (accessibleContext == null) {
+			accessibleContext = new AccessibleMultiLineLabel();
+		}
+		return accessibleContext;
+	}
+
+	public class  AccessibleMultiLineLabel extends AccessibleJComponent
+	{
+		
+		AccessibleMultiLineLabel()
+		{
+			super();
+		}
+		
+		@Override
+		public String getAccessibleName()
+		{
+			if (lines == null)
+				return "";
+			return String.join("\n",lines);
+		}
+
+		public AccessibleRole getAccessibleRole() {
+			return AccessibleRole.LABEL;
+		}
+	}
+	
 	/**
 	 * Simple test for the MultiLineLabel class.
 	 * @param args not used
