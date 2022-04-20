@@ -19,9 +19,6 @@ import static ghidra.app.plugin.core.debug.gui.DebuggerResources.ICON_REGISTER_M
 import static ghidra.app.plugin.core.debug.gui.DebuggerResources.OPTION_NAME_COLORS_TRACKING_MARKERS;
 
 import java.awt.Color;
-import java.awt.datatransfer.Transferable;
-import java.awt.datatransfer.UnsupportedFlavorException;
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,7 +38,6 @@ import docking.menu.MultiStateDockingAction;
 import docking.widgets.EventTrigger;
 import docking.widgets.fieldpanel.support.ViewerPosition;
 import ghidra.app.nav.ListingPanelContainer;
-import ghidra.app.plugin.core.clipboard.CodeBrowserClipboardProvider;
 import ghidra.app.plugin.core.codebrowser.CodeViewerProvider;
 import ghidra.app.plugin.core.codebrowser.MarkerServiceBackgroundColorModel;
 import ghidra.app.plugin.core.debug.DebuggerCoordinates;
@@ -52,8 +48,11 @@ import ghidra.app.plugin.core.debug.gui.action.*;
 import ghidra.app.plugin.core.debug.gui.modules.DebuggerMissingModuleActionContext;
 import ghidra.app.plugin.core.debug.utils.ProgramLocationUtils;
 import ghidra.app.plugin.core.debug.utils.ProgramURLUtils;
+import ghidra.app.plugin.core.marker.MarkerMarginProvider;
+import ghidra.app.plugin.core.marker.MarkerOverviewProvider;
 import ghidra.app.services.*;
 import ghidra.app.services.DebuggerListingService.LocationTrackingSpecChangeListener;
+import ghidra.app.services.DebuggerStateEditingService.StateEditingMode;
 import ghidra.app.util.viewer.format.FormatManager;
 import ghidra.app.util.viewer.listingpanel.ListingPanel;
 import ghidra.framework.model.DomainFile;
@@ -221,6 +220,8 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 	@AutoServiceConsumed
 	private DebuggerConsoleService consoleService;
 	@AutoServiceConsumed
+	private DebuggerStateEditingService editingService;
+	@AutoServiceConsumed
 	private ProgramManager programManager;
 	@AutoServiceConsumed
 	private FileImporterService importerService;
@@ -266,6 +267,8 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 	protected final MultiBlendedListingBackgroundColorModel colorModel;
 	protected final MarkerSetChangeListener markerChangeListener = new MarkerSetChangeListener();
 	protected MarkerServiceBackgroundColorModel markerServiceColorModel;
+	protected MarkerMarginProvider markerMarginProvider;
+	protected MarkerOverviewProvider markerOverviewProvider;
 
 	private SuppressableCallback<ProgramLocation> cbGoTo = new SuppressableCallback<>();
 
@@ -347,7 +350,15 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 
 	@Override
 	public boolean isReadOnly() {
-		return current.isAliveAndPresent();
+		if (editingService == null) {
+			return true;
+		}
+		Trace trace = current.getTrace();
+		if (trace == null) {
+			return true;
+		}
+		StateEditingMode mode = editingService.getCurrentMode(trace);
+		return !mode.canEdit(current);
 	}
 
 	@Override
@@ -425,28 +436,6 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 		super.addToTool();
 	}
 
-	@Override
-	protected CodeBrowserClipboardProvider newClipboardProvider() {
-		/**
-		 * TODO: Ensure memory writes via paste are properly directed to the target process. In the
-		 * meantime, just prevent byte pastes altogether. I cannot disable the clipboard altogether,
-		 * because there are still excellent cases for copying from the dynamic listing, and we
-		 * should still permit pastes of annotations.
-		 */
-		return new CodeBrowserClipboardProvider(tool, this) {
-			@Override
-			protected boolean pasteBytes(Transferable pasteData)
-					throws UnsupportedFlavorException, IOException {
-				return false;
-			}
-
-			@Override
-			protected boolean pasteByteString(String string) {
-				return false;
-			}
-		};
-	}
-
 	protected void updateMarkerServiceColorModel() {
 		colorModel.removeModel(markerServiceColorModel);
 		if (markerService != null) {
@@ -500,6 +489,10 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 	private void setMarkerService(MarkerService markerService) {
 		if (this.markerService != null) {
 			this.markerService.removeChangeListener(markerChangeListener);
+			removeMarginProvider(markerMarginProvider);
+			markerMarginProvider = null;
+			removeOverviewProvider(markerOverviewProvider);
+			markerOverviewProvider = null;
 		}
 		removeOldStaticTrackingMarker();
 		this.markerService = markerService;
@@ -509,6 +502,12 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 		if (this.markerService != null && !isMainListing()) {
 			// NOTE: Connected provider marker listener is taken care of by CodeBrowserPlugin
 			this.markerService.addChangeListener(markerChangeListener);
+		}
+		if (this.markerService != null) {
+			markerMarginProvider = markerService.createMarginProvider();
+			addMarginProvider(markerMarginProvider);
+			markerOverviewProvider = markerService.createOverviewProvider();
+			addOverviewProvider(markerOverviewProvider);
 		}
 	}
 
@@ -809,6 +808,9 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 		}
 		ProgramLocation loc = getLocation();
 		if (loc == null) { // Redundant?
+			return;
+		}
+		if (mappingService == null) {
 			return;
 		}
 		ProgramLocation mapped = mappingService.getStaticLocationFromDynamic(loc);

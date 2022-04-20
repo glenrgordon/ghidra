@@ -21,6 +21,7 @@ import java.util.*;
 import ghidra.app.cmd.label.DemanglerCmd;
 import ghidra.app.util.NamespaceUtils;
 import ghidra.app.util.demangler.*;
+import ghidra.app.util.opinion.ElfLoader;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.*;
@@ -133,8 +134,7 @@ public class RTTIGccClassRecoverer extends RTTIClassRecoverer {
 
 	private boolean isGcc() {
 
-		boolean isELF = program.getExecutableFormat().contains("ELF");
-		if (!isELF) {
+		if (!ElfLoader.ELF_NAME.equals(program.getExecutableFormat())) {
 			return false;
 		}
 
@@ -149,7 +149,7 @@ public class RTTIGccClassRecoverer extends RTTIClassRecoverer {
 			return false;
 		}
 
-		if (!commentBlock.isLoaded()) {
+		if (!commentBlock.isInitialized()) {
 			return false;
 		}
 
@@ -1077,20 +1077,6 @@ public class RTTIGccClassRecoverer extends RTTIClassRecoverer {
 		return true;
 	}
 
-	private Data createVftableArray(Address vftableAddress, int numFunctionPointers)
-			throws Exception {
-
-		api.clearListing(vftableAddress,
-			vftableAddress.add((numFunctionPointers * defaultPointerSize - 1)));
-
-		DataType pointerDataType = dataTypeManager.getPointer(null);
-		ArrayDataType vftableArrayDataType =
-			new ArrayDataType(pointerDataType, numFunctionPointers, defaultPointerSize);
-
-		Data vftableArrayData = api.createData(vftableAddress, vftableArrayDataType);
-		return vftableArrayData;
-	}
-
 	/**
 	 * Method to check for a valid vtable at the given address
 	 * @param vtableAddress the given address
@@ -1819,6 +1805,9 @@ public class RTTIGccClassRecoverer extends RTTIClassRecoverer {
 		//	identifyPureVirtualFunction(recoveredClasses);
 
 		//	findRealVBaseFunctions(recoveredClasses);
+
+		// make constructors and destructors this calls
+		makeConstructorsAndDestructorsThiscalls(recoveredClasses);
 
 	}
 

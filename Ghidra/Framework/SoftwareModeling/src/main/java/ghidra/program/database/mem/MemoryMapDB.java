@@ -57,12 +57,13 @@ public class MemoryMapDB implements Memory, ManagerDB, LiveMemoryListener {
 	private AddressSet initializedLoadedAddrSet = new AddressSet();
 	private AddressSet allInitializedAddrSet = new AddressSet();
 	private AddressSetView executeSet = null;
+	private AddressSet externalBlockAddrSet;
 
 	private MemoryBlock lastBlock;// the last accessed block
 	private LiveMemoryHandler liveMemory;
 
 	// lazy hashmap of block names to blocks, must be reloaded if blocks are removed or added
-	private HashMap<String, MemoryBlock> nameBlockMap = new HashMap<String, MemoryBlock>();
+	private HashMap<String, MemoryBlock> nameBlockMap = new HashMap<>();
 	private final static MemoryBlock NoBlock = new MemoryBlockStub();  // placeholder for no block, not given out
 
 	Lock lock;
@@ -130,6 +131,7 @@ public class MemoryMapDB implements Memory, ManagerDB, LiveMemoryListener {
 		addrSet = new AddressSet();
 		initializedLoadedAddrSet = new AddressSet();
 		allInitializedAddrSet = new AddressSet();
+		externalBlockAddrSet = new AddressSet();
 		// we have to process the non-mapped blocks first because to process the mapped
 		// blocks we need the address sets for the non-mapped blocks to be complete
 		for (MemoryBlockDB block : blocks) {
@@ -161,6 +163,10 @@ public class MemoryMapDB implements Memory, ManagerDB, LiveMemoryListener {
 	private void addBlockAddresses(MemoryBlockDB block, boolean scanAllMappedBlocksIfNeeded) {
 		AddressSet blockSet = new AddressSet(block.getStart(), block.getEnd());
 		addrSet = addrSet.union(blockSet);
+		if (block.isExternalBlock()) {
+			// NOTE: no handling for mapped blocks which should never map onto EXTERNAL block
+			externalBlockAddrSet.add(block.getStart(), block.getEnd());
+		}
 		if (block.isMapped()) {
 
 			// Identify source-blocks which block maps onto and add as a mapped-block to each of these
@@ -1257,8 +1263,13 @@ public class MemoryMapDB implements Memory, ManagerDB, LiveMemoryListener {
 	 * Tests if the memory contains a sequence of contiguous bytes that match the given byte array
 	 * at all bit positions where the mask contains an "on" bit. The test will be something like
 	 *
-	 * for(int i=0;i<bytes.length;i++) { if (bytes[i] != memory.getByte(addr+i) &amp; masks[i]) {
-	 * return false; } } return false;
+	 * <PRE>
+	 *  for(int i = 0; i &lt; bytes.length; i++) {
+	 *     if (bytes[i] != memory.getByte(addr+i) &amp; masks[i]) {
+	 *         return false;
+	 *     }
+	 * }
+	 * </PRE>
 	 *
 	 * @param addr The beginning address in memory to test against.
 	 * @param bytes the array of bytes to test for.
@@ -1758,6 +1769,11 @@ public class MemoryMapDB implements Memory, ManagerDB, LiveMemoryListener {
 	@Override
 	public boolean isEmpty() {
 		return addrSet.isEmpty();
+	}
+
+	@Override
+	public boolean isExternalBlockAddress(Address addr) {
+		return externalBlockAddrSet.contains(addr);
 	}
 
 	@Override
