@@ -148,6 +148,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		addLocalAction(new CutAction(plugin));
 		addLocalAction(new CopyAction(plugin));
 		addLocalAction(new PasteAction(plugin));
+		addLocalAction(new ReplaceDataTypeAction(plugin));
 		addLocalAction(new DeleteAction(plugin));
 		addLocalAction(new DeleteArchiveAction(plugin));
 		addLocalAction(new RenameAction(plugin));
@@ -181,8 +182,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		addLocalAction(new FindDataTypesBySizeAction(plugin, "2"));
 		addLocalAction(new FindStructuresByOffsetAction(plugin, "3"));
 		addLocalAction(new FindStructuresBySizeAction(plugin, "4"));
-		includeDataMembersInSearchAction =
-			new IncludeDataTypesInFilterAction(plugin, this, "5");
+		includeDataMembersInSearchAction = new IncludeDataTypesInFilterAction(plugin, this, "5");
 		addLocalAction(includeDataMembersInSearchAction);
 
 		addLocalAction(new ApplyFunctionDataTypesAction(plugin)); // Tree
@@ -778,6 +778,25 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		gTree.setSelectedNode(dataTypeNode);
 		gTree.scrollPathToVisible(dataTypeNode.getTreePath());
 		contextChanged();
+	}
+
+	/**
+	 * Returns a list of all the data types selected in the data types tree
+	 * @return a list of all the data types selected in the data types tree
+	 */
+	public List<DataType> getSelectedDataTypes() {
+		List<DataType> selectedDataTypes = new ArrayList<>();
+		DataTypeArchiveGTree gTree = getGTree();
+		for (TreePath path : gTree.getSelectionPaths()) {
+			Object node = path.getLastPathComponent();
+			if (node instanceof DataTypeNode) {
+				DataType dataType = ((DataTypeNode) node).getDataType();
+				if (dataType != null) {
+					selectedDataTypes.add(dataType);
+				}
+			}
+		}
+		return selectedDataTypes;
 	}
 
 	// this is a callback from the action--we need this to prevent callbacks, as the other

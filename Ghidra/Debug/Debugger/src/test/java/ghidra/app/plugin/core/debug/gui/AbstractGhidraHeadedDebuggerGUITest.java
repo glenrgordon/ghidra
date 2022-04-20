@@ -38,13 +38,16 @@ import org.junit.rules.TestName;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
 
+import docking.ActionContext;
+import docking.action.ActionContextProvider;
+import docking.action.DockingActionIf;
 import docking.widgets.tree.GTree;
 import docking.widgets.tree.GTreeNode;
 import generic.Unique;
+import ghidra.app.nav.Navigatable;
 import ghidra.app.plugin.core.debug.gui.action.*;
 import ghidra.app.plugin.core.debug.mapping.*;
-import ghidra.app.plugin.core.debug.service.model.DebuggerModelServiceInternal;
-import ghidra.app.plugin.core.debug.service.model.DebuggerModelServiceProxyPlugin;
+import ghidra.app.plugin.core.debug.service.model.*;
 import ghidra.app.plugin.core.debug.service.tracemgr.DebuggerTraceManagerServicePlugin;
 import ghidra.app.services.*;
 import ghidra.app.util.viewer.listingpanel.ListingPanel;
@@ -59,8 +62,7 @@ import ghidra.program.model.address.*;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.lang.*;
 import ghidra.program.model.listing.Program;
-import ghidra.program.util.DefaultLanguageService;
-import ghidra.program.util.ProgramLocation;
+import ghidra.program.util.*;
 import ghidra.test.AbstractGhidraHeadedIntegrationTest;
 import ghidra.test.TestEnv;
 import ghidra.trace.database.ToyDBTraceBuilder;
@@ -440,6 +442,23 @@ public abstract class AbstractGhidraHeadedDebuggerGUITest
 		});
 	}
 
+	protected static void assertDisabled(ActionContextProvider provider, DockingActionIf action) {
+		ActionContext context = provider.getActionContext(null);
+		assertFalse(action.isEnabledForContext(context));
+	}
+
+	protected static void assertEnabled(ActionContextProvider provider, DockingActionIf action) {
+		ActionContext context = provider.getActionContext(null);
+		assertTrue(action.isEnabledForContext(context));
+	}
+
+	protected static void performEnabledAction(ActionContextProvider provider,
+			DockingActionIf action, boolean wait) {
+		ActionContext context = provider.getActionContext(null);
+		waitForCondition(() -> action.isEnabledForContext(context));
+		performAction(action, context, wait);
+	}
+
 	protected static void goTo(ListingPanel listingPanel, ProgramLocation location) {
 		waitForPass(() -> {
 			runSwing(() -> listingPanel.goTo(location));
@@ -447,6 +466,18 @@ public abstract class AbstractGhidraHeadedDebuggerGUITest
 			assertNotNull(confirm);
 			assertEquals(location.getAddress(), confirm.getAddress());
 		});
+	}
+
+	protected void select(Navigatable nav, Address min, Address max) {
+		select(nav, new ProgramSelection(min, max));
+	}
+
+	protected void select(Navigatable nav, AddressSetView set) {
+		select(nav, new ProgramSelection(set));
+	}
+
+	protected void select(Navigatable nav, ProgramSelection sel) {
+		runSwing(() -> nav.setSelection(sel));
 	}
 
 	protected static LocationTrackingSpec getLocationTrackingSpec(String name) {
@@ -521,6 +552,8 @@ public abstract class AbstractGhidraHeadedDebuggerGUITest
 
 	@After
 	public void tearDown() {
+		runSwing(() -> traceManager.setSaveTracesByDefault(false));
+
 		if (tb != null) {
 			if (traceManager != null && traceManager.getOpenTraces().contains(tb.trace)) {
 				traceManager.closeTrace(tb.trace);
@@ -531,8 +564,6 @@ public abstract class AbstractGhidraHeadedDebuggerGUITest
 		if (mb != null) {
 			if (mb.testModel != null) {
 				modelService.removeModel(mb.testModel);
-
-				runSwing(() -> traceManager.setSaveTracesByDefault(false));
 				for (TraceRecorder recorder : modelService.getTraceRecorders()) {
 					recorder.stopRecording();
 				}
@@ -586,6 +617,17 @@ public abstract class AbstractGhidraHeadedDebuggerGUITest
 
 	protected void useTrace(Trace trace) {
 		tb = new ToyDBTraceBuilder(trace);
+	}
+
+	protected DebuggerTargetTraceMapper createTargetTraceMapper(TargetObject target)
+			throws Exception {
+		return new TestDebuggerTargetTraceMapper(target) {
+			@Override
+			public TraceRecorder startRecording(DebuggerModelServicePlugin service, Trace trace) {
+				useTrace(trace);
+				return super.startRecording(service, trace);
+			}
+		};
 	}
 
 	protected void createAndOpenTrace(String langID) throws IOException {
