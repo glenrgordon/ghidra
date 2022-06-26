@@ -16,6 +16,11 @@
 #include "varmap.hh"
 #include "funcdata.hh"
 
+AttributeId ATTRIB_LOCK = AttributeId("lock",129);
+AttributeId ATTRIB_MAIN = AttributeId("main",130);
+
+ElementId ELEM_LOCALDB = ElementId("localdb",206);
+
 /// \brief Can the given intersecting RangeHint coexist with \b this at their given offsets
 ///
 /// Determine if the data-type information in the two ranges \e line \e up
@@ -306,6 +311,33 @@ void ScopeLocal::collectNameRecs(void)
   }
 }
 
+/// For any read of the input stack pointer by a non-additive p-code op, assume this constitutes a
+/// a zero offset reference into the stack frame.  Replace the raw Varnode with the standard
+/// spacebase placeholder, PTRSUB(sp,#0), so that the data-type system can treat it as a reference.
+void ScopeLocal::annotateRawStackPtr(void)
+
+{
+  if (!fd->isTypeRecoveryOn()) return;
+  Varnode *spVn = fd->findSpacebaseInput(space);
+  if (spVn == (Varnode *)0) return;
+  list<PcodeOp *>::const_iterator iter;
+  vector<PcodeOp *> refOps;
+  for(iter=spVn->beginDescend();iter!=spVn->endDescend();++iter) {
+    PcodeOp *op = *iter;
+    if (op->getEvalType() == PcodeOp::special && !op->isCall()) continue;
+    OpCode opc = op->code();
+    if (opc == CPUI_INT_ADD || opc == CPUI_PTRSUB || opc == CPUI_PTRADD)
+      continue;
+    refOps.push_back(op);
+  }
+  for(int4 i=0;i<refOps.size();++i) {
+    PcodeOp *op = refOps[i];
+    int4 slot = op->getSlot(spVn);
+    PcodeOp *ptrsub = fd->newOpBefore(op,CPUI_PTRSUB,spVn,fd->newConstant(spVn->getSize(),0));
+    fd->opSetInput(op, ptrsub->getOut(), slot);
+  }
+}
+
 /// This resets the discovery process for new local variables mapped to the scope's address space.
 /// Any analysis removing specific ranges from the mapped set (via markNotMapped()) is cleared.
 void ScopeLocal::resetLocalWindow(void)
@@ -337,27 +369,30 @@ void ScopeLocal::resetLocalWindow(void)
   glb->symboltab->setRange(this,newrange);
 }
 
-void ScopeLocal::saveXml(ostream &s) const
+void ScopeLocal::encode(Encoder &encoder) const
 
 {
-  s << "<localdb";
-  a_v(s,"main",space->getName());
-  a_v_b(s,"lock",rangeLocked);
-  s << ">\n";
-  ScopeInternal::saveXml(s);
-  s << "</localdb>\n";
+  encoder.openElement(ELEM_LOCALDB);
+  encoder.writeString(ATTRIB_MAIN, space->getName());
+  encoder.writeBool(ATTRIB_LOCK, rangeLocked);
+  ScopeInternal::encode(encoder);
+  encoder.closeElement(ELEM_LOCALDB);
 }
 
-void ScopeLocal::restoreXml(const Element *el)
+void ScopeLocal::decode(Decoder &decoder)
+
+{
+  ScopeInternal::decode( decoder );
+  collectNameRecs();
+}
+
+void ScopeLocal::decodeWrappingAttributes(Decoder &decoder)
 
 {
   rangeLocked = false;
-  if (xml_readbool(el->getAttributeValue("lock")))
+  if (decoder.readBool(ATTRIB_LOCK))
     rangeLocked = true;
-  space = glb->getSpaceByName(el->getAttributeValue("main"));
-  
-  ScopeInternal::restoreXml( *(el->getChildren().begin()) );
-  collectNameRecs();
+  space = glb->getSpaceByName(decoder.readString(ATTRIB_MAIN));
 }
 
 /// The given range can no longer hold a \e mapped local variable. This indicates the range
@@ -1024,6 +1059,8 @@ void ScopeLocal::restructureVarnode(bool aliasyes)
   state.sortAlias();
   if (aliasyes)
     markUnaliased(state.getAlias());
+  if (!state.getAlias().empty() && state.getAlias()[0] == 0)	// If a zero offset use of the stack pointer exists
+    annotateRawStackPtr();					// Add a special placeholder PTRSUB
 }
 
 /// Define stack Symbols based on HighVariables.
