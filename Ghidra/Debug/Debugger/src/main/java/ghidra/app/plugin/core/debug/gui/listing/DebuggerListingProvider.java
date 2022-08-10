@@ -348,6 +348,11 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 		return false;
 	}
 
+	@Override
+	public boolean isDynamic() {
+		return true;
+	}
+
 	/**
 	 * Check if this is the main dynamic listing.
 	 * 
@@ -490,7 +495,8 @@ public class DebuggerListingProvider extends CodeViewerProvider {
 		if (markerService != null && markedAddress != null) {
 			trackingMarker = markerService.createPointMarker("Tracked Register",
 				"An address stored by a trace register, mapped to a static program", markedProgram,
-				0, true, true, true, trackingColor, ICON_REGISTER_MARKER, true);
+				MarkerService.HIGHLIGHT_PRIORITY + 1, true, true, true, trackingColor,
+				ICON_REGISTER_MARKER, true);
 			trackingMarker.add(markedAddress);
 		}
 	}
