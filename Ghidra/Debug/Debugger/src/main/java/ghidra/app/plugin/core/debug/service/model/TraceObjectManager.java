@@ -30,7 +30,7 @@ import ghidra.async.AsyncLazyMap;
 import ghidra.dbg.target.*;
 import ghidra.dbg.util.PathUtils;
 import ghidra.dbg.util.PathUtils.PathComparator;
-import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressRange;
 import ghidra.trace.model.breakpoint.TraceBreakpoint;
 import ghidra.trace.model.breakpoint.TraceBreakpointKind;
 import ghidra.trace.model.memory.TraceMemoryRegion;
@@ -255,7 +255,7 @@ public class TraceObjectManager {
 			TraceThread traceThread = threadRecorder.getTraceThread();
 			recorder.createSnapshot(traceThread + " started", traceThread, null);
 			try (UndoableTransaction tid =
-				UndoableTransaction.start(recorder.getTrace(), "Adjust thread creation", true)) {
+				UndoableTransaction.start(recorder.getTrace(), "Adjust thread creation")) {
 				long existing = traceThread.getCreationSnap();
 				if (existing == Long.MIN_VALUE) {
 					traceThread.setCreationSnap(recorder.getSnap());
@@ -496,12 +496,10 @@ public class TraceObjectManager {
 
 	public void attributesChangedBreakpointLocation(TargetObject obj, Map<String, ?> added) {
 		TargetBreakpointLocation loc = (TargetBreakpointLocation) obj;
-		if (added.containsKey(TargetBreakpointLocation.LENGTH_ATTRIBUTE_NAME) ||
-			added.containsKey(TargetBreakpointLocation.ADDRESS_ATTRIBUTE_NAME)) {
-			Address traceAddr = recorder.getMemoryMapper().targetToTrace(loc.getAddress());
+		if (added.containsKey(TargetBreakpointLocation.RANGE_ATTRIBUTE_NAME)) {
+			AddressRange traceRng = recorder.getMemoryMapper().targetToTrace(loc.getRange());
 			String path = loc.getJoinedPath(".");
-			int length = loc.getLengthOrDefault(1);
-			recorder.breakpointRecorder.breakpointLocationChanged(length, traceAddr, path);
+			recorder.breakpointRecorder.breakpointLocationChanged(traceRng, path);
 		}
 	}
 
@@ -545,7 +543,7 @@ public class TraceObjectManager {
 			if (rec != null) {
 				String name = (String) added.get(TargetObject.DISPLAY_ATTRIBUTE_NAME);
 				try (UndoableTransaction tid =
-					UndoableTransaction.start(rec.getTrace(), "Renamed thread", true)) {
+					UndoableTransaction.start(rec.getTrace(), "Rename thread")) {
 					rec.getTraceThread().setName(name);
 				}
 			}
@@ -700,6 +698,12 @@ public class TraceObjectManager {
 	public void disposeModelListeners() {
 		eventListener.dispose();
 		objectListener.dispose();
+	}
+
+	public CompletableFuture<Void> flushEvents() {
+		return eventListener.flushEvents().thenCompose(__ -> {
+			return objectListener.flushEvents();
+		});
 	}
 
 }

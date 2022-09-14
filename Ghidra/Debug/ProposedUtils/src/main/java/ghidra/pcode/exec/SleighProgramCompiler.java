@@ -15,10 +15,9 @@
  */
 package ghidra.pcode.exec;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
 
 import ghidra.app.plugin.processors.sleigh.*;
 import ghidra.app.plugin.processors.sleigh.template.ConstructTpl;
@@ -65,12 +64,12 @@ public class SleighProgramCompiler {
 	 * @param language the language
 	 * @param parser the parser
 	 * @param sourceName the name of the program, for error diagnostics
-	 * @param text the SLEIGH source
+	 * @param source the Sleigh source
 	 * @return the constructor template
 	 */
 	public static ConstructTpl compileTemplate(Language language, PcodeParser parser,
-			String sourceName, String text) {
-		return parser.compilePcode(text, EXPRESSION_SOURCE_NAME, 1);
+			String sourceName, String source) {
+		return parser.compilePcode(source, EXPRESSION_SOURCE_NAME, 1);
 	}
 
 	/**
@@ -81,9 +80,10 @@ public class SleighProgramCompiler {
 	 * @return the list of p-code ops
 	 * @throws UnknownInstructionException in case of crossbuilds, the target instruction is unknown
 	 * @throws MemoryAccessException in case of crossbuilds, the target address cannot be accessed
+	 * @throws IOException for errors in during emitting
 	 */
 	public static List<PcodeOp> buildOps(Language language, ConstructTpl template)
-			throws UnknownInstructionException, MemoryAccessException {
+			throws UnknownInstructionException, MemoryAccessException, IOException {
 		Address zero = language.getDefaultSpace().getAddress(0);
 		SleighParserContext c = new SleighParserContext(zero, zero, zero, zero);
 		ParserWalker walk = new ParserWalker(c);
@@ -116,6 +116,7 @@ public class SleighProgramCompiler {
 	 * This is basically a hack to avoid NPEs when no output varnode is given.
 	 * 
 	 * @param parser the parser to add the symbol to
+	 * @return the nil symbol
 	 */
 	protected static VarnodeSymbol addNilSymbol(PcodeParser parser) {
 		SleighSymbol exists = parser.findSymbol(NIL_SYMBOL_NAME);
@@ -124,9 +125,8 @@ public class SleighProgramCompiler {
 			return (VarnodeSymbol) exists;
 		}
 		long offset = parser.allocateTemp();
-		VarnodeSymbol nil =
-			new VarnodeSymbol(new Location("<util>", 0), NIL_SYMBOL_NAME, parser.getUniqueSpace(),
-				offset, 1);
+		VarnodeSymbol nil = new VarnodeSymbol(new Location("<util>", 0), NIL_SYMBOL_NAME,
+			parser.getUniqueSpace(), offset, 1);
 		parser.addSymbol(nil);
 		return nil;
 	}
@@ -156,39 +156,37 @@ public class SleighProgramCompiler {
 			return ctor.construct(language, SleighProgramCompiler.buildOps(language, template),
 				libSyms);
 		}
-		catch (UnknownInstructionException | MemoryAccessException e) {
+		catch (UnknownInstructionException | MemoryAccessException | IOException e) {
 			throw new AssertionError(e);
 		}
 	}
 
 	/**
-	 * Compile the given SLEIGH source into a simple p-code program
+	 * Compile the given Sleigh source into a simple p-code program
 	 * 
 	 * <p>
-	 * This is suitable for modifying program state using SLEIGH statements. Most likely, in
-	 * scripting, or perhaps in a SLEIGH repl. The library given during compilation must match the
+	 * This is suitable for modifying program state using Sleigh statements. Most likely, in
+	 * scripting, or perhaps in a Sleigh repl. The library given during compilation must match the
 	 * library given for execution, at least in its binding of userop IDs to symbols.
 	 * 
 	 * @param language the language of the target p-code machine
-	 * @param sourceName a diagnostic name for the SLEIGH source
-	 * @param lines the lines of SLEIGH source. These are joined with line separators but no
-	 *            semicolon!
+	 * @param sourceName a diagnostic name for the Sleigh source
+	 * @param source the Sleigh source
 	 * @param library the userop library or stub library for binding userop symbols
 	 * @return the compiled p-code program
 	 */
 	public static PcodeProgram compileProgram(SleighLanguage language, String sourceName,
-			List<String> lines, PcodeUseropLibrary<?> library) {
+			String source, PcodeUseropLibrary<?> library) {
 		PcodeParser parser = createParser(language);
 		Map<Integer, UserOpSymbol> symbols = library.getSymbols(language);
 		addParserSymbols(parser, symbols);
 
-		ConstructTpl template =
-			compileTemplate(language, parser, sourceName, StringUtils.join(lines, "\n"));
+		ConstructTpl template = compileTemplate(language, parser, sourceName, source);
 		return constructProgram(PcodeProgram::new, language, template, symbols);
 	}
 
 	/**
-	 * Compile the given SLEIGH expression into a p-code program that can evaluate it
+	 * Compile the given Sleigh expression into a p-code program that can evaluate it
 	 * 
 	 * <p>
 	 * TODO: Currently, expressions cannot be compiled for a user-supplied userop library. The
@@ -196,7 +194,7 @@ public class SleighProgramCompiler {
 	 * userop libraries are easily composed. It should be easy to add that feature if needed.
 	 * 
 	 * @param language the languge of the target p-code machine
-	 * @param expression the SLEIGH expression to be evaluated
+	 * @param expression the Sleigh expression to be evaluated
 	 * @return a p-code program whose {@link PcodeExpression#evaluate(PcodeExecutor)} method will
 	 *         evaluate the expression on the given executor and its state.
 	 */
@@ -211,7 +209,7 @@ public class SleighProgramCompiler {
 	}
 
 	/**
-	 * Generate a SLEIGH symbol for context when compiling a userop definition
+	 * Generate a Sleigh symbol for context when compiling a userop definition
 	 * 
 	 * @param language the language of the target p-code machine
 	 * @param sleigh a means of translating address spaces between execution and compilation
@@ -219,7 +217,7 @@ public class SleighProgramCompiler {
 	 * @param opName a diagnostic name for the userop in which this parameter applies
 	 * @param paramName the symbol name for the parameter
 	 * @param arg the varnode to bind to the parameter symbol
-	 * @return the named SLEIGH symbol bound to the given varnode
+	 * @return the named Sleigh symbol bound to the given varnode
 	 */
 	public static VarnodeSymbol paramSym(Language language, SleighBase sleigh, String opName,
 			String paramName, Varnode arg) {
@@ -230,11 +228,11 @@ public class SleighProgramCompiler {
 	}
 
 	/**
-	 * Compile the definition of a p-code userop from SLEIGH source into a p-code program
+	 * Compile the definition of a p-code userop from Sleigh source into a p-code program
 	 * 
 	 * <p>
-	 * TODO: Defining a userop from SLEIGH source is currently a bit of a hack. It would be nice if
-	 * there were a formalization of SLEIGH/p-code subroutines. At the moment, the control flow for
+	 * TODO: Defining a userop from Sleigh source is currently a bit of a hack. It would be nice if
+	 * there were a formalization of Sleigh/p-code subroutines. At the moment, the control flow for
 	 * subroutines is handled out of band, which actually works fairly well. However, parameter
 	 * passing and returning results is not well defined. The current solution is to alias the
 	 * parameters to their arguments, implementing a pass-by-reference scheme. Similarly, the output
@@ -254,14 +252,13 @@ public class SleighProgramCompiler {
 	 * @param opName the name of the userop (used only for diagnostics here)
 	 * @param params the names of parameters in order. Index 0 names the output symbol, probably
 	 *            {@link SleighPcodeUseropDefinition#OUT_SYMBOL_NAME}
-	 * @param lines the lines of SLEIGH source. These are joined with line separators but no
-	 *            semicolon!
+	 * @param source the Sleigh source
 	 * @param library the userop library or stub library for binding userop symbols
 	 * @param args the varnode arguments in order. Index 0 is the output varnode.
 	 * @return a p-code program that implements the userop for the given arguments
 	 */
 	public static PcodeProgram compileUserop(SleighLanguage language, String opName,
-			List<String> params, List<String> lines, PcodeUseropLibrary<?> library,
+			List<String> params, String source, PcodeUseropLibrary<?> library,
 			List<Varnode> args) {
 		PcodeParser parser = createParser(language);
 		Map<Integer, UserOpSymbol> symbols = library.getSymbols(language);
@@ -278,16 +275,14 @@ public class SleighProgramCompiler {
 			String p = params.get(i);
 			Varnode a = args.get(i);
 			if (a == null && i == 0) { // Only allow output to be omitted
-				parser.addSymbol(
-					new VarnodeSymbol(nil.getLocation(), p, nilVnData.space, nilVnData.offset,
-						nilVnData.size));
+				parser.addSymbol(new VarnodeSymbol(nil.getLocation(), p, nilVnData.space,
+					nilVnData.offset, nilVnData.size));
 			}
 			else {
 				parser.addSymbol(paramSym(language, sleigh, opName, p, a));
 			}
 		}
 
-		String source = StringUtils.join(lines, "\n");
 		try {
 			ConstructTpl template = compileTemplate(language, parser, opName, source);
 			return constructProgram(PcodeProgram::new, language, template, symbols);

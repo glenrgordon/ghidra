@@ -19,7 +19,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Before;
@@ -31,7 +30,7 @@ import ghidra.program.model.lang.*;
 import ghidra.program.util.DefaultLanguageService;
 import ghidra.test.AbstractGhidraHeadlessIntegrationTest;
 import ghidra.trace.database.ToyDBTraceBuilder;
-import ghidra.trace.model.memory.TraceMemoryRegisterSpace;
+import ghidra.trace.model.memory.TraceMemorySpace;
 import ghidra.trace.model.memory.TraceMemoryState;
 import ghidra.trace.model.thread.TraceThread;
 import ghidra.util.database.UndoableTransaction;
@@ -71,7 +70,7 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 				thread = b.getOrAddThread("Thread1", 0);
 
 				Register r0 = language.getRegister("r0");
-				TraceMemoryRegisterSpace regs =
+				TraceMemorySpace regs =
 					b.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 				regs.setValue(0, new RegisterValue(r0, BigInteger.valueOf(4321)));
 			}
@@ -115,7 +114,7 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 				thread = b.getOrAddThread("Thread1", 0);
 
 				Register r0 = language.getRegister("r0");
-				TraceMemoryRegisterSpace regs =
+				TraceMemorySpace regs =
 					b.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 				regs.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x00400000)));
 
@@ -135,7 +134,7 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 				thread = b.getOrAddThread("Thread1", 0);
 
 				Register r0 = language.getRegister("r0");
-				TraceMemoryRegisterSpace regs =
+				TraceMemorySpace regs =
 					b.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 				regs.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x00400000)));
 
@@ -158,7 +157,7 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 				thread = b.getOrAddThread("Thread1", 0);
 
 				Register r0 = language.getRegister("r0");
-				TraceMemoryRegisterSpace regs =
+				TraceMemorySpace regs =
 					b.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 				regs.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x00400000)));
 
@@ -188,7 +187,7 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 				thread = b.getOrAddThread("Thread1", 0);
 
 				Register r0 = language.getRegister("r0");
-				TraceMemoryRegisterSpace regs =
+				TraceMemorySpace regs =
 					b.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 				regs.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x00400000)));
 
@@ -207,21 +206,21 @@ public class TraceSleighUtilsTest extends AbstractGhidraHeadlessIntegrationTest 
 	public void testCompileSleighProgram() throws Exception {
 		try (ToyDBTraceBuilder b = new ToyDBTraceBuilder("test", TOY_BE_64_HARVARD)) {
 			PcodeProgram sp = SleighProgramCompiler.compileProgram((SleighLanguage) b.language,
-				"test", List.of(
-					"if (r0) goto <else>;",
-					"    r1 = 6;",
-					"    goto <done>;",
-					"<else>",
-					"    r1 = 7;",
-					"<done>"),
-				PcodeUseropLibrary.NIL);
+				"test", """
+						if (r0) goto <else>;
+						    r1 = 6;
+						    goto <done>;
+						<else>
+						    r1 = 7;
+						<done>
+						""", PcodeUseropLibrary.NIL);
 			TraceThread thread;
 			try (UndoableTransaction tid = b.startTransaction()) {
 				thread = b.getOrAddThread("Thread1", 0);
 				PcodeExecutor<byte[]> executor =
 					new PcodeExecutor<>(sp.getLanguage(),
 						BytesPcodeArithmetic.forLanguage(b.language),
-						new TraceBytesPcodeExecutorState(b.trace, 0, thread, 0));
+						new DirectBytesTracePcodeExecutorState(b.trace, 0, thread, 0));
 				sp.execute(executor, PcodeUseropLibrary.nil());
 			}
 

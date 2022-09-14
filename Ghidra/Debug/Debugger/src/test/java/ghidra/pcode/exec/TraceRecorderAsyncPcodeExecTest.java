@@ -18,7 +18,6 @@ package ghidra.pcode.exec;
 import static org.junit.Assert.*;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
@@ -99,7 +98,7 @@ public class TraceRecorderAsyncPcodeExecTest extends AbstractGhidraHeadedDebugge
 		SleighLanguage language = (SleighLanguage) trace.getBaseLanguage();
 
 		PcodeProgram prog = SleighProgramCompiler.compileProgram(language, "test",
-			List.of("r2 = r0 + r1;"), PcodeUseropLibrary.NIL);
+			"r2 = r0 + r1;", PcodeUseropLibrary.NIL);
 
 		Register r0 = language.getRegister("r0");
 		Register r1 = language.getRegister("r1");

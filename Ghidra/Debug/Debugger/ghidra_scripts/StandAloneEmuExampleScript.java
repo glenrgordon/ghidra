@@ -21,10 +21,7 @@
 //@menupath
 //@toolbar
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.List;
 
 import ghidra.app.plugin.assembler.*;
 import ghidra.app.plugin.processors.sleigh.SleighLanguage;
@@ -88,7 +85,7 @@ public class StandAloneEmuExampleScript extends GhidraScript {
 		 */
 		Address entry = dyn.getAddress(0x00400000);
 		Assembler asm = Assemblers.getAssembler(language);
-		CodeBuffer buffer = new CodeBuffer(asm, entry);
+		AssemblyBuffer buffer = new AssemblyBuffer(asm, entry);
 		buffer.assemble("MOV RCX, 0xdeadbeef");
 		Address injectHere = buffer.getNext();
 		buffer.assemble("MOV RAX, 1");
@@ -104,10 +101,10 @@ public class StandAloneEmuExampleScript extends GhidraScript {
 		 */
 		byte[] hw = "Hello, World!\n".getBytes(UTF8);
 		emulator.getSharedState().setVar(dyn, 0xdeadbeefL, hw.length, true, hw);
-		PcodeProgram init = SleighProgramCompiler.compileProgram(language, "init", List.of(
-			"RIP = 0x" + entry + ";",
-			"RSP = 0x00001000;"),
-			library);
+		PcodeProgram init = SleighProgramCompiler.compileProgram(language, "init", String.format("""
+				RIP = 0x%s;
+				RSP = 0x00001000;
+				""", entry), library);
 		thread.getExecutor().execute(init, library);
 		thread.overrideContextWithDefault();
 		thread.reInitialize();
@@ -116,9 +113,10 @@ public class StandAloneEmuExampleScript extends GhidraScript {
 		 * Inject a call to our custom print userop. Otherwise, the language itself will never
 		 * invoke it.
 		 */
-		emulator.inject(injectHere, List.of(
-			"print_utf8(RCX);",
-			"emu_exec_decoded();"));
+		emulator.inject(injectHere, """
+				print_utf8(RCX);
+				emu_exec_decoded();
+				""");
 
 		/*
 		 * Run the experiment: This should interrupt on the second SYSCALL, because any value other
@@ -149,31 +147,5 @@ public class StandAloneEmuExampleScript extends GhidraScript {
 			Utils.bytesToLong(SleighProgramCompiler.compileExpression(language, "RCX+4")
 					.evaluate(thread.getExecutor()),
 				8, language.isBigEndian()));
-	}
-
-	public static class CodeBuffer {
-		private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		private final Assembler asm;
-		private final Address entry;
-
-		public CodeBuffer(Assembler asm, Address entry) {
-			this.asm = asm;
-			this.entry = entry;
-		}
-
-		public Address getNext() {
-			return entry.add(baos.size());
-		}
-
-		public byte[] assemble(String line)
-				throws AssemblySyntaxException, AssemblySemanticException, IOException {
-			byte[] bytes = asm.assembleLine(getNext(), line);
-			baos.write(bytes);
-			return bytes;
-		}
-
-		public byte[] getBytes() {
-			return baos.toByteArray();
-		}
 	}
 }

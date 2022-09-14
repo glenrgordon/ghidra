@@ -23,8 +23,7 @@ import ghidra.app.services.LogicalBreakpoint;
 import ghidra.app.services.TraceRecorder;
 import ghidra.dbg.target.*;
 import ghidra.dbg.target.TargetBreakpointSpec.TargetBreakpointKind;
-import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressSet;
+import ghidra.program.model.address.*;
 import ghidra.program.model.listing.*;
 import ghidra.program.util.ProgramLocation;
 import ghidra.trace.model.Trace;
@@ -128,9 +127,8 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 				throw new IllegalStateException("Must save breakpoint to program before naming it");
 			}
 			try (UndoableTransaction tid =
-				UndoableTransaction.start(program, "Rename breakpoint", false)) {
+				UndoableTransaction.start(program, "Rename breakpoint")) {
 				bookmark.set(bookmark.getCategory(), name);
-				tid.commit();
 			}
 		}
 
@@ -154,8 +152,7 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 			// volatile reads
 			Bookmark eBookmark = this.eBookmark;
 			Bookmark dBookmark = this.dBookmark;
-			try (UndoableTransaction tid =
-				UndoableTransaction.start(program, "Clear breakpoint", false)) {
+			try (UndoableTransaction tid = UndoableTransaction.start(program, "Clear breakpoint")) {
 				BookmarkManager bookmarkManager = program.getBookmarkManager();
 				if (eBookmark != null) {
 					bookmarkManager.removeBookmark(eBookmark);
@@ -165,7 +162,6 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 				}
 				// (e,d)Bookmark Gets nulled on program change callback
 				// If null here, logical breakpoint manager will get confused
-				tid.commit();
 			}
 		}
 
@@ -250,7 +246,7 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 			String delType =
 				enabled ? BREAKPOINT_DISABLED_BOOKMARK_TYPE : BREAKPOINT_ENABLED_BOOKMARK_TYPE;
 			try (UndoableTransaction tid =
-				UndoableTransaction.start(program, "Enable breakpoint", true)) {
+				UndoableTransaction.start(program, "Enable breakpoint")) {
 				BookmarkManager manager = program.getBookmarkManager();
 				String catStr = computeCategory();
 				manager.setBookmark(address, addType, catStr, comment);
@@ -397,10 +393,11 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 			Set<TargetBreakpointKind> tKinds = TraceRecorder.traceToTargetBreakpointKinds(kinds);
 			Address targetAddr = computeTargetAddress();
 			for (TargetBreakpointLocation loc : recorder.collectBreakpoints(null)) {
-				if (!targetAddr.equals(loc.getAddress())) {
+				AddressRange range = loc.getRange();
+				if (!targetAddr.equals(range.getMinAddress())) {
 					continue;
 				}
-				if (length != loc.getLength().longValue()) {
+				if (length != range.getLength()) {
 					continue;
 				}
 				TargetBreakpointSpec spec = loc.getSpecification();
@@ -416,10 +413,11 @@ public interface LogicalBreakpointInternal extends LogicalBreakpoint {
 			Set<TargetBreakpointKind> tKinds = TraceRecorder.traceToTargetBreakpointKinds(kinds);
 			Address targetAddr = computeTargetAddress();
 			for (TargetBreakpointLocation loc : recorder.collectBreakpoints(null)) {
-				if (!targetAddr.equals(loc.getAddress())) {
+				AddressRange range = loc.getRange();
+				if (!targetAddr.equals(range.getMinAddress())) {
 					continue;
 				}
-				if (length != loc.getLength().longValue()) {
+				if (length != range.getLength()) {
 					continue;
 				}
 				TargetBreakpointSpec spec = loc.getSpecification();
