@@ -22,15 +22,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.swing.*;
 
 import docking.action.DockingAction;
 import docking.action.ToggleDockingAction;
 import docking.action.builder.*;
-import docking.menu.ActionState;
 import docking.widgets.table.*;
 import docking.widgets.tree.GTreeNode;
 import ghidra.app.plugin.core.debug.DebuggerPluginPackage;
@@ -51,7 +48,6 @@ import ghidra.app.plugin.core.debug.gui.thread.DebuggerThreadsPlugin;
 import ghidra.app.plugin.core.debug.gui.time.DebuggerTimePlugin;
 import ghidra.app.plugin.core.debug.gui.watch.DebuggerWatchesPlugin;
 import ghidra.app.plugin.core.debug.service.model.launch.DebuggerProgramLaunchOffer;
-import ghidra.app.services.DebuggerStateEditingService.StateEditingMode;
 import ghidra.app.services.DebuggerTraceManagerService.BooleanChangeAdapter;
 import ghidra.async.AsyncUtils;
 import ghidra.framework.plugintool.Plugin;
@@ -80,8 +76,8 @@ public interface DebuggerResources {
 
 	ImageIcon ICON_LAUNCH = ResourceManager.loadImage("images/launch.png");
 	ImageIcon ICON_ATTACH = ResourceManager.loadImage("images/attach.png");
-	ImageIcon ICON_RESUME = ResourceManager.loadImage("images/continue.png");
-	ImageIcon ICON_TERMINATE = ResourceManager.loadImage("images/stop.png");
+	ImageIcon ICON_RESUME = ResourceManager.loadImage("images/resume.png");
+	ImageIcon ICON_INTERRUPT = ResourceManager.loadImage("images/interrupt.png");
 	ImageIcon ICON_KILL = ResourceManager.loadImage("images/kill.png");
 	ImageIcon ICON_DETACH = ResourceManager.loadImage("images/detach.png");
 	ImageIcon ICON_RECORD = ResourceManager.loadImage("images/record.png");
@@ -91,10 +87,11 @@ public interface DebuggerResources {
 	ImageIcon ICON_SKIP_OVER = ResourceManager.loadImage("images/skipover.png");
 	ImageIcon ICON_STEP_FINISH = ResourceManager.loadImage("images/stepout.png");
 	ImageIcon ICON_STEP_BACK = ResourceManager.loadImage("images/stepback.png");
+	ImageIcon ICON_STEP_LAST = ResourceManager.loadImage("images/steplast.png");
 	// TODO: Draw new icons?
 	ImageIcon ICON_SNAP_FORWARD = ResourceManager.loadImage("images/2rightarrow.png");
 	ImageIcon ICON_SNAP_BACKWARD = ResourceManager.loadImage("images/2leftarrow.png");
-	ImageIcon ICON_SEEK_PRESENT = ICON_RESUME;
+	ImageIcon ICON_SEEK_PRESENT = ResourceManager.loadImage("images/seek-present.png");
 
 	ImageIcon ICON_SET_BREAKPOINT = ResourceManager.loadImage("images/breakpoint-enable.png");
 	ImageIcon ICON_CLEAR_BREAKPOINT = ResourceManager.loadImage("images/breakpoint-clear.png");
@@ -182,10 +179,10 @@ public interface DebuggerResources {
 	ImageIcon ICON_EDIT_MODE_WRITE_EMULATOR =
 		ResourceManager.loadImage("images/write-emulator.png");
 
-	String NAME_EDIT_MODE_READ_ONLY = "Read Only";
-	String NAME_EDIT_MODE_WRITE_TARGET = "Write Target";
-	String NAME_EDIT_MODE_WRITE_TRACE = "Write Trace";
-	String NAME_EDIT_MODE_WRITE_EMULATOR = "Write Emulator";
+	String NAME_EDIT_MODE_READ_ONLY = "Control Target w/ Edits Disabled";
+	String NAME_EDIT_MODE_WRITE_TARGET = "Control Target";
+	String NAME_EDIT_MODE_WRITE_TRACE = "Control Trace";
+	String NAME_EDIT_MODE_WRITE_EMULATOR = "Control Emulator";
 
 	HelpLocation HELP_PACKAGE = new HelpLocation("Debugger", "package");
 
@@ -692,7 +689,7 @@ public interface DebuggerResources {
 
 	abstract class AbstractStepLastAction extends DockingAction {
 		public static final String NAME = "Step Last";
-		public static final Icon ICON = ICON_STEP_FINISH; // TODO: Draw one
+		public static final Icon ICON = ICON_STEP_LAST;
 		public static final String HELP_ANCHOR = "step_last";
 
 		public static HelpLocation help(Plugin owner) {
@@ -708,7 +705,7 @@ public interface DebuggerResources {
 
 	abstract class AbstractInterruptAction extends DockingAction {
 		public static final String NAME = "Interrupt";
-		public static final Icon ICON = ICON_TERMINATE;
+		public static final Icon ICON = ICON_INTERRUPT;
 		public static final String HELP_ANCHOR = "interrupt";
 
 		public static HelpLocation help(Plugin owner) {
@@ -798,7 +795,7 @@ public interface DebuggerResources {
 	interface InterpreterInterruptAction {
 		String NAME = "Interpreter Interrupt";
 		String DESCRIPTION = "Send an interrupt through this Interpreter";
-		Icon ICON = ICON_TERMINATE;
+		Icon ICON = ICON_INTERRUPT;
 		String HELP_ANCHOR = "interrupt";
 
 		public static ActionBuilder builder(Plugin owner) {
@@ -863,6 +860,7 @@ public interface DebuggerResources {
 		String NAME_PC_BY_STACK = "Track Program Counter (by Stack)";
 		String NAME_SP = "Track Stack Pointer";
 		String NAME_NONE = "Do Not Track";
+		String NAME_PREFIX_WATCH = "Track address of watch: ";
 
 		// TODO: Separate icons for Program Counter and Stack Pointer
 		Icon ICON_PC = ICON_REGISTER_MARKER;
@@ -2084,26 +2082,6 @@ public interface DebuggerResources {
 					.toolBarGroup(GROUP)
 					.toolBarIcon(ICON)
 					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
-		}
-	}
-
-	interface EditModeAction {
-		String NAME = "Edit Mode";
-		String DESCRIPTION = "Choose what to edit in dynamic views";
-		String GROUP = GROUP_GENERAL;
-		Icon ICON = StateEditingMode.values()[0].icon;
-		String HELP_ANCHOR = "edit_mode";
-
-		static MultiStateActionBuilder<StateEditingMode> builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new MultiStateActionBuilder<StateEditingMode>(NAME, ownerName)
-					.description(DESCRIPTION)
-					.toolBarGroup(GROUP)
-					.toolBarIcon(ICON_EDIT_MODE_WRITE_TARGET)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR))
-					.addStates(Stream.of(StateEditingMode.values())
-							.map(m -> new ActionState<>(m.name, m.icon, m))
-							.collect(Collectors.toList()));
 		}
 	}
 

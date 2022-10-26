@@ -65,7 +65,7 @@ public class DefaultPcodeDebuggerMemoryAccess extends DefaultPcodeTraceMemoryAcc
 
 	@Override
 	public boolean isLive() {
-		return recorder != null && recorder.isRecording() && recorder.getSnap() == snap;
+		return InternalPcodeDebuggerDataAccess.super.isLive();
 	}
 
 	@Override
@@ -109,6 +109,9 @@ public class DefaultPcodeDebuggerMemoryAccess extends DefaultPcodeTraceMemoryAcc
 		// TODO: Expand to block? DON'T OVERWRITE KNOWN!
 		DebuggerStaticMappingService mappingService =
 			tool.getService(DebuggerStaticMappingService.class);
+		if (mappingService == null) {
+			return false;
+		}
 		byte[] data = new byte[4096];
 
 		Trace trace = platform.getTrace();
