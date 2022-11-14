@@ -1024,11 +1024,8 @@ RtGotoCheck:       is Rt1215 {}
 #
 
 
-@if defined(VERSION_6T2) || defined(VERSION_7)
-# Ensure that the recursive rule for ARMcond is applied for assembly
+# Ensure that the condition check phase has been completed
 with : ARMcondCk=1 {
-@endif
-
 
 :adc^CheckInIT_CZNO^ItCond	Rd0002,Rm0305 		is TMode=1 & ItCond & op6=0x105 & Rm0305 & Rd0002 & CheckInIT_CZNO
 {
@@ -2276,14 +2273,14 @@ define pcodeop ExclusiveAccess;
   Rt1215 = zext(val);
 }
 
-:ldrsb^ItCond".w"	Rt1215,RnIndirect12 		is TMode=1 & ItCond & (op4=0xf99; Rt1215) & RnIndirect12
+:ldrsb^ItCond^".w"	Rt1215,RnIndirect12 		is TMode=1 & ItCond & (op4=0xf99; Rt1215) & RnIndirect12
 {
    build ItCond;
    tmp:1 = *RnIndirect12;
    Rt1215 = sext(tmp);
 }
 
-:ldrsb^ItCond".w"	Rt1215,RnIndirectPUW 		is TMode=1 & ItCond & (op4=0xf91; Rt1215 & thc1111=1) & $(RN_INDIRECT_PUW)
+:ldrsb^ItCond^".w"	Rt1215,RnIndirectPUW 		is TMode=1 & ItCond & (op4=0xf91; Rt1215 & thc1111=1) & $(RN_INDIRECT_PUW)
 {
    build ItCond;
    build RnIndirectPUW;
@@ -5291,6 +5288,6 @@ Pcrel: [cloc,Rm0003]  is Rm0003 & thc0404=1 [ cloc = inst_next; ]
 {
 	HintYield();
 }
+@endif #VERSION_6T2 || VERSION_7
 
 } # End with : ARMcondCk=1
-@endif # VERSION_6T2 || VERSION_7

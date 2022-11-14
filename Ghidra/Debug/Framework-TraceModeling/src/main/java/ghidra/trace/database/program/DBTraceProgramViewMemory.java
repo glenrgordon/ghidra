@@ -24,6 +24,7 @@ import com.google.common.cache.CacheBuilder;
 import ghidra.program.model.address.*;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.trace.model.memory.TraceMemoryRegion;
+import ghidra.util.LockHold;
 
 public class DBTraceProgramViewMemory extends AbstractDBTraceProgramViewMemory {
 
@@ -76,8 +77,10 @@ public class DBTraceProgramViewMemory extends AbstractDBTraceProgramViewMemory {
 	@Override
 	protected void recomputeAddressSet() {
 		AddressSet temp = new AddressSet();
-		// TODO: Performance test this
-		forVisibleRegions(reg -> temp.add(reg.getRange()));
+		try (LockHold hold = program.trace.lockRead()) {
+			// TODO: Performance test this
+			forVisibleRegions(reg -> temp.add(reg.getRange()));
+		}
 		addressSet = temp;
 	}
 
@@ -139,7 +142,6 @@ public class DBTraceProgramViewMemory extends AbstractDBTraceProgramViewMemory {
 
 	public void updateChangeRegionBlockRange(TraceMemoryRegion region, AddressRange oldRange,
 			AddressRange newRange) {
-		// TODO: update cached block? Nothing to update.
 		changeRange(oldRange, newRange);
 	}
 
