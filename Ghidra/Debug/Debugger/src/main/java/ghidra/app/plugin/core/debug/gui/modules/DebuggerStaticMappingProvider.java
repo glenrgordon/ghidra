@@ -27,6 +27,7 @@ import javax.swing.*;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
+import db.Transaction;
 import docking.ActionContext;
 import docking.action.DockingAction;
 import docking.action.DockingActionIf;
@@ -50,11 +51,9 @@ import ghidra.trace.model.*;
 import ghidra.trace.model.Trace.TraceStaticMappingChangeType;
 import ghidra.trace.model.modules.TraceStaticMapping;
 import ghidra.trace.model.modules.TraceStaticMappingManager;
-import ghidra.trace.model.program.TraceProgramView;
 import ghidra.util.MathUtilities;
 import ghidra.util.Msg;
 import ghidra.util.database.ObjectKey;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.table.GhidraTableFilterPanel;
 
 public class DebuggerStaticMappingProvider extends ComponentProviderAdapter
@@ -101,7 +100,8 @@ public class DebuggerStaticMappingProvider extends ComponentProviderAdapter
 
 		public MappingTableModel(PluginTool tool) {
 			super(tool, "Mappings", StaticMappingTableColumns.class,
-				TraceStaticMapping::getObjectKey, StaticMappingRow::new);
+				TraceStaticMapping::getObjectKey, StaticMappingRow::new,
+				StaticMappingRow::getMapping);
 		}
 	}
 
@@ -173,6 +173,10 @@ public class DebuggerStaticMappingProvider extends ComponentProviderAdapter
 		buildMainPanel();
 		setVisible(true);
 		createActions();
+	}
+
+	void dispose() {
+		addMappingDialog.dispose();
 	}
 
 	@AutoServiceConsumed
@@ -286,11 +290,11 @@ public class DebuggerStaticMappingProvider extends ComponentProviderAdapter
 				: traceLen == 0 ? progLen : MathUtilities.unsignedMin(progLen, traceLen);
 		Address progStart = progLen != 0 ? progSel.getMinAddress() : progLoc.getAddress();
 		Address traceStart = traceLen != 0 ? traceSel.getMinAddress() : traceLoc.getAddress();
-		TraceProgramView view = (TraceProgramView) traceLoc.getProgram();
+		long snap = traceManager.getCurrentSnap();
 
 		try {
 			addMappingDialog.setValues(progLoc.getProgram(), currentTrace, progStart, traceStart,
-				length, Lifespan.nowOn(view.getSnap()));
+				length, Lifespan.nowOn(snap));
 		}
 		catch (AddressOverflowException e) {
 			Msg.showError(this, null, "Add Mapping", "Error populating dialog");
@@ -300,8 +304,7 @@ public class DebuggerStaticMappingProvider extends ComponentProviderAdapter
 	private void activatedRemove(DebuggerStaticMappingActionContext ctx) {
 		// TODO: Action to adjust life span?
 		// Note: provider displays mappings for all time, so delete means delete, not truncate
-		try (UndoableTransaction tid =
-			UndoableTransaction.start(currentTrace, "Remove Static Mappings")) {
+		try (Transaction tid = currentTrace.openTransaction("Remove Static Mappings")) {
 			for (StaticMappingRow mapping : ctx.getSelectedMappings()) {
 				mapping.getMapping().delete();
 			}

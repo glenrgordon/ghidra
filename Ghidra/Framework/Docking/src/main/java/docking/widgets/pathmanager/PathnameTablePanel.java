@@ -24,6 +24,7 @@ import java.util.Objects;
 import javax.swing.*;
 
 import docking.widgets.OptionDialog;
+import docking.widgets.button.GButton;
 import docking.widgets.filechooser.GhidraFileChooser;
 import docking.widgets.filechooser.GhidraFileChooserMode;
 import docking.widgets.table.*;
@@ -52,8 +53,7 @@ public class PathnameTablePanel extends JPanel {
 	private JButton addButton;
 	private JButton removeButton;
 	private JButton resetButton;
-	private GhidraFileChooser fileChooser;
-	private String preferenceForLastSelectedDir = Preferences.LAST_IMPORT_DIRECTORY;
+	private String preferenceForLastSelectedDir = Preferences.LAST_PATH_DIRECTORY;
 	private String title = "Select File";
 	private boolean allowMultiFileSelection;
 	private GhidraFileFilter filter;
@@ -157,24 +157,24 @@ public class PathnameTablePanel extends JPanel {
 
 	private void create() {
 
-		upButton = new JButton(Icons.UP_ICON);
+		upButton = new GButton(Icons.UP_ICON);
 		upButton.setName("UpArrow");
 		upButton.setToolTipText("Move the selected path up in list");
 		upButton.addActionListener(e -> up());
-		downButton = new JButton(Icons.DOWN_ICON);
+		downButton = new GButton(Icons.DOWN_ICON);
 		downButton.setName("DownArrow");
 		downButton.setToolTipText("Move the selected path down in list");
 		downButton.addActionListener(e -> down());
-		addButton = new JButton(Icons.ADD_ICON);
+		addButton = new GButton(Icons.ADD_ICON);
 		addButton.setName("AddPath");
 		addButton.setToolTipText("Display file chooser to select files to add");
 		addButton.addActionListener(e -> add());
-		removeButton = new JButton(Icons.DELETE_ICON);
+		removeButton = new GButton(Icons.DELETE_ICON);
 		removeButton.setName("RemovePath");
 		removeButton.setToolTipText("Remove selected path(s) from list");
 		removeButton.addActionListener(e -> remove());
 
-		resetButton = new JButton(RESET_ICON);
+		resetButton = new GButton(RESET_ICON);
 		resetButton.setName("RefreshPaths");
 		resetButton.setToolTipText("Resets path list to the default values");
 		resetButton.addActionListener(e -> reset());
@@ -295,32 +295,28 @@ public class PathnameTablePanel extends JPanel {
 	}
 
 	private void add() {
-		if (fileChooser == null) {
-			fileChooser = new GhidraFileChooser(this);
-			fileChooser.setMultiSelectionEnabled(allowMultiFileSelection);
-			fileChooser.setFileSelectionMode(fileChooserMode);
-			fileChooser.setTitle(title);
-			fileChooser.setApproveButtonToolTipText(title);
-			if (filter != null) {
-				fileChooser.addFileFilter(new GhidraFileFilter() {
-					@Override
-					public String getDescription() {
-						return filter.getDescription();
-					}
 
-					@Override
-					public boolean accept(File f, GhidraFileChooserModel model) {
-						return filter.accept(f, model);
-					}
-				});
-			}
-			String dir = Preferences.getProperty(preferenceForLastSelectedDir);
-			if (dir != null) {
-				fileChooser.setCurrentDirectory(new File(dir));
-			}
+		GhidraFileChooser fileChooser = new GhidraFileChooser(this);
+		fileChooser.setMultiSelectionEnabled(allowMultiFileSelection);
+		fileChooser.setFileSelectionMode(fileChooserMode);
+		fileChooser.setTitle(title);
+		fileChooser.setApproveButtonToolTipText(title);
+		if (filter != null) {
+			fileChooser.addFileFilter(new GhidraFileFilter() {
+				@Override
+				public String getDescription() {
+					return filter.getDescription();
+				}
+
+				@Override
+				public boolean accept(File f, GhidraFileChooserModel model) {
+					return filter.accept(f, model);
+				}
+			});
 		}
-		else {
-			fileChooser.rescanCurrentDirectory();
+		String dir = Preferences.getProperty(preferenceForLastSelectedDir);
+		if (dir != null) {
+			fileChooser.setCurrentDirectory(new File(dir));
 		}
 
 		List<File> files = fileChooser.getSelectedFiles();
@@ -340,6 +336,8 @@ public class PathnameTablePanel extends JPanel {
 				Preferences.setProperty(preferenceForLastSelectedDir, paths[0]);
 			}
 		}
+
+		fileChooser.dispose();
 
 		tableModel.addPaths(paths, addToTop);
 	}

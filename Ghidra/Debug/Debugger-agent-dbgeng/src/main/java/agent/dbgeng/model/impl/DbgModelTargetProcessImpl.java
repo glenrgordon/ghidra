@@ -24,6 +24,7 @@ import agent.dbgeng.manager.*;
 import agent.dbgeng.manager.impl.DbgManagerImpl;
 import agent.dbgeng.model.iface1.DbgModelTargetFocusScope;
 import agent.dbgeng.model.iface2.*;
+import ghidra.dbg.DebuggerObjectModel.RefreshBehavior;
 import ghidra.dbg.target.*;
 import ghidra.dbg.target.TargetEventScope.TargetEventType;
 import ghidra.dbg.target.schema.*;
@@ -183,8 +184,6 @@ public class DbgModelTargetProcessImpl extends DbgModelTargetObjectImpl
 		switch (kind) {
 			case SKIP:
 				throw new UnsupportedOperationException(kind.name());
-			case ADVANCE: // Why no exec-advance in dbgeng?
-				throw new UnsupportedOperationException(kind.name());
 			default:
 				return model.gateFuture(process.step(convertToDbg(kind)));
 		}
@@ -265,9 +264,9 @@ public class DbgModelTargetProcessImpl extends DbgModelTargetObjectImpl
 	}
 
 	@Override
-	public CompletableFuture<Void> resync(boolean refreshAttributes, boolean refreshElements) {
+	public CompletableFuture<Void> resync(RefreshBehavior refreshAttributes, RefreshBehavior refreshElements) {
 		if (memory != null) {
-			memory.requestElements(true);
+			memory.requestElements(RefreshBehavior.REFRESH_ALWAYS);
 		}
 		return super.resync(refreshAttributes, refreshElements);
 	}

@@ -30,7 +30,6 @@ import utilities.util.reflection.ReflectionUtilities;
 public class ColorValue extends ThemeValue<Color> {
 	private static final String COLOR_ID_PREFIX = "color.";
 	private static final String EXTERNAL_PREFIX = "[color]";
-	private static final String SYSTEM_COLOR_PREFIX = "system.color";
 
 	public static final Color LAST_RESORT_DEFAULT = new Color(128, 128, 128);
 
@@ -61,14 +60,18 @@ public class ColorValue extends ThemeValue<Color> {
 		return outputId + " = " + getSerializedValue();
 	}
 
+	@Override
+	public boolean isExternal() {
+		return !id.startsWith(COLOR_ID_PREFIX);
+	}
+
 	/** 
 	 * Returns true if the given key string is a valid external key for a color value
 	 * @param key the key string to test
 	 * @return true if the given key string is a valid external key for a color value
 	 */
 	public static boolean isColorKey(String key) {
-		return key.startsWith(COLOR_ID_PREFIX) || key.startsWith(EXTERNAL_PREFIX) ||
-			key.startsWith(SYSTEM_COLOR_PREFIX);
+		return key.startsWith(COLOR_ID_PREFIX) || key.startsWith(EXTERNAL_PREFIX);
 	}
 
 	/**
@@ -93,7 +96,7 @@ public class ColorValue extends ThemeValue<Color> {
 	}
 
 	@Override
-	protected Color getUnresolvedReferenceValue(String id, String unresolvedId) {
+	protected Color getUnresolvedReferenceValue(String primaryId, String unresolvedId) {
 
 		Throwable t = ReflectionUtilities.createThrowableWithStackOlderThan();
 		StackTraceElement[] trace = t.getStackTrace();
@@ -102,15 +105,14 @@ public class ColorValue extends ThemeValue<Color> {
 				"Application", "ghidra.GhidraRun", "java.lang.Class", "java.lang.Thread");
 		t.setStackTrace(filtered);
 
-		Msg.error(this,
-			"Could not resolve indirect color path for \"" + unresolvedId +
-				"\" for primary id \"" + id + "\", using last resort default",
-			t);
+		Msg.error(this, "Could not resolve indirect color path for \"" + unresolvedId +
+			"\" for primary id \"" + primaryId + "\", using last resort default", t);
+
 		return LAST_RESORT_DEFAULT;
 	}
 
 	private static String toExternalId(String internalId) {
-		if (internalId.startsWith(COLOR_ID_PREFIX) || internalId.startsWith(SYSTEM_COLOR_PREFIX)) {
+		if (internalId.startsWith(COLOR_ID_PREFIX)) {
 			return internalId;
 		}
 		return EXTERNAL_PREFIX + internalId;

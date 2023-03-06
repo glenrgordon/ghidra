@@ -131,7 +131,8 @@ public class DBTraceObjectBreakpointSpec
 	@Override
 	public void setEnabled(boolean enabled) {
 		try (LockHold hold = object.getTrace().lockWrite()) {
-			object.setValue(getLifespan(), TargetBreakpointSpec.ENABLED_ATTRIBUTE_NAME, enabled);
+			object.setValue(getLifespan(), TargetBreakpointSpec.ENABLED_ATTRIBUTE_NAME,
+				enabled ? true : null);
 		}
 	}
 
@@ -191,6 +192,26 @@ public class DBTraceObjectBreakpointSpec
 	}
 
 	@Override
+	public void setEmuEnabled(boolean enabled) {
+		throw new UnsupportedOperationException("Set on a location instead");
+	}
+
+	@Override
+	public boolean isEmuEnabled(long snap) {
+		throw new UnsupportedOperationException("Ask a location instead");
+	}
+
+	@Override
+	public void setEmuSleigh(String sleigh) {
+		throw new UnsupportedOperationException("Set on a location instead");
+	}
+
+	@Override
+	public String getEmuSleigh() {
+		throw new UnsupportedOperationException("Ask a location instead");
+	}
+
+	@Override
 	public void delete() {
 		try (LockHold hold = object.getTrace().lockWrite()) {
 			object.removeTree(computeSpan());
@@ -205,9 +226,8 @@ public class DBTraceObjectBreakpointSpec
 	@Override
 	public Collection<? extends TraceObjectBreakpointLocation> getLocations() {
 		try (LockHold hold = object.getTrace().lockRead()) {
-			return object
-					.querySuccessorsInterface(getLifespan(), TraceObjectBreakpointLocation.class)
-					.collect(Collectors.toSet());
+			return object.querySuccessorsInterface(getLifespan(),
+				TraceObjectBreakpointLocation.class, true).collect(Collectors.toSet());
 		}
 	}
 

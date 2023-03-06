@@ -27,7 +27,7 @@ import ghidra.app.context.ProgramActionContext;
 import ghidra.app.services.GoToService;
 import ghidra.app.services.NavigationHistoryService;
 import ghidra.framework.data.DomainObjectAdapterDB;
-import ghidra.framework.model.Transaction;
+import ghidra.framework.model.TransactionInfo;
 import ghidra.framework.model.TransactionListener;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.program.model.listing.Program;
@@ -139,7 +139,6 @@ public abstract class AbstractUndoRedoAction extends DockingAction {
 		if (lastProgram != null) {
 			actionName += " " + lastProgram.getDomainFile().getName();
 			description = actionName;
-
 		}
 
 		if (canPerformAction(lastProgram)) {
@@ -147,7 +146,7 @@ public abstract class AbstractUndoRedoAction extends DockingAction {
 				getName() + " " + HTMLUtilities.escapeHTML(getUndoRedoDescription(lastProgram)));
 		}
 
-		getMenuBarData().setMenuItemName(actionName);
+		getMenuBarData().setMenuItemNamePlain(actionName);
 		setDescription(description);
 	}
 
@@ -162,7 +161,7 @@ public abstract class AbstractUndoRedoAction extends DockingAction {
 	private class ContextProgramTransactionListener implements TransactionListener {
 
 		@Override
-		public void transactionStarted(DomainObjectAdapterDB domainObj, Transaction tx) {
+		public void transactionStarted(DomainObjectAdapterDB domainObj, TransactionInfo tx) {
 			// don't care
 		}
 

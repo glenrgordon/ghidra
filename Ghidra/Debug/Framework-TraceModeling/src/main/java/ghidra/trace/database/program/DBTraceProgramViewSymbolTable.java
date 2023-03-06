@@ -16,8 +16,7 @@
 package ghidra.trace.database.program;
 
 import java.util.*;
-
-import com.google.common.collect.Iterators;
+import java.util.stream.StreamSupport;
 
 import generic.NestedIterator;
 import generic.util.PeekableIterator;
@@ -381,6 +380,11 @@ public class DBTraceProgramViewSymbolTable implements SymbolTable {
 	}
 
 	@Override
+	public SymbolIterator scanSymbolsByName(String startName) {
+		return new SymbolIteratorAdapter(symbolManager.allSymbols().scanByName(startName));
+	}
+
+	@Override
 	public int getNumSymbols() {
 		return symbolManager.allSymbols().size(true);
 	}
@@ -388,12 +392,12 @@ public class DBTraceProgramViewSymbolTable implements SymbolTable {
 	protected Iterator<? extends Symbol> getSymbolIteratorAtMySnap(
 			TraceSymbolWithLocationView<? extends TraceSymbol> view, AddressSetView asv,
 			boolean includeDynamicSymbols, boolean forward) {
-		Iterator<AddressRange> rit = asv.iterator(forward);
-		Iterator<Iterator<? extends Symbol>> iit = Iterators.transform(rit, range -> {
+		Spliterator<AddressRange> spliterator =
+			Spliterators.spliteratorUnknownSize(asv.iterator(forward), 0);
+		return StreamSupport.stream(spliterator, false).flatMap(range -> {
 			return view.getIntersecting(Lifespan.at(program.snap), null, range,
-				includeDynamicSymbols, forward).iterator();
-		});
-		return Iterators.concat(iit);
+				includeDynamicSymbols, forward).stream();
+		}).iterator();
 	}
 
 	@Override

@@ -174,17 +174,6 @@ public interface DebuggerResources {
 	Icon ICON_DIFF_PREV = new GIcon("icon.debugger.diff.previous");
 	Icon ICON_DIFF_NEXT = new GIcon("icon.debugger.diff.next");
 
-	Icon ICON_EDIT_MODE_READ_ONLY = new GIcon("icon.debugger.edit.mode.read.only");
-	Icon ICON_EDIT_MODE_WRITE_TARGET = new GIcon("icon.debugger.edit.mode.write.target");
-	Icon ICON_EDIT_MODE_WRITE_TRACE = new GIcon("icon.debugger.edit.mode.write.trace");
-	Icon ICON_EDIT_MODE_WRITE_EMULATOR =
-		new GIcon("icon.debugger.edit.mode.write.emulator");
-
-	String NAME_EDIT_MODE_READ_ONLY = "Control Target w/ Edits Disabled";
-	String NAME_EDIT_MODE_WRITE_TARGET = "Control Target";
-	String NAME_EDIT_MODE_WRITE_TRACE = "Control Trace";
-	String NAME_EDIT_MODE_WRITE_EMULATOR = "Control Emulator";
-
 	HelpLocation HELP_PACKAGE = new HelpLocation("Debugger", "package");
 
 	String HELP_ANCHOR_PLUGIN = "plugin";
@@ -273,52 +262,18 @@ public interface DebuggerResources {
 
 	String BOOKMARK_CATEGORY_MEMORY_READ_ERROR = "Debugger Memory Read Error";
 
-	String OPTION_NAME_COLORS_STALE_MEMORY = "Colors.Stale Memory";
-	GColor DEFAULT_COLOR_BACKGROUND_STALE = new GColor("color.bg.debugger.plugin.resources.stale");
-
-	String OPTION_NAME_COLORS_ERROR_MEMORY = "Colors.Error Memory";
-	Color DEFAULT_COLOR_BACKGROUND_ERROR = new GColor("color.bg.debugger.plugin.resources.error");
+	GColor COLOR_BACKGROUND_STALE = new GColor("color.bg.debugger.plugin.resources.stale");
+	Color COLOR_BACKGROUND_ERROR = new GColor("color.bg.debugger.plugin.resources.error");
 
 	int PRIORITY_REGISTER_MARKER = 10;
-	String OPTION_NAME_COLORS_TRACKING_MARKERS = "Colors.Tracking Markers";
-	Color DEFAULT_COLOR_REGISTER_MARKERS =
-		new GColor("color.debugger.plugin.resources.register.marker");
+	Color COLOR_REGISTER_MARKERS = new GColor("color.debugger.plugin.resources.register.marker");
 	Icon ICON_REGISTER_MARKER = new GIcon("icon.debugger.marker.register");
 
-	Icon ICON_EVENT_MARKER = new GIcon("icon.debugger.marker.event"); // TODO: Another icon?
-	// At least rename to "marker-arrow", and then have both ref it.
+	Icon ICON_EVENT_MARKER = new GIcon("icon.debugger.marker.event");
 
-	//@formatter:off
-	String OPTION_NAME_COLORS_REGISTER_STALE = "Colors.Stale Registers";
-	Color DEFAULT_COLOR_REGISTER_STALE = new GColor("color.debugger.plugin.resources.register.stale");
-	String OPTION_NAME_COLORS_REGISTER_STALE_SEL = "Colors.Stale Registers (selected)";
-	Color DEFAULT_COLOR_REGISTER_STALE_SEL = new GColor("color.debugger.plugin.resources.register.stale.selected");
-	String OPTION_NAME_COLORS_REGISTER_CHANGED = "Colors.Changed Registers";
-	Color DEFAULT_COLOR_REGISTER_CHANGED = new GColor("color.debugger.plugin.resources.register.changed");
-	String OPTION_NAME_COLORS_REGISTER_CHANGED_SEL = "Colors.Changed Registers (selected)";
-	Color DEFAULT_COLOR_REGISTER_CHANGED_SEL = new GColor("color.debugger.plugin.resources.register.changed.selected");
-	//@formatter:on
-
-	//@formatter:off
-	String OPTION_NAME_COLORS_WATCH_STALE = "Colors.Stale Watches";
-	Color DEFAULT_COLOR_WATCH_STALE = new GColor("color.debugger.plugin.resources.watch.stale");
-	String OPTION_NAME_COLORS_WATCH_STALE_SEL = "Colors.Stale Watches (selected)";
-	Color DEFAULT_COLOR_WATCH_STALE_SEL = new GColor("color.debugger.plugin.resources.watch.stale.selected");
-	String OPTION_NAME_COLORS_WATCH_CHANGED = "Colors.Changed Watches";
-	Color DEFAULT_COLOR_WATCH_CHANGED = new GColor("color.debugger.plugin.resources.watch.changed");
-	String OPTION_NAME_COLORS_WATCH_CHANGED_SEL = "Colors.Changed Watches (selected)";
-	Color DEFAULT_COLOR_WATCH_CHANGED_SEL = new GColor("color.debugger.plugin.resources.watch.changed.selected");
-	//@formatter:on
-
-	//@formatter:off	
-	String OPTION_NAME_COLORS_VALUE_CHANGED = "Colors.Changed Values";
-	Color DEFAULT_COLOR_VALUE_CHANGED = new GColor("color.debugger.plugin.resources.value.changed");
-	String OPTION_NAME_COLORS_VALUE_CHANGED_SEL = "Colors.Changed Values (selected)";
-	Color DEFAULT_COLOR_VALUE_CHANGED_SEL = new GColor("color.debugger.plugin.resources.value.changed.selected");
-	//@formatter:on
-
-	String OPTION_NAME_COLORS_PCODE_COUNTER = "Colors.Pcode Counter";
-	Color DEFAULT_COLOR_PCODE_COUNTER = new GColor("color.debugger.plugin.resources.pcode.counter");
+	Color COLOR_VALUE_CHANGED = new GColor("color.debugger.plugin.resources.value.changed");
+	Color COLOR_VALUE_CHANGED_SEL =
+		new GColor("color.debugger.plugin.resources.value.changed.selected");
 
 	String NAME_BREAKPOINT_MARKER_ENABLED = "Enabled Breakpoint";
 	String NAME_BREAKPOINT_MARKER_DISABLED = "Disabled Breakpoint";
@@ -354,17 +309,6 @@ public interface DebuggerResources {
 	Icon ICON_UNIQUE_REF_READ = new GIcon("icon.debugger.unique.ref.read"); // TODO
 	Icon ICON_UNIQUE_REF_WRITE = new GIcon("icon.debugger.unique.ref.write"); // TODO
 	Icon ICON_UNIQUE_REF_RW = new MultiIcon(ICON_UNIQUE_REF_READ, ICON_UNIQUE_REF_WRITE); // TODO
-
-	//@formatter:off
-	String OPTION_NAME_COLORS_ENABLED_BREAKPOINT_MARKERS = "Colors.Enabled Breakpoint Markers";
-	Color DEFAULT_COLOR_ENABLED_BREAKPOINT_MARKERS = new GColor("color.debugger.plugin.resources.breakpoint.marker.enabled");
-	String OPTION_NAME_COLORS_DISABLED_BREAKPOINT_MARKERS = "Colors.Disabled Breakpoint Markers";
-	Color DEFAULT_COLOR_DISABLED_BREAKPOINT_MARKERS = new GColor("color.debugger.plugin.resources.breakpoint.marker.disabled");
-	String OPTION_NAME_COLORS_INEFF_EN_BREAKPOINT_MARKERS = "Colors.Ineffective Enabled Breakpoint Markers";
-	Color DEFAULT_COLOR_INEFF_EN_BREAKPOINT_MARKERS = new GColor("color.debugger.plugin.resources.breakpoint.marker.enabled.ineffective");
-	String OPTION_NAME_COLORS_INEFF_DIS_BREAKPOINT_MARKERS = "Colors.Ineffective Disabled Breakpoint Markers";
-	Color DEFAULT_COLOR_INEFF_DIS_BREAKPOINT_MARKERS = new GColor("color.debugger.plugin.resources.breakpoint.marker.disabled.ineffective");
-	//@formatter:on
 
 	String OPTION_NAME_COLORS_ENABLED_BREAKPOINT_COLORING_BACKGROUND =
 		"Colors.Enabled Breakpoint Markers Have Background";
@@ -464,7 +408,7 @@ public interface DebuggerResources {
 
 		public AbstractConnectAction(Plugin owner) {
 			super(NAME, owner.getName());
-			setDescription("Create a new connection to an debugging agent");
+			setDescription("Create a new connection to a debugging agent");
 			setHelpLocation(new HelpLocation(owner.getName(), HELP_ANCHOR));
 		}
 	}
@@ -528,65 +472,6 @@ public interface DebuggerResources {
 					.menuIcon(offer.getIcon())
 					.menuGroup(GROUP)
 					.helpLocation(new HelpLocation(helpOwner.getName(), HELP_ANCHOR));
-		}
-	}
-
-	interface EmulateProgramAction {
-		String NAME = "Emulate Program in new Trace";
-		String DESCRIPTION = "Emulate the current program in a new trace starting at the cursor";
-		Icon ICON = ICON_EMULATE;
-		String GROUP = GROUP_GENERAL;
-		String HELP_ANCHOR = "emulate_program";
-
-		static ActionBuilder builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new ActionBuilder(NAME, ownerName)
-					.description(DESCRIPTION)
-					.toolBarIcon(ICON)
-					.toolBarGroup(GROUP)
-					.menuPath(DebuggerPluginPackage.NAME, NAME)
-					.menuIcon(ICON)
-					.menuGroup(GROUP)
-					.popupMenuPath(NAME)
-					.popupMenuIcon(ICON)
-					.popupMenuGroup(GROUP)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
-		}
-	}
-
-	interface EmulateAddThreadAction {
-		String NAME = "Add Emulated Thread to Trace";
-		String DESCRIPTION = "Add an emulated thread to the current trace starting here";
-		Icon ICON = ICON_THREAD;
-		String GROUP = GROUP_GENERAL;
-		String HELP_ANCHOR = "add_emulated_thread";
-
-		static ActionBuilder builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new ActionBuilder(NAME, ownerName)
-					.description(DESCRIPTION)
-					.menuPath(DebuggerPluginPackage.NAME, NAME)
-					.menuIcon(ICON)
-					.menuGroup(GROUP)
-					.popupMenuPath(NAME)
-					.popupMenuIcon(ICON)
-					.popupMenuGroup(GROUP)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
-		}
-	}
-
-	interface ConfigureEmulatorAction {
-		String NAME = "Configure Emulator";
-		String DESCRIPTION = "Choose and configure the current emulator";
-		String GROUP = GROUP_MAINTENANCE;
-		String HELP_ANCHOR = "configure_emulator";
-
-		static ToggleActionBuilder builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new ToggleActionBuilder(NAME, ownerName)
-					.description(DESCRIPTION)
-					.menuGroup(GROUP)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
 		}
 	}
 
@@ -1013,11 +898,13 @@ public interface DebuggerResources {
 
 		String NAME_VIS_RO_ONCE = "Read Visible Memory, RO Once";
 		String NAME_VISIBLE = "Read Visible Memory";
+		String NAME_LOAD_EMU = "Load Emulator from Programs";
 		String NAME_NONE = "Do Not Read Memory";
 
 		// TODO: Separate icon for each
 		Icon ICON_VIS_RO_ONCE = ICON_AUTOREAD;
 		Icon ICON_VISIBLE = ICON_AUTOREAD;
+		Icon ICON_LOAD_EMU = ICON_EMULATE;
 		Icon ICON_NONE = ICON_DELETE;
 
 		static <T> MultiStateActionBuilder<T> builder(Plugin owner) {
@@ -1705,23 +1592,6 @@ public interface DebuggerResources {
 		}
 	}
 
-	interface SeekTracePresentAction {
-		String NAME = "Seek Trace Present";
-		String DESCRIPTION = "Track the tool to the latest snap";
-		Icon ICON = ICON_SEEK_PRESENT;
-		String GROUP = "zz";
-		String HELP_ANCHOR = "seek_trace_present";
-
-		static ToggleActionBuilder builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new ToggleActionBuilder(NAME, ownerName)
-					.description(DESCRIPTION)
-					.toolBarIcon(ICON)
-					.toolBarGroup(GROUP)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
-		}
-	}
-
 	// TODO: Perhaps to reduce overloading of "snapshot" we should use "event" instead?
 	interface RenameSnapshotAction {
 		String NAME = "Rename Current Snapshot";
@@ -1742,33 +1612,17 @@ public interface DebuggerResources {
 		}
 	}
 
-	interface SynchronizeFocusAction {
-		String NAME = "Synchronize Focus";
+	interface SynchronizeTargetAction {
+		String NAME = "Synchronize Target Activation";
 		String DESCRIPTION = "Synchronize trace activation with debugger focus/select";
 		Icon ICON = ICON_SYNC;
-		String HELP_ANCHOR = "sync_focus";
+		String HELP_ANCHOR = "sync_target";
 
 		static ToggleActionBuilder builder(Plugin owner) {
 			String ownerName = owner.getName();
 			return new ToggleActionBuilder(NAME, ownerName).description(DESCRIPTION)
 					.menuPath(NAME)
 					.menuIcon(ICON)
-					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
-		}
-	}
-
-	interface GoToTimeAction {
-		String NAME = "Go To Time";
-		String DESCRIPTION = "Go to a specific time, optionally using emulation";
-		Icon ICON = ICON_TIME;
-		String HELP_ANCHOR = "goto_time";
-
-		static ActionBuilder builder(Plugin owner) {
-			String ownerName = owner.getName();
-			return new ActionBuilder(NAME, ownerName).description(DESCRIPTION)
-					.menuPath(NAME)
-					.menuIcon(ICON)
-					.keyBinding("CTRL SHIFT T")
 					.helpLocation(new HelpLocation(ownerName, HELP_ANCHOR));
 		}
 	}

@@ -24,16 +24,16 @@ import org.apache.commons.collections4.bidimap.DualHashBidiMap;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 
+import db.Transaction;
 import ghidra.dbg.DebuggerObjectModel;
 import ghidra.dbg.attributes.TargetDataType;
+import ghidra.dbg.target.*;
 import ghidra.dbg.target.TargetAttacher.TargetAttachKind;
 import ghidra.dbg.target.TargetAttacher.TargetAttachKindSet;
 import ghidra.dbg.target.TargetBreakpointSpec.TargetBreakpointKind;
 import ghidra.dbg.target.TargetBreakpointSpecContainer.TargetBreakpointKindSet;
 import ghidra.dbg.target.TargetExecutionStateful.TargetExecutionState;
-import ghidra.dbg.target.TargetFocusScope;
 import ghidra.dbg.target.TargetMethod.TargetParameterMap;
-import ghidra.dbg.target.TargetObject;
 import ghidra.dbg.target.TargetSteppable.TargetStepKind;
 import ghidra.dbg.target.TargetSteppable.TargetStepKindSet;
 import ghidra.dbg.target.schema.TargetObjectSchema;
@@ -46,13 +46,13 @@ import ghidra.trace.model.target.*;
 import ghidra.trace.model.thread.TraceObjectThread;
 import ghidra.trace.model.thread.TraceThread;
 import ghidra.util.Msg;
-import ghidra.util.database.UndoableTransaction;
 import utilities.util.IDKeyed;
 
 class ObjectRecorder {
 	protected final ObjectBasedTraceRecorder recorder;
 	protected final TraceObjectManager objectManager;
 	protected final boolean isSupportsFocus;
+	protected final boolean isSupportsActivation;
 
 	private final BidiMap<IDKeyed<TargetObject>, IDKeyed<TraceObject>> objectMap =
 		new DualHashBidiMap<>();
@@ -62,9 +62,9 @@ class ObjectRecorder {
 		this.objectManager = recorder.trace.getObjectManager();
 		TargetObjectSchema schema = recorder.target.getSchema();
 		this.isSupportsFocus = !schema.searchFor(TargetFocusScope.class, false).isEmpty();
+		this.isSupportsActivation = !schema.searchFor(TargetActiveScope.class, false).isEmpty();
 
-		try (UndoableTransaction tid =
-			UndoableTransaction.start(recorder.trace, "Create root")) {
+		try (Transaction tx = recorder.trace.openTransaction("Create root")) {
 			objectManager.createRootObject(schema);
 		}
 	}
@@ -313,13 +313,14 @@ class ObjectRecorder {
 	}
 
 	protected <T extends TargetObject> List<T> collectTargetSuccessors(TargetObject targetSeed,
-			Class<T> targetIf) {
+			Class<T> targetIf, boolean requireCanonical) {
 		// TODO: Should this really go through the database?
 		TraceObject seed = toTrace(targetSeed);
 		if (seed == null) {
 			return List.of();
 		}
-		return seed.querySuccessorsTargetInterface(Lifespan.at(recorder.getSnap()), targetIf)
+		return seed.querySuccessorsTargetInterface(Lifespan.at(recorder.getSnap()), targetIf,
+			requireCanonical)
 				.map(p -> toTarget(p.getDestination(seed)).as(targetIf))
 				.collect(Collectors.toList());
 	}

@@ -102,17 +102,11 @@ public abstract class AbstractGCellRenderer extends GDHtmlLabel {
 	 * @param row The row being rendered.
 	 * @return the color
 	 */
-	protected Color getOSDependentBackgroundColor(JComponent parent, int row) {
+	protected Color getAlternatingBackgroundColor(JComponent parent, int row) {
 
 		if (!shouldAlternateRowBackgroundColor()) {
 			return getDefaultBackgroundColor();
 		}
-
-// For now we always alternate row colors--it actually makes the various LaFs look nicer
-// Leaving the above call in the code so that it can be later found by reference
-//		if (!DockingWindowsLookAndFeelUtils.isUsingAquaUI(parent.getUI())) {
-//			return parent.getBackground();
-//		}
 
 		return getBackgroundColorForRow(row);
 	}
@@ -151,11 +145,11 @@ public abstract class AbstractGCellRenderer extends GDHtmlLabel {
 		return defaultFont;
 	}
 
-	protected Font getFixedWidthFont() {
+	public Font getFixedWidthFont() {
 		return fixedWidthFont;
 	}
 
-	protected Font getBoldFont() {
+	public Font getBoldFont() {
 		return boldFont;
 	}
 
@@ -274,9 +268,9 @@ public abstract class AbstractGCellRenderer extends GDHtmlLabel {
 	/**
 	 * Overrides this method to ensure that the new foreground color is not
 	 * a {@link GColorUIResource}. Some Look and Feels will ignore color values that extend
-	 * {@link UIResource}, choosing instead their own custom painting behavior. By not using a 
+	 * {@link UIResource}, choosing instead their own custom painting behavior. By not using a
 	 * UIResource, we prevent the Look and Feel from overriding this renderer's color value.
-	 *  
+	 *
 	 * @param fg the new foreground color
 	 */
 	@Override
@@ -287,9 +281,9 @@ public abstract class AbstractGCellRenderer extends GDHtmlLabel {
 	/**
 	 * Overrides this method to ensure that the new background color is not
 	 * a {@link GColorUIResource}. Some Look and Feels will ignore color values that extend
-	 * {@link UIResource}, choosing instead their own custom painting behavior. By not using a 
+	 * {@link UIResource}, choosing instead their own custom painting behavior. By not using a
 	 * UIResource, we prevent the Look and Feel from overriding this renderer's color value.
-	 * 
+	 *
 	 * @param bg the new background color
 	 */
 	@Override

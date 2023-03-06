@@ -65,7 +65,6 @@ class FileActionManager {
 	private DockingAction saveAction;
 
 	private List<ViewInfo> reopenList;
-	private GhidraFileChooser fileChooser;
 
 	private boolean firingProjectOpened;
 
@@ -238,19 +237,16 @@ class FileActionManager {
 		if (activeProject != null) {
 			currentProjectLocator = activeProject.getProjectLocator();
 		}
-		if (fileChooser == null) {
-			fileChooser = plugin.createFileChooser(LAST_SELECTED_PROJECT_DIRECTORY);
-		}
 
+		GhidraFileChooser fileChooser = plugin.createFileChooser(LAST_SELECTED_PROJECT_DIRECTORY);
 		ProjectLocator projectLocator =
 			plugin.chooseProject(fileChooser, "Open", LAST_SELECTED_PROJECT_DIRECTORY);
 		if (projectLocator != null) {
-
 			if (!doOpenProject(projectLocator) && currentProjectLocator != null) {
 				doOpenProject(currentProjectLocator);
 			}
-
 		}
+		fileChooser.dispose();
 	}
 
 	private class OpenTaskRunnable implements Runnable {
@@ -374,7 +370,7 @@ class FileActionManager {
 				buf.append("The File " + files.get(lastIndex).getPathname() +
 					" is currently being modified by the\n");
 				buf.append("the following actions:\n \n");
-				Transaction t = udo.getCurrentTransaction();
+				TransactionInfo t = udo.getCurrentTransactionInfo();
 				List<String> list = t.getOpenSubTransactions();
 				Iterator<String> it = list.iterator();
 				while (it.hasNext()) {
@@ -579,11 +575,11 @@ class FileActionManager {
 	 * menu listener for File | Delete Project...
 	 */
 	private void deleteProject() {
-		if (fileChooser == null) {
-			fileChooser = plugin.createFileChooser(LAST_SELECTED_PROJECT_DIRECTORY);
-		}
+
+		GhidraFileChooser fileChooser = plugin.createFileChooser(LAST_SELECTED_PROJECT_DIRECTORY);
 		ProjectLocator projectLocator =
 			plugin.chooseProject(fileChooser, "Delete", LAST_SELECTED_PROJECT_DIRECTORY);
+		fileChooser.dispose();
 		if (projectLocator == null) {
 			return; // user canceled
 		}
@@ -603,7 +599,7 @@ class FileActionManager {
 		confirmMsg.append(" ?\n");
 		boolean isActiveProject =
 			(activeProject != null && activeProject.getProjectLocator().equals(projectLocator));
-		// also give special warning if we open this project as read-only voew
+		// also give special warning if we open this project as read-only view
 		boolean isOpenProjectView = isOpenProjectView(projectLocator);
 
 		if (!allowDelete(isActiveProject ? activeProject : null)) {

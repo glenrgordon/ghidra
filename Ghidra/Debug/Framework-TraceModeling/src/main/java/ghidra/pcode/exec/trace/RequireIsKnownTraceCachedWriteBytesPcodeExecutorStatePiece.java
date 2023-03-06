@@ -34,6 +34,17 @@ public class RequireIsKnownTraceCachedWriteBytesPcodeExecutorStatePiece
 		super(data);
 	}
 
+	protected RequireIsKnownTraceCachedWriteBytesPcodeExecutorStatePiece(PcodeTraceDataAccess data,
+			AbstractSpaceMap<CachedSpace> spaceMap) {
+		super(data, spaceMap);
+	}
+
+	@Override
+	public RequireIsKnownTraceCachedWriteBytesPcodeExecutorStatePiece fork() {
+		return new RequireIsKnownTraceCachedWriteBytesPcodeExecutorStatePiece(data,
+			spaceMap.fork());
+	}
+
 	/**
 	 * Construct a piece
 	 * 

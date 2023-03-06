@@ -31,6 +31,7 @@ import javax.swing.table.TableColumnModel;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
+import db.Transaction;
 import docking.*;
 import docking.action.*;
 import docking.action.builder.ActionBuilder;
@@ -46,7 +47,7 @@ import ghidra.app.plugin.core.debug.gui.DebuggerProvider;
 import ghidra.app.plugin.core.debug.gui.DebuggerResources;
 import ghidra.app.plugin.core.debug.mapping.DebuggerRegisterMapper;
 import ghidra.app.services.*;
-import ghidra.app.services.DebuggerStateEditingService.StateEditor;
+import ghidra.app.services.DebuggerControlService.StateEditor;
 import ghidra.async.AsyncLazyValue;
 import ghidra.async.AsyncUtils;
 import ghidra.base.widgets.table.DataTypeTableCellEditor;
@@ -58,7 +59,6 @@ import ghidra.framework.model.DomainObject;
 import ghidra.framework.model.DomainObjectChangeRecord;
 import ghidra.framework.options.AutoOptions;
 import ghidra.framework.options.SaveState;
-import ghidra.framework.options.annotation.*;
 import ghidra.framework.plugintool.*;
 import ghidra.framework.plugintool.annotation.AutoServiceConsumed;
 import ghidra.program.model.address.*;
@@ -79,7 +79,6 @@ import ghidra.trace.util.TraceRegisterUtils;
 import ghidra.util.*;
 import ghidra.util.classfinder.ClassSearcher;
 import ghidra.util.data.DataTypeParser.AllowedDataTypes;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.table.GhidraTable;
 import ghidra.util.table.GhidraTableFilterPanel;
@@ -87,6 +86,17 @@ import ghidra.util.task.TaskMonitor;
 
 public class DebuggerRegistersProvider extends ComponentProviderAdapter
 		implements DebuggerProvider, PopupActionProvider {
+	private static final GColor COLOR_BORDER_DISCONNECTED =
+		new GColor("color.border.provider.disconnected");
+	private static final Color COLOR_FOREGROUND_STALE =
+		new GColor("color.debugger.plugin.resources.register.stale");
+	private static final Color COLOR_FOREGROUND_STALE_SEL =
+		new GColor("color.debugger.plugin.resources.register.stale.selected");
+	private static final Color COLOR_FOREGROUND_CHANGED =
+		new GColor("color.debugger.plugin.resources.register.changed");
+	private static final Color COLOR_FOREGROUND_CHANGED_SEL =
+		new GColor("color.debugger.plugin.resources.register.changed.selected");
+
 	private static final String KEY_DEBUGGER_COORDINATES = "DebuggerCoordinates";
 
 	interface ClearRegisterType {
@@ -398,18 +408,18 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 			RegisterRow row = (RegisterRow) data.getRowObject();
 			if (!row.isKnown()) {
 				if (data.isSelected()) {
-					setForeground(registerStaleSelColor);
+					setForeground(COLOR_FOREGROUND_STALE_SEL);
 				}
 				else {
-					setForeground(registerStaleColor);
+					setForeground(COLOR_FOREGROUND_STALE);
 				}
 			}
 			else if (row.isChanged()) {
 				if (data.isSelected()) {
-					setForeground(registerChangesSelColor);
+					setForeground(COLOR_FOREGROUND_CHANGED_SEL);
 				}
 				else {
-					setForeground(registerChangesColor);
+					setForeground(COLOR_FOREGROUND_CHANGED);
 				}
 			}
 			return this;
@@ -440,8 +450,7 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 			if (dataType == null) {
 				return null;
 			}
-			try (UndoableTransaction tid =
-				UndoableTransaction.start(currentTrace, "Resolve DataType")) {
+			try (Transaction tx = currentTrace.openTransaction("Resolve DataType")) {
 				return currentTrace.getDataTypeManager().resolve(dataType, null);
 			}
 		}
@@ -466,28 +475,11 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 	@AutoServiceConsumed
 	private DebuggerListingService listingService;
 	@AutoServiceConsumed
-	private DebuggerStateEditingService editingService;
+	private DebuggerControlService controlService;
 	@AutoServiceConsumed
 	private MarkerService markerService; // TODO: Mark address types (separate plugin?)
 	@SuppressWarnings("unused")
 	private final AutoService.Wiring autoServiceWiring;
-
-	@AutoOptionDefined(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_STALE, //
-			description = "Text color for registers whose value is not known", //
-			help = @HelpInfo(anchor = "colors"))
-	protected Color registerStaleColor = DebuggerResources.DEFAULT_COLOR_REGISTER_STALE;
-	@AutoOptionDefined(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_STALE_SEL, //
-			description = "Selected text color for registers whose value is not known", //
-			help = @HelpInfo(anchor = "colors"))
-	protected Color registerStaleSelColor = DebuggerResources.DEFAULT_COLOR_REGISTER_STALE_SEL;
-	@AutoOptionDefined(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_CHANGED, //
-			description = "Text color for registers whose value just changed", //
-			help = @HelpInfo(anchor = "colors"))
-	protected Color registerChangesColor = DebuggerResources.DEFAULT_COLOR_REGISTER_CHANGED;
-	@AutoOptionDefined(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_CHANGED_SEL, //
-			description = "Selected text color for registers whose value just changed", //
-			help = @HelpInfo(anchor = "colors"))
-	protected Color registerChangesSelColor = DebuggerResources.DEFAULT_COLOR_REGISTER_CHANGED_SEL;
 
 	@SuppressWarnings("unused")
 	private final AutoOptions.Wiring autoOptionsWiring;
@@ -546,8 +538,7 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 			setTitle("[" + DebuggerResources.TITLE_PROVIDER_REGISTERS + "]");
 			setWindowGroup("Debugger.Core.disconnected");
 			setIntraGroupPosition(WindowPosition.STACK);
-			mainPanel.setBorder(BorderFactory
-					.createLineBorder(new GColor("color.border.provider.disconnected"), 2));
+			mainPanel.setBorder(BorderFactory.createLineBorder(COLOR_BORDER_DISCONNECTED, 2));
 			setTransient();
 		}
 		else {
@@ -561,6 +552,8 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 
 	@Override
 	public void removeFromTool() {
+		availableRegsDialog.dispose();
+
 		plugin.providerRemoved(this);
 		plugin.getTool().removePopupActionProvider(this);
 		super.removeFromTool();
@@ -853,10 +846,10 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 		if (!isEditsEnabled()) {
 			return false;
 		}
-		if (editingService == null) {
+		if (controlService == null) {
 			return false;
 		}
-		StateEditor editor = editingService.createStateEditor(current);
+		StateEditor editor = controlService.createStateEditor(current);
 		return editor.isRegisterEditable(register);
 	}
 
@@ -874,11 +867,11 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 	}
 
 	void writeRegisterValue(RegisterValue rv) {
-		if (editingService == null) {
-			Msg.showError(this, getComponent(), "Edit Register", "No editing service.");
+		if (controlService == null) {
+			Msg.showError(this, getComponent(), "Edit Register", "No control service.");
 			return;
 		}
-		StateEditor editor = editingService.createStateEditor(current);
+		StateEditor editor = controlService.createStateEditor(current);
 		if (!editor.isRegisterEditable(rv.getRegister())) {
 			Msg.showError(this, getComponent(), "Edit Register",
 				"Neither the register nor any parent can be edited.");
@@ -908,8 +901,7 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 	 * register and modify it.... Well, that works until you consider changes in time....
 	 */
 	void writeRegisterDataType(Register register, DataType dataType) {
-		try (UndoableTransaction tid =
-			UndoableTransaction.start(current.getTrace(), "Edit Register Type")) {
+		try (Transaction tx = current.getTrace().openTransaction("Edit Register Type")) {
 			if (dataType instanceof Pointer ptrType && register.getAddress().isRegisterAddress()) {
 				// Because we're about to use the size, resolve it first
 				ptrType = (Pointer) current.getTrace()
@@ -1010,8 +1002,8 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 	void prepareRegisterSpace() {
 		if (current.getThread() != null &&
 			current.getTrace().getObjectManager().getRootSchema() != null) {
-			try (UndoableTransaction tid =
-				UndoableTransaction.start(current.getTrace(), "Create/initialize register space")) {
+			try (Transaction tx =
+				current.getTrace().openTransaction("Create/initialize register space")) {
 				getRegisterMemorySpace(true);
 			}
 		}
@@ -1304,8 +1296,9 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 			return AsyncUtils.NIL;
 		}
 		toRead.retainAll(regMapper.getRegistersOnTarget());
-		TargetRegisterBank bank = recorder.getTargetRegisterBank(traceThread, current.getFrame());
-		if (bank == null || !bank.isValid()) {
+		Set<TargetRegisterBank> banks =
+			recorder.getTargetRegisterBanks(traceThread, current.getFrame());
+		if (banks == null || banks.isEmpty()) {
 			Msg.error(this, "Current frame's bank does not exist");
 			return AsyncUtils.NIL;
 		}
@@ -1328,10 +1321,10 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 		if (recorder.getSnap() != current.getSnap()) {
 			return AsyncUtils.NIL;
 		}
-		if (current.getFrame() == 0) {
-			// Should have been pushed by model. non-zero frames are poll-only
-			return AsyncUtils.NIL;
-		}
+//		if (current.getFrame() == 0) {
+//			// Should have been pushed by model. non-zero frames are poll-only
+//			return AsyncUtils.NIL;
+//		}
 		TraceThread traceThread = current.getThread();
 		TargetThread targetThread = recorder.getTargetThread(traceThread);
 		if (targetThread == null) {
@@ -1349,44 +1342,11 @@ public class DebuggerRegistersProvider extends ComponentProviderAdapter
 		}
 		return future.exceptionally(ex -> {
 			ex = AsyncUtils.unwrapThrowable(ex);
-			if (ex instanceof DebuggerModelAccessException) {
-				String msg =
-					"Could not read target registers for selected thread: " + ex.getMessage();
-				Msg.info(this, msg);
-				plugin.getTool().setStatusInfo(msg);
-			}
-			else {
-				Msg.showError(this, getComponent(), "Read Target Registers",
-					"Could not read target registers for selected thread", ex);
-			}
+			String msg = "Could not read target registers for selected thread: " + ex.getMessage();
+			Msg.info(this, msg);
+			plugin.getTool().setStatusInfo(msg);
 			return ExceptionUtils.rethrow(ex);
 		}).thenApply(__ -> null);
-	}
-
-	private void repaintTable() {
-		if (regsTable != null) {
-			regsTable.repaint();
-		}
-	}
-
-	@AutoOptionConsumed(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_STALE)
-	private void setRegisterStaleColor(Color color) {
-		repaintTable();
-	}
-
-	@AutoOptionConsumed(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_STALE_SEL)
-	private void setRegisterStaleSelColor(Color color) {
-		repaintTable();
-	}
-
-	@AutoOptionConsumed(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_CHANGED)
-	private void setRegisterChangesColor(Color color) {
-		repaintTable();
-	}
-
-	@AutoOptionConsumed(name = DebuggerResources.OPTION_NAME_COLORS_REGISTER_CHANGED_SEL)
-	private void setRegisterChangesSelColor(Color color) {
-		repaintTable();
 	}
 
 	protected String formatAddressInfo(Address address) {

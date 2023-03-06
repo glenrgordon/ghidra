@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import org.junit.*;
 
+import db.Transaction;
 import generic.Unique;
 import ghidra.app.plugin.core.codebrowser.CodeBrowserPlugin;
 import ghidra.app.plugin.core.codebrowser.CodeViewerProvider;
@@ -32,10 +33,9 @@ import ghidra.app.plugin.core.debug.gui.listing.DebuggerListingPlugin;
 import ghidra.app.plugin.core.debug.gui.listing.DebuggerListingProvider;
 import ghidra.app.plugin.core.debug.gui.register.*;
 import ghidra.app.plugin.core.debug.gui.watch.DebuggerWatchesProvider.WatchDataSettingsDialog;
-import ghidra.app.plugin.core.debug.service.editing.DebuggerStateEditingServicePlugin;
+import ghidra.app.plugin.core.debug.service.control.DebuggerControlServicePlugin;
 import ghidra.app.plugin.core.debug.service.modules.DebuggerStaticMappingServicePlugin;
 import ghidra.app.services.*;
-import ghidra.app.services.DebuggerStateEditingService.StateEditingMode;
 import ghidra.dbg.model.TestTargetRegisterBankInThread;
 import ghidra.docking.settings.FormatSettingsDefinition;
 import ghidra.docking.settings.Settings;
@@ -54,7 +54,6 @@ import ghidra.trace.model.memory.*;
 import ghidra.trace.model.thread.TraceThread;
 import ghidra.trace.util.TraceRegisterUtils;
 import ghidra.util.Msg;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.task.TaskMonitor;
 
 public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUITest {
@@ -72,7 +71,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	protected DebuggerListingProvider listingProvider;
 	protected DebuggerStaticMappingServicePlugin mappingService;
 	protected CodeViewerProvider codeViewerProvider;
-	protected DebuggerStateEditingService editingService;
+	protected DebuggerControlService editingService;
 
 	protected Register r0;
 	protected Register r1;
@@ -92,12 +91,12 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		listingPlugin = addPlugin(tool, DebuggerListingPlugin.class);
 		listingProvider = waitForComponentProvider(DebuggerListingProvider.class);
 		mappingService = addPlugin(tool, DebuggerStaticMappingServicePlugin.class);
-		editingService = addPlugin(tool, DebuggerStateEditingServicePlugin.class);
+		editingService = addPlugin(tool, DebuggerControlServicePlugin.class);
 
 		createTrace();
 		r0 = tb.language.getRegister("r0");
 		r1 = tb.language.getRegister("r1");
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			thread = tb.getOrAddThread("Thread1", 0);
 		}
 	}
@@ -113,7 +112,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	}
 
 	private void setRegisterValues(TraceThread thread) {
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceMemorySpace regVals =
 				tb.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 			regVals.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x00400000)));
@@ -298,7 +297,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	}
 
 	@Test
-	public void testLiveCausesReads() throws Exception {
+	public void testLiveCausesReads() throws Throwable {
 		createTestModel();
 		mb.createTestProcessesAndThreads();
 		bank = mb.testThread1.addRegisterBank();
@@ -312,6 +311,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 		recorder = modelService.recordTarget(mb.testProcess1,
 			createTargetTraceMapper(mb.testProcess1), ActionSource.AUTOMATIC);
+		waitRecorder(recorder);
 		Trace trace = recorder.getTrace();
 		TraceThread thread = waitForValue(() -> recorder.getTraceThread(mb.testThread1));
 
@@ -350,7 +350,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		assertFalse(row.isRawValueEditable());
 		traceManager.openTrace(tb.trace);
 		traceManager.activateThread(thread);
-		editingService.setCurrentMode(tb.trace, StateEditingMode.WRITE_EMULATOR);
+		editingService.setCurrentMode(tb.trace, ControlMode.RW_EMULATOR);
 		waitForWatches();
 
 		assertNoErr(row);
@@ -384,7 +384,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 		traceManager.openTrace(tb.trace);
 		traceManager.activateThread(thread);
-		editingService.setCurrentMode(tb.trace, StateEditingMode.WRITE_EMULATOR);
+		editingService.setCurrentMode(tb.trace, ControlMode.RW_EMULATOR);
 		waitForWatches();
 
 		performAction(watchesProvider.actionEnableEdits);
@@ -547,7 +547,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 		traceManager.openTrace(trace);
 		traceManager.activateThread(thread);
-		editingService.setCurrentMode(trace, StateEditingMode.WRITE_TARGET);
+		editingService.setCurrentMode(trace, ControlMode.RW_TARGET);
 		waitForSwing();
 
 		performAction(watchesProvider.actionAdd);
@@ -595,7 +595,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	}
 
 	protected void setupUnmappedDataSection() throws Throwable {
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceMemoryOperations mem = tb.trace.getMemoryManager();
 			mem.createRegion("Memory[bin:.data]", 0, tb.range(0x00600000, 0x0060ffff),
 				TraceMemoryFlag.READ, TraceMemoryFlag.WRITE);
@@ -612,7 +612,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		intoProject(tb.trace);
 		intoProject(program);
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceMemoryOperations mem = tb.trace.getMemoryManager();
 			mem.createRegion("Memory[bin:.data]", 0, tb.range(0x55750000, 0x5575ffff),
 				TraceMemoryFlag.READ, TraceMemoryFlag.WRITE);
@@ -624,7 +624,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		programManager.openProgram(program);
 
 		AddressSpace stSpace = program.getAddressFactory().getDefaultAddressSpace();
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Add block")) {
+		try (Transaction tx = program.openTransaction("Add block")) {
 			Memory mem = program.getMemory();
 			mem.createInitializedBlock(".data", tb.addr(stSpace, 0x00600000), 0x10000,
 				(byte) 0, TaskMonitor.DUMMY, false);
@@ -633,7 +633,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		DefaultTraceLocation tloc =
 			new DefaultTraceLocation(tb.trace, null, Lifespan.nowOn(0), tb.addr(0x55750000));
 		ProgramLocation ploc = new ProgramLocation(program, tb.addr(stSpace, 0x00600000));
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			mappingService.addMapping(tloc, ploc, 0x10000, false);
 		}
 		waitForValue(() -> mappingService.getOpenMappedLocation(tloc));
@@ -681,7 +681,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		structDt.add(DWordDataType.dataType, "field0", "");
 		structDt.add(DWordDataType.dataType, "field4", "");
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			tb.trace.getCodeManager()
 					.definedData()
 					.create(Lifespan.nowOn(0), tb.addr(0x00600000), structDt);
@@ -705,7 +705,7 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		structDt.add(DWordDataType.dataType, "field0", "");
 		structDt.add(DWordDataType.dataType, "field4", "");
 
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Add data")) {
+		try (Transaction tx = program.openTransaction("Add data")) {
 			program.getListing().createData(tb.addr(stSpace, 0x00600000), structDt);
 		}
 
@@ -746,11 +746,11 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		setupMappedDataSection();
 
 		Symbol symbol;
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Add symbol")) {
+		try (Transaction tx = program.openTransaction("Add symbol")) {
 			symbol = program.getSymbolTable()
 					.createLabel(tb.addr(0x00601234), "my_symbol", SourceType.USER_DEFINED);
 		}
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceMemorySpace regVals =
 				tb.trace.getMemoryManager().getMemoryRegisterSpace(thread, true);
 			regVals.setValue(0, new RegisterValue(r0, BigInteger.valueOf(0x55751234)));
@@ -802,5 +802,19 @@ public class DebuggerWatchesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		WatchRow rRow0 = rows.get("r0");
 		assertTrue(LongLongDataType.dataType.isEquivalent(rRow0.getDataType()));
 		assertEquals(FormatSettingsDefinition.DECIMAL, format.getChoice(rRow0.getSettings()));
+	}
+
+	@Test
+	public void testTraceClosure() throws Throwable {
+		setRegisterValues(thread);
+		watchesProvider.addWatch("r0");
+		watchesProvider.addWatch("*:8 r0");
+
+		traceManager.openTrace(tb.trace);
+		waitForSwing();
+
+		tb.close();
+		traceManager.activateThread(thread);
+		traceManager.closeTrace(tb.trace);
 	}
 }

@@ -27,7 +27,8 @@ import javax.swing.*;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
-import docking.DialogComponentProvider;
+import db.Transaction;
+import docking.ReusableDialogComponentProvider;
 import docking.widgets.table.*;
 import docking.widgets.table.DefaultEnumeratedColumnTableModel.EnumeratedTableColumn;
 import ghidra.app.plugin.core.debug.DebuggerCoordinates;
@@ -47,12 +48,11 @@ import ghidra.trace.model.memory.TraceMemoryRegion;
 import ghidra.trace.model.modules.*;
 import ghidra.trace.model.program.TraceProgramView;
 import ghidra.util.*;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.table.GhidraTableFilterPanel;
 import ghidra.util.task.*;
 
-public class DebuggerCopyIntoProgramDialog extends DialogComponentProvider {
+public class DebuggerCopyIntoProgramDialog extends ReusableDialogComponentProvider {
 	static final int GAP = 5;
 	static final int BUTTON_SIZE = 32;
 
@@ -831,7 +831,7 @@ public class DebuggerCopyIntoProgramDialog extends DialogComponentProvider {
 		Program dest = getDestination().getOrCreateProgram(source, this);
 		boolean doRelease = !Arrays.asList(programManager.getAllOpenPrograms()).contains(dest);
 		TraceRecorder recorder = getRecorderIfEnabledAndReadsPresent();
-		try (UndoableTransaction tid = UndoableTransaction.start(dest, "Copy From Trace")) {
+		try (Transaction tx = dest.openTransaction("Copy From Trace")) {
 			monitor.initialize(tableModel.getRowCount());
 			for (RangeEntry entry : tableModel.getModelData()) {
 				monitor.setMessage("Copying into " + entry.getDstRange());

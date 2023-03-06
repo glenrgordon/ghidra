@@ -179,14 +179,17 @@ public class SearchTextPlugin extends ProgramPlugin implements OptionsChangeList
 
 		navigatable = null;
 
-		if (searchDialog != null && searchDialog.isVisible()) {
-			TaskMonitor taskMonitor = searchDialog.getTaskMonitorComponent();
-			taskMonitor.cancel();
-			searchDialog.dispose();
+		if (searchDialog != null) {
 
-			if (searchAllTaskMonitor != null) {
-				searchAllTaskMonitor.cancel();
+			if (searchDialog.isVisible()) {
+				TaskMonitor taskMonitor = searchDialog.getTaskMonitorComponent();
+				taskMonitor.cancel();
+				if (searchAllTaskMonitor != null) {
+					searchAllTaskMonitor.cancel();
+				}
 			}
+
+			searchDialog.dispose();
 		}
 
 		if (currentTask != null) {
@@ -562,7 +565,7 @@ public class SearchTextPlugin extends ProgramPlugin implements OptionsChangeList
 
 				Msg.showWarn(getClass(), getParentComponent(), "Search Limit Exceeded!",
 					"Stopped search after finding " + matchCount + " matches.\n" +
-						"The Search limit can be changed in the Edit->Options, under Tool Options");
+						"The search limit can be changed at Edit->Tool Options, under Search.");
 			}
 			// there was a suggestion that the dialog should not go way after a search all
 //			searchDialog.close();

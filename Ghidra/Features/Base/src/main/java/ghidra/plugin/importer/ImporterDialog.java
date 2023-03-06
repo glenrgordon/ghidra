@@ -62,8 +62,6 @@ import ghidra.util.task.TaskBuilder;
  */
 public class ImporterDialog extends DialogComponentProvider {
 
-	public static final String LAST_IMPORTFILE_PREFERENCE_KEY = "Importer.LastFile";
-
 	protected PluginTool tool;
 	private ProgramManager programManager;
 	protected FSRL fsrl;
@@ -75,7 +73,7 @@ public class ImporterDialog extends DialogComponentProvider {
 	private String suggestedDestinationPath;
 
 	protected ByteProvider byteProvider;
-	protected JTextField filenameTextField;
+	protected JTextField nameTextField;
 	private boolean userHasChangedName;
 	protected JButton folderButton;
 	protected JButton languageButton;
@@ -92,7 +90,7 @@ public class ImporterDialog extends DialogComponentProvider {
 	 * @param byteProvider the ByteProvider for getting the bytes from the file to be imported.  The
 	 *        dialog takes ownership of the ByteProvider and it will be closed when the dialog is closed
 	 * @param suggestedDestinationPath optional string path that will be pre-pended to the destination
-	 * filename.  Any path specified in the destination filename field will be created when
+	 * name.  Any path specified in the destination name field will be created when
 	 * the user performs the import (as opposed to the {@link #setDestinationFolder(DomainFolder) destination folder}
 	 * option which requires the DomainFolder to already exist). The two destination paths work together
 	 * to specify the final Ghidra project folder where the imported binary is placed.
@@ -118,7 +116,7 @@ public class ImporterDialog extends DialogComponentProvider {
 			// only save the imported file's path if its a local filesystem path that
 			// will be valid when used later.  FSRL paths that drill into container files
 			// aren't widely supported yet.
-			Preferences.setProperty(LAST_IMPORTFILE_PREFERENCE_KEY, fsrl.getPath());
+			Preferences.setProperty(Preferences.LAST_IMPORT_FILE, fsrl.getPath());
 		}
 
 		addWorkPanel(buildWorkPanel());
@@ -162,26 +160,26 @@ public class ImporterDialog extends DialogComponentProvider {
 		panel.add(new GLabel("Destination Folder: ", SwingConstants.RIGHT));
 		panel.add(buildFolderPanel());
 		panel.add(new GLabel("Program Name: ", SwingConstants.RIGHT));
-		panel.add(buildFilenameTextField());
+		panel.add(buildNameTextField());
 		return panel;
 	}
 
-	private Component buildFilenameTextField() {
-		String initalSuggestedFilename =
-			FSUtilities.appendPath(suggestedDestinationPath, getSuggestedFilename());
-		int columns = (initalSuggestedFilename.length() > 50) ? 50 : 0;
-		filenameTextField = new JTextField(initalSuggestedFilename, columns);
+	private Component buildNameTextField() {
+		String initalSuggestedName =
+			FSUtilities.appendPath(suggestedDestinationPath, getSuggestedName());
+		int columns = (initalSuggestedName.length() > 50) ? 50 : 0;
+		nameTextField = new JTextField(initalSuggestedName, columns);
 
 		// Use a key listener to track users edits.   We can't use the document listener, as
 		// we change the name field ourselves when other fields are changed.
-		filenameTextField.addKeyListener(new KeyAdapter() {
+		nameTextField.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyTyped(KeyEvent e) {
 				// tracking all key events; are there any that we don't want to track?
 				userHasChangedName = true;
 			}
 		});
-		filenameTextField.getDocument().addDocumentListener(new DocumentListener() {
+		nameTextField.getDocument().addDocumentListener(new DocumentListener() {
 			@Override
 			public void changedUpdate(DocumentEvent e) {
 				// don't care
@@ -197,10 +195,10 @@ public class ImporterDialog extends DialogComponentProvider {
 				validateFormInput();
 			}
 		});
-		return filenameTextField;
+		return nameTextField;
 	}
 
-	private String getSuggestedFilename() {
+	private String getSuggestedName() {
 		Loader loader = getSelectedLoader();
 		if (loader != null) {
 			return loader.getPreferredFileName(byteProvider);
@@ -304,9 +302,9 @@ public class ImporterDialog extends DialogComponentProvider {
 		if (loader != null) {
 			languageNeeded = isLanguageNeeded(loader);
 			setSelectedLanguage(getPreferredLanguage(loader));
-			String newSuggestedFilename =
-				FSUtilities.appendPath(suggestedDestinationPath, getSuggestedFilename());
-			setFilename(newSuggestedFilename);
+			String newSuggestedName =
+				FSUtilities.appendPath(suggestedDestinationPath, getSuggestedName());
+			setName(newSuggestedName);
 		}
 		else {
 			languageNeeded = true;
@@ -461,7 +459,7 @@ public class ImporterDialog extends DialogComponentProvider {
 			return false;
 		}
 		optionsButton.setEnabled(selectedLanguage != null);
-		if (!validateFilename()) {
+		if (!validateName()) {
 			return false;
 		}
 		setStatusText("");
@@ -469,64 +467,67 @@ public class ImporterDialog extends DialogComponentProvider {
 		return true;
 	}
 
-	private boolean validateFilename() {
+	private boolean validateName() {
+		Loader loader = getSelectedLoader();
+		boolean loadsIntoFolder = loader.loadsIntoNewFolder();
+		String destType = loadsIntoFolder ? "folder" : "file name";
 		if (getName().isEmpty()) {
-			setStatusText("Please enter a destination file name.");
+			setStatusText("Please enter a destination " + destType + ".");
 			return false;
 		}
-		if (warnedAboutInvalidFilenameChars()) {
+		if (warnedAboutInvalidNameChars()) {
 			return false;
 		}
-		if (isMissingFilename()) {
-			setStatusText("Destination path does not specify filename.");
+		if (isMissingName()) {
+			setStatusText("Destination path does not specify " + destType + ".");
 			return false;
 		}
-		if (isDuplicateFilename()) {
-			setStatusText("Destination file name already exists.");
+		if (isDuplicateName(loadsIntoFolder)) {
+			setStatusText("Destination " + destType + " already exists.");
 			return false;
 		}
-		if (isFilenameTooLong()) {
-			setStatusText("Destination file name is too long. ( >" +
+		if (isNameTooLong()) {
+			setStatusText("Destination " + destType + " is too long. ( >" +
 				tool.getProject().getProjectData().getMaxNameLength() + ")");
 			return false;
 		}
 		return true;
 	}
 
-	private boolean warnedAboutInvalidFilenameChars() {
-		String filename = getName();
-		for (int i = 0; i < filename.length(); i++) {
-			char ch = filename.charAt(i);
+	private boolean warnedAboutInvalidNameChars() {
+		String name = getName();
+		for (int i = 0; i < name.length(); i++) {
+			char ch = name.charAt(i);
 			if (!LocalFileSystem.isValidNameCharacter(ch) && ch != '/') {
-				setStatusText("Invalid character " + ch + " in filename.");
+				setStatusText("Invalid character " + ch + " in name.");
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private boolean isMissingFilename() {
-		String filename = FilenameUtils.getName(getName());
-		return StringUtils.isBlank(filename);
+	private boolean isMissingName() {
+		String name = FilenameUtils.getName(getName());
+		return StringUtils.isBlank(name);
 	}
 
-	private boolean isDuplicateFilename() {
-		String pathFilename = getName();
-		String parentPath = FilenameUtils.getFullPathNoEndSeparator(pathFilename);
-		String filename = FilenameUtils.getName(pathFilename);
+	private boolean isDuplicateName(boolean isFolder) {
+		String pathName = getName();
+		String parentPath = FilenameUtils.getFullPathNoEndSeparator(pathName);
+		String fileOrFolderName = FilenameUtils.getName(pathName);
 		DomainFolder localDestFolder =
 			(parentPath != null) ? ProjectDataUtils.lookupDomainPath(destinationFolder, parentPath)
 					: destinationFolder;
 		if (localDestFolder != null) {
-			if (localDestFolder.getFolder(filename) != null ||
-				localDestFolder.getFile(filename) != null) {
+			if (isFolder && localDestFolder.getFolder(fileOrFolderName) != null ||
+				!isFolder && localDestFolder.getFile(fileOrFolderName) != null) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private boolean isFilenameTooLong() {
+	private boolean isNameTooLong() {
 		int maxNameLen = tool.getProject().getProjectData().getMaxNameLength();
 		for (String pathPart : getName().split("/")) {
 			if (pathPart.length() >= maxNameLen) {
@@ -537,17 +538,17 @@ public class ImporterDialog extends DialogComponentProvider {
 	}
 
 	private String getName() {
-		return filenameTextField.getText().trim();
+		return nameTextField.getText().trim();
 	}
 
-	private void setFilename(String s) {
-		if (userHasChangedName && validateFilename()) {
-			// Changing the user's text is really annoying. Keep the user's filename, if it is valid
+	private void setName(String s) {
+		if (userHasChangedName && validateName()) {
+			// Changing the user's text is really annoying. Keep the user's name, if it is valid
 			return;
 		}
 
-		filenameTextField.setText(s);
-		filenameTextField.setCaretPosition(s.length());
+		nameTextField.setText(s);
+		nameTextField.setCaretPosition(s.length());
 	}
 
 	protected void setSelectedLanguage(LanguageCompilerSpecPair lcsPair) {
@@ -601,8 +602,8 @@ public class ImporterDialog extends DialogComponentProvider {
 		return languageTextField;
 	}
 
-	JTextField getFilenameTextField() {
-		return filenameTextField;
+	JTextField getNameTextField() {
+		return nameTextField;
 	}
 
 }

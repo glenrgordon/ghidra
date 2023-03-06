@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.*;
 import org.junit.experimental.categories.Category;
 
+import db.Transaction;
 import docking.widgets.filechooser.GhidraFileChooser;
 import docking.widgets.table.DynamicTableColumn;
 import generic.Unique;
@@ -46,9 +47,9 @@ import ghidra.app.plugin.core.debug.gui.modules.DebuggerSectionMapProposalDialog
 import ghidra.app.plugin.core.debug.mapping.DebuggerTargetTraceMapper;
 import ghidra.app.plugin.core.debug.mapping.ObjectBasedDebuggerTargetTraceMapper;
 import ghidra.app.services.DebuggerListingService;
-import ghidra.app.services.TraceRecorder;
 import ghidra.app.services.ModuleMapProposal.ModuleMapEntry;
 import ghidra.app.services.SectionMapProposal.SectionMapEntry;
+import ghidra.app.services.TraceRecorder;
 import ghidra.dbg.attributes.TargetPrimitiveDataType.DefaultTargetPrimitiveDataType;
 import ghidra.dbg.attributes.TargetPrimitiveDataType.PrimitiveKind;
 import ghidra.dbg.model.TestTargetModule;
@@ -56,8 +57,8 @@ import ghidra.dbg.model.TestTargetTypedefDataType;
 import ghidra.dbg.target.*;
 import ghidra.dbg.target.schema.SchemaContext;
 import ghidra.dbg.target.schema.TargetObjectSchema.SchemaName;
-import ghidra.dbg.util.*;
 import ghidra.dbg.target.schema.XmlSchemaContext;
+import ghidra.dbg.util.*;
 import ghidra.framework.main.DataTreeDialog;
 import ghidra.plugin.importer.ImporterPlugin;
 import ghidra.program.model.address.*;
@@ -73,7 +74,6 @@ import ghidra.trace.model.modules.*;
 import ghidra.trace.model.symbol.TraceSymbol;
 import ghidra.trace.model.target.*;
 import ghidra.trace.model.target.TraceObject.ConflictResolution;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.table.GhidraTable;
 
 @Category(NightlyCategory.class)
@@ -138,44 +138,44 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 	public void activateObjectsMode() throws Exception {
 		// NOTE the use of index='1' allowing object-based managers to ID unique path
-		ctx = XmlSchemaContext.deserialize("" + //
-			"<context>" + //
-			"    <schema name='Session' elementResync='NEVER' attributeResync='ONCE'>" + //
-			"        <attribute name='Processes' schema='ProcessContainer' />" + //
-			"    </schema>" + //
-			"    <schema name='ProcessContainer' canonical='yes' elementResync='NEVER' " + //
-			"            attributeResync='ONCE'>" + //
-			"        <element index='1' schema='Process' />" + // <---- NOTE HERE
-			"    </schema>" + //
-			"    <schema name='Process' elementResync='NEVER' attributeResync='ONCE'>" + //
-			"        <attribute name='Modules' schema='ModuleContainer' />" + //
-			"        <attribute name='Memory' schema='RegionContainer' />" + //
-			"    </schema>" + //
-			"    <schema name='RegionContainer' canonical='yes' elementResync='NEVER' " + //
-			"            attributeResync='ONCE'>" + //
-			"        <element schema='Region' />" + //
-			"    </schema>" + //
-			"    <schema name='Region' elementResync='NEVER' attributeResync='NEVER'>" + //
-			"        <interface name='MemoryRegion' />" + //
-			"    </schema>" + //
-			"    <schema name='ModuleContainer' canonical='yes' elementResync='NEVER' " + //
-			"            attributeResync='ONCE'>" + //
-			"        <element schema='Module' />" + //
-			"    </schema>" + //
-			"    <schema name='Module' elementResync='NEVER' attributeResync='NEVER'>" + //
-			"        <interface name='Module' />" + //
-			"        <attribute name='Sections' schema='SectionContainer' />" + //
-			"    </schema>" + //
-			"    <schema name='SectionContainer' canonical='yes' elementResync='NEVER' " + //
-			"            attributeResync='ONCE'>" + //
-			"        <element schema='Section' />" + //
-			"    </schema>" + //
-			"    <schema name='Section' elementResync='NEVER' attributeResync='NEVER'>" + //
-			"        <interface name='Section' />" + //
-			"    </schema>" + //
-			"</context>");
+		ctx = XmlSchemaContext.deserialize("""
+				<context>
+				    <schema name='Session' elementResync='NEVER' attributeResync='ONCE'>
+				        <attribute name='Processes' schema='ProcessContainer' />
+				    </schema>
+				    <schema name='ProcessContainer' canonical='yes' elementResync='NEVER'
+				            attributeResync='ONCE'>
+				        <element index='1' schema='Process' />
+				    </schema>
+				    <schema name='Process' elementResync='NEVER' attributeResync='ONCE'>
+				        <attribute name='Modules' schema='ModuleContainer' />
+				        <attribute name='Memory' schema='RegionContainer' />
+				    </schema>
+				    <schema name='RegionContainer' canonical='yes' elementResync='NEVER'
+				            attributeResync='ONCE'>
+				        <element schema='Region' />
+				    </schema>
+				    <schema name='Region' elementResync='NEVER' attributeResync='NEVER'>
+				        <interface name='MemoryRegion' />
+				    </schema>
+				    <schema name='ModuleContainer' canonical='yes' elementResync='NEVER'
+				            attributeResync='ONCE'>
+				        <element schema='Module' />
+				    </schema>
+				    <schema name='Module' elementResync='NEVER' attributeResync='NEVER'>
+				        <interface name='Module' />
+				        <attribute name='Sections' schema='SectionContainer' />
+				    </schema>
+				    <schema name='SectionContainer' canonical='yes' elementResync='NEVER'
+				            attributeResync='ONCE'>
+				        <element schema='Section' />
+				    </schema>
+				    <schema name='Section' elementResync='NEVER' attributeResync='NEVER'>
+				        <interface name='Section' />
+				    </schema>
+				</context>""");
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			tb.trace.getObjectManager().createRootObject(ctx.getSchema(new SchemaName("Session")));
 		}
 	}
@@ -183,16 +183,16 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	protected void addRegionsFromModules() throws Exception {
 		PathPattern regionPattern = new PathPattern(PathUtils.parse("Processes[1].Memory[]"));
 		TraceObjectManager om = tb.trace.getObjectManager();
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceObject root = om.getRootObject();
 			for (TraceObject module : (Iterable<TraceObject>) () -> root
-					.querySuccessorsTargetInterface(Lifespan.at(0), TargetModule.class)
+					.querySuccessorsTargetInterface(Lifespan.at(0), TargetModule.class, true)
 					.map(p -> p.getDestination(root))
 					.iterator()) {
 				String moduleName = module.getCanonicalPath().index();
 				Lifespan span = module.getLife().bound();
 				for (TraceObject section : (Iterable<TraceObject>) () -> module
-						.querySuccessorsTargetInterface(Lifespan.at(0), TargetSection.class)
+						.querySuccessorsTargetInterface(Lifespan.at(0), TargetSection.class, true)
 						.map(p -> p.getDestination(root))
 						.iterator()) {
 					String sectionName = section.getCanonicalPath().index();
@@ -242,7 +242,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 	protected void addModules() throws Exception {
 		Lifespan zeroOn = Lifespan.nowOn(0);
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			modExe = addModule("first_proc", tb.range(0x55550000, 0x5575007f), zeroOn);
 			secExeText = addSection(modExe, ".text", tb.range(0x55550000, 0x555500ff));
 			secExeData = addSection(modExe, ".data", tb.range(0x55750000, 0x5575007f));
@@ -254,7 +254,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 	}
 
 	protected MemoryBlock addBlock() throws Exception {
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Add block")) {
+		try (Transaction tx = program.openTransaction("Add block")) {
 			return program.getMemory()
 					.createInitializedBlock(".text", tb.addr(0x00400000), 0x1000, (byte) 0, monitor,
 						false);
@@ -392,7 +392,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		waitForTasks();
 
 		MemoryBlock block = addBlock();
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Change name")) {
+		try (Transaction tx = program.openTransaction("Change name")) {
 			program.setName(modExe.getName());
 		}
 		waitForDomainObject(program);
@@ -427,7 +427,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 
 		waitForPass(() -> assertProviderPopulated());
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			modExe.getObject().removeTree(Lifespan.nowOn(0));
 		}
 		waitForDomainObject(tb.trace);
@@ -515,7 +515,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		waitForPass(() -> assertTrue(provider.actionMapIdentically.isEnabled()));
 
 		// Need some substance in the program
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Populate")) {
+		try (Transaction tx = program.openTransaction("Populate")) {
 			addBlock();
 		}
 		waitForDomainObject(program);
@@ -550,7 +550,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		// Still
 		assertFalse(provider.actionMapModules.isEnabled());
 
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Change name")) {
+		try (Transaction tx = program.openTransaction("Change name")) {
 			program.setImageBase(addr(program, 0x00400000), true);
 			program.setName(modExe.getName());
 
@@ -618,7 +618,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		assertFalse(provider.actionMapSections.isEnabled());
 
 		MemoryBlock block = addBlock();
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Change name")) {
+		try (Transaction tx = program.openTransaction("Change name")) {
 			program.setName(modExe.getName());
 		}
 		waitForDomainObject(program);
@@ -819,7 +819,7 @@ public class DebuggerModulesProviderTest extends AbstractGhidraHeadedDebuggerGUI
 		traceManager.activateTrace(tb.trace);
 		waitForTasks();
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			modExe.setName("/bin/echo"); // File has to exist
 		}
 		waitForPass(() -> assertModuleTableSize(2));

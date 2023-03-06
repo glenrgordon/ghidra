@@ -15,8 +15,7 @@
  */
 package ghidra.app.plugin.core.debug.gui.stack;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,11 +23,13 @@ import java.util.Objects;
 
 import org.junit.*;
 
+import db.Transaction;
 import docking.widgets.table.DynamicTableColumn;
 import ghidra.app.plugin.core.debug.DebuggerCoordinates;
 import ghidra.app.plugin.core.debug.gui.AbstractGhidraHeadedDebuggerGUITest;
 import ghidra.app.plugin.core.debug.gui.model.ObjectTableModel.ValueProperty;
 import ghidra.app.plugin.core.debug.gui.model.ObjectTableModel.ValueRow;
+import ghidra.app.plugin.core.debug.gui.model.QueryPanelTestHelper;
 import ghidra.app.plugin.core.debug.service.modules.DebuggerStaticMappingServicePlugin;
 import ghidra.app.plugin.core.debug.service.modules.DebuggerStaticMappingUtils;
 import ghidra.app.services.DebuggerStaticMappingService;
@@ -51,7 +52,6 @@ import ghidra.trace.model.stack.TraceObjectStack;
 import ghidra.trace.model.target.*;
 import ghidra.trace.model.target.TraceObject.ConflictResolution;
 import ghidra.trace.model.thread.TraceObjectThread;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.task.TaskMonitor;
 
 /**
@@ -158,7 +158,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 				</context>
 				""");
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			tb.trace.getObjectManager().createRootObject(ctx.getSchema(new SchemaName("Session")));
 		}
 	}
@@ -167,7 +167,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 		PathPattern threadPattern = new PathPattern(PathUtils.parse("Processes[1].Threads[]"));
 		TraceObjectKeyPath threadPath =
 			TraceObjectKeyPath.of(threadPattern.applyIntKeys(n).getSingletonPath());
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			return Objects.requireNonNull(tb.trace.getObjectManager()
 					.createObject(threadPath)
 					.insert(Lifespan.nowOn(0), ConflictResolution.TRUNCATE)
@@ -178,7 +178,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 
 	protected TraceObjectStack addStack(TraceObjectThread thread) {
 		TraceObjectKeyPath stackPath = thread.getObject().getCanonicalPath().extend("Stack");
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			return Objects.requireNonNull(tb.trace.getObjectManager()
 					.createObject(stackPath)
 					.insert(Lifespan.nowOn(0), ConflictResolution.TRUNCATE)
@@ -194,7 +194,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 	protected void addStackFrames(TraceObjectStack stack, int count) {
 		TraceObjectKeyPath stackPath = stack.getObject().getCanonicalPath();
 		TraceObjectManager om = tb.trace.getObjectManager();
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			for (int i = 0; i < count; i++) {
 				TraceObject frame = om.createObject(stackPath.index(i))
 						.insert(Lifespan.nowOn(0), ConflictResolution.TRUNCATE)
@@ -345,7 +345,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 
 		waitForPass(() -> assertProviderPopulated());
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceObject frame2 = tb.trace.getObjectManager()
 					.createObject(stack.getObject().getCanonicalPath().index(2))
 					.insert(Lifespan.nowOn(0), ConflictResolution.TRUNCATE)
@@ -378,7 +378,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 
 		waitForPass(() -> assertProviderPopulated());
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceObject frame1 = stack.getObject().getElement(0, 1).getChild();
 			frame1.removeTree(Lifespan.nowOn(0));
 		}
@@ -404,7 +404,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 
 		waitForPass(() -> assertProviderPopulated());
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			stack.getObject().removeTree(Lifespan.nowOn(0));
 		}
 		waitForDomainObject(tb.trace);
@@ -448,7 +448,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 
 		waitForPass(() -> assertProviderPopulated());
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			stack.getObject().removeTree(Lifespan.nowOn(1));
 		}
 		waitForDomainObject(tb.trace);
@@ -488,33 +488,6 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 	}
 
 	@Test
-	public void testSelectRowActivateFrame() throws Exception {
-		createAndOpenTrace();
-
-		TraceObjectThread thread = addThread(1);
-		TraceObjectStack stack = addStack(thread);
-		addStackFrames(stack);
-		waitForDomainObject(tb.trace);
-
-		traceManager.activateObject(thread.getObject());
-		waitForTasks();
-
-		waitForPass(() -> assertProviderPopulated());
-
-		TraceObject frame0 = stack.getObject().getElement(0, 0).getChild();
-		TraceObject frame1 = stack.getObject().getElement(0, 1).getChild();
-		List<ValueRow> allItems = stackProvider.panel.getAllItems();
-
-		stackProvider.panel.setSelectedItem(allItems.get(1));
-		waitForTasks();
-		waitForPass(() -> assertEquals(frame1, traceManager.getCurrentObject()));
-
-		stackProvider.panel.setSelectedItem(allItems.get(0));
-		waitForTasks();
-		waitForPass(() -> assertEquals(frame0, traceManager.getCurrentObject()));
-	}
-
-	@Test
 	public void testActivateFrameSelectsRow() throws Exception {
 		createAndOpenTrace();
 
@@ -542,6 +515,32 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 	}
 
 	@Test
+	public void testDoubleClickRowActivateFrame() throws Exception {
+		createAndOpenTrace();
+
+		TraceObjectThread thread = addThread(1);
+		TraceObjectStack stack = addStack(thread);
+		addStackFrames(stack);
+		waitForDomainObject(tb.trace);
+
+		traceManager.activateObject(thread.getObject());
+		waitForTasks();
+
+		waitForPass(() -> assertProviderPopulated());
+
+		TraceObject frame0 = stack.getObject().getElement(0, 0).getChild();
+		TraceObject frame1 = stack.getObject().getElement(0, 1).getChild();
+
+		clickTableCell(QueryPanelTestHelper.getTable(stackProvider.panel), 1, 0, 2);
+		waitForTasks();
+		waitForPass(() -> assertEquals(frame1, traceManager.getCurrentObject()));
+
+		clickTableCell(QueryPanelTestHelper.getTable(stackProvider.panel), 0, 0, 2);
+		waitForTasks();
+		waitForPass(() -> assertEquals(frame0, traceManager.getCurrentObject()));
+	}
+
+	@Test
 	public void testActivateTheAddMappingPopulatesFunctionColumn() throws Exception {
 		createTrace();
 		createProgramFromTrace();
@@ -563,7 +562,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 		waitForPass(() -> assertProviderPopulated());
 
 		Function func;
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Add Function")) {
+		try (Transaction tx = program.openTransaction("Add Function")) {
 			program.getMemory()
 					.createInitializedBlock(".text", addr(program, 0x00600000), 0x1000, (byte) 0,
 						TaskMonitor.DUMMY, false);
@@ -574,7 +573,7 @@ public class DebuggerStackProviderTest extends AbstractGhidraHeadedDebuggerGUITe
 		}
 		waitForDomainObject(program);
 
-		try (UndoableTransaction tid = tb.startTransaction()) {
+		try (Transaction tx = tb.startTransaction()) {
 			TraceObjectMemoryRegion region = Objects.requireNonNull(tb.trace.getObjectManager()
 					.createObject(TraceObjectKeyPath.parse("Processes[1].Memory[bin:.text]"))
 					.insert(Lifespan.nowOn(0), ConflictResolution.TRUNCATE)

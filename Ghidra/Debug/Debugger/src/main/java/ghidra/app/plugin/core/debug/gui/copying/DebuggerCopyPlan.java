@@ -20,7 +20,7 @@ import java.util.*;
 import javax.swing.JCheckBox;
 
 import ghidra.app.plugin.core.debug.gui.DebuggerResources;
-import ghidra.app.plugin.core.debug.service.breakpoint.LogicalBreakpointInternal.ProgramBreakpoint;
+import ghidra.app.plugin.core.debug.service.breakpoint.ProgramBreakpoint;
 import ghidra.app.util.viewer.listingpanel.PropertyBasedBackgroundColorModel;
 import ghidra.program.database.IntRangeMap;
 import ghidra.program.model.address.*;
@@ -96,9 +96,9 @@ public class DebuggerCopyPlan {
 					s -> s == TraceMemoryState.ERROR);
 				AddressSetView staleSet = rngAsSet.subtract(knownSet).subtract(errorSet);
 				setShifted(map, fromRange.getMinAddress(), intoAddress, errorSet,
-					DebuggerResources.DEFAULT_COLOR_BACKGROUND_ERROR.getRGB());
+					DebuggerResources.COLOR_BACKGROUND_ERROR.getRGB());
 				setShifted(map, fromRange.getMinAddress(), intoAddress, staleSet,
-					DebuggerResources.DEFAULT_COLOR_BACKGROUND_STALE.getRGB());
+					DebuggerResources.COLOR_BACKGROUND_STALE.getRGB());
 			}
 
 			public void setShifted(IntRangeMap map, Address src, Address dst, AddressSetView set,
@@ -233,6 +233,7 @@ public class DebuggerCopyPlan {
 					else {
 						pb.disable();
 					}
+					pb.setEmuSleigh(bpt.getEmuSleigh());
 				}
 			}
 		},

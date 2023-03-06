@@ -47,6 +47,7 @@ class PluginManager {
 	boolean acceptData(DomainFile[] data) {
 		for (Plugin p : pluginList) {
 			if (p.acceptData(data)) {
+				tool.getWindowManager().getMainWindow().toFront();
 				return true;
 			}
 		}
@@ -64,6 +65,7 @@ class PluginManager {
 	boolean accept(URL url) {
 		for (Plugin p : pluginList) {
 			if (p.accept(url)) {
+				tool.getWindowManager().getMainWindow().toFront();
 				return true;
 			}
 		}
@@ -351,8 +353,8 @@ class PluginManager {
 		}
 
 		Map<String, Exception> badMap = new LinkedHashMap<>();
-		List<Plugin> list = getPluginsByServiceOrder(0);
-		for (Plugin p : list) {
+		List<Plugin> plugins = getPluginsByServiceOrder(0);
+		for (Plugin p : plugins) {
 			SaveState saveState = map.get(p.getName());
 			if (saveState != null) {
 				try {
@@ -376,9 +378,7 @@ class PluginManager {
 			Msg.showError(this, null, "Data State Error",
 				"Errors in plugin data states - check console for details");
 		}
-		for (Plugin plugin : list) {
-			plugin.dataStateRestoreCompleted();
-		}
+		plugins.forEach(Plugin::dataStateRestoreCompleted);
 	}
 
 	Element saveDataStateToXml(boolean savingProject) {

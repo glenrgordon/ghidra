@@ -24,6 +24,7 @@ import java.util.function.BiFunction;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import db.Transaction;
 import ghidra.framework.data.DomainObjectEventQueues;
 import ghidra.framework.model.*;
 import ghidra.framework.options.Options;
@@ -42,8 +43,7 @@ import ghidra.program.model.util.AddressSetPropertyMap;
 import ghidra.program.model.util.PropertyMapManager;
 import ghidra.program.util.ChangeManager;
 import ghidra.program.util.ProgramChangeRecord;
-import ghidra.trace.database.DBTrace;
-import ghidra.trace.database.DBTraceTimeViewport;
+import ghidra.trace.database.*;
 import ghidra.trace.database.listing.DBTraceCodeSpace;
 import ghidra.trace.database.listing.DBTraceDefinedUnitsView;
 import ghidra.trace.database.memory.DBTraceMemorySpace;
@@ -82,7 +82,8 @@ public class DBTraceProgramView implements TraceProgramView {
 	public static final int TIME_INTERVAL = 100;
 	public static final int BUF_SIZE = 1000;
 
-	protected class EventTranslator extends TraceDomainObjectListener {
+	protected class EventTranslator extends TypedEventDispatcher
+			implements DBTraceDirectChangeListener {
 		public EventTranslator() {
 			listenForUntyped(DomainObject.DO_OBJECT_SAVED, this::eventPassthrough);
 			listenForUntyped(DomainObject.DO_DOMAIN_FILE_CHANGED, this::eventPassthrough);
@@ -170,6 +171,11 @@ public class DBTraceProgramView implements TraceProgramView {
 			listenFor(TraceSymbolChangeType.ADDRESS_CHANGED, this::symbolAddressChanged);
 			listenFor(TraceSymbolChangeType.LIFESPAN_CHANGED, this::symbolLifespanChanged);
 			listenFor(TraceSymbolChangeType.DELETED, this::symbolDeleted);
+		}
+
+		@Override
+		public void changed(DomainObjectChangeRecord event) {
+			handleChangeRecord(event);
 		}
 
 		private void eventPassthrough(DomainObjectChangeRecord rec) {
@@ -1291,6 +1297,11 @@ public class DBTraceProgramView implements TraceProgramView {
 	}
 
 	@Override
+	public Transaction openTransaction(String description) throws IllegalStateException {
+		return trace.openTransaction(description);
+	}
+
+	@Override
 	public int startTransaction(String description) {
 		return trace.startTransaction(description);
 	}
@@ -1306,8 +1317,8 @@ public class DBTraceProgramView implements TraceProgramView {
 	}
 
 	@Override
-	public Transaction getCurrentTransaction() {
-		return trace.getCurrentTransaction();
+	public TransactionInfo getCurrentTransactionInfo() {
+		return trace.getCurrentTransactionInfo();
 	}
 
 	@Override
@@ -1376,7 +1387,7 @@ public class DBTraceProgramView implements TraceProgramView {
 	protected synchronized EventTranslator getEventTranslator() {
 		if (eventTranslator == null) {
 			eventTranslator = new EventTranslator();
-			trace.addListener(eventTranslator);
+			trace.addDirectChangeListener(eventTranslator);
 		}
 		return eventTranslator;
 	}

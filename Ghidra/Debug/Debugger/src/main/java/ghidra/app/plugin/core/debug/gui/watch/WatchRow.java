@@ -19,11 +19,12 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+import db.Transaction;
 import ghidra.app.plugin.core.debug.DebuggerCoordinates;
 import ghidra.app.plugin.processors.sleigh.SleighLanguage;
 import ghidra.app.services.DataTypeManagerService;
-import ghidra.app.services.DebuggerStateEditingService;
-import ghidra.app.services.DebuggerStateEditingService.StateEditor;
+import ghidra.app.services.DebuggerControlService;
+import ghidra.app.services.DebuggerControlService.StateEditor;
 import ghidra.async.AsyncUtils;
 import ghidra.docking.settings.Settings;
 import ghidra.docking.settings.SettingsImpl;
@@ -44,7 +45,6 @@ import ghidra.trace.model.memory.TraceMemoryState;
 import ghidra.trace.model.symbol.TraceLabelSymbol;
 import ghidra.util.Msg;
 import ghidra.util.NumericUtilities;
-import ghidra.util.database.UndoableTransaction;
 
 public class WatchRow {
 	public static final int TRUNCATE_BYTES_LENGTH = 64;
@@ -126,7 +126,7 @@ public class WatchRow {
 			prevValue = prevExec == null ? null : compiled.evaluate(prevExec);
 
 			TracePlatform platform = provider.current.getPlatform();
-			value = fullValue.bytes();
+			value = fullValue.bytes().bytes();
 			error = null;
 			state = fullValue.state();
 			// TODO: Optional column for guest address?
@@ -234,8 +234,7 @@ public class WatchRow {
 			dataType =
 				new PointerTypedef(null, ptrType.getDataType(), ptrType.getLength(), dtm, space);
 			if (dtm != null) {
-				try (UndoableTransaction tid =
-					UndoableTransaction.start(dtm, "Resolve data type")) {
+				try (Transaction tid = dtm.openTransaction("Resolve data type")) {
 					dataType = dtm.resolve(dataType, DataTypeConflictHandler.DEFAULT_HANDLER);
 				}
 			}
@@ -346,11 +345,11 @@ public class WatchRow {
 		if (address == null) {
 			return false;
 		}
-		DebuggerStateEditingService editingService = provider.editingService;
-		if (editingService == null) {
+		DebuggerControlService controlService = provider.controlService;
+		if (controlService == null) {
 			return false;
 		}
-		StateEditor editor = editingService.createStateEditor(provider.current);
+		StateEditor editor = controlService.createStateEditor(provider.current);
 		return editor.isVariableEditable(address, getValueLength());
 	}
 
@@ -397,11 +396,11 @@ public class WatchRow {
 			System.arraycopy(bytes, 0, fillOld, 0, bytes.length);
 			bytes = fillOld;
 		}
-		DebuggerStateEditingService editingService = provider.editingService;
-		if (editingService == null) {
-			throw new AssertionError("No editing service");
+		DebuggerControlService controlService = provider.controlService;
+		if (controlService == null) {
+			throw new AssertionError("No control service");
 		}
-		StateEditor editor = editingService.createStateEditor(provider.current);
+		StateEditor editor = controlService.createStateEditor(provider.current);
 		editor.setVariable(address, bytes).exceptionally(ex -> {
 			Msg.showError(this, null, "Write Failed",
 				"Could not modify watch value (on target)", ex);

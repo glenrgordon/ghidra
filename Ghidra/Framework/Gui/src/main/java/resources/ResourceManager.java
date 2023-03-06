@@ -437,7 +437,12 @@ public class ResourceManager {
 		if (icon instanceof ImageIcon) {
 			return ((ImageIcon) icon).getDescription();
 		}
-		if (icon instanceof GIcon) {
+		if (icon instanceof GIcon gIcon) {
+			Icon delegateIcon = gIcon.getDelegate();
+			String name = getIconName(delegateIcon);
+			if (name != null) {
+				return name;
+			}
 			return ((GIcon) icon).getId();
 		}
 		if (icon instanceof TranslateIcon) {
@@ -547,15 +552,12 @@ public class ResourceManager {
 		return icon == null ? new UnresolvedIcon(iconPath, DEFAULT_ICON) : icon;
 	}
 
-	public static Set<Icon> getLoadedUrlIcons() {
-		Set<Icon> icons = new HashSet<>();
-		for (Icon icon : iconMap.values()) {
-			if (icon instanceof UrlImageIcon) {
-				icons.add(icon);
-			}
-		}
-
-		return icons;
+	/**
+	 * Returns a list of all loaded icons.
+	 * @return a list of all loaded icons
+	 */
+	public static Set<Icon> getLoadedIcons() {
+		return new HashSet<>(iconMap.values());
 	}
 
 	private static UrlImageIcon doLoadIcon(String path) {
@@ -649,8 +651,7 @@ public class ResourceManager {
 		if (url != null) {
 			return new UrlImageIcon(BOMB, url);
 		}
-		Msg.error(ResourceManager.class,
-			"Could not find default icon: " + BOMB);
+		Msg.error(ResourceManager.class, "Could not find default icon: " + BOMB);
 		return getImageIcon(new ColorIcon3D(Color.RED, 16, 16));
 	}
 

@@ -38,6 +38,7 @@ import docking.widgets.textpane.GHtmlTextPane;
 import docking.widgets.tree.*;
 import docking.widgets.tree.support.GTreeSelectionEvent.EventOrigin;
 import generic.theme.GIcon;
+import generic.theme.GThemeDefaults.Colors;
 import ghidra.app.plugin.core.datamgr.actions.*;
 import ghidra.app.plugin.core.datamgr.actions.associate.*;
 import ghidra.app.plugin.core.datamgr.archive.*;
@@ -98,8 +99,17 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 	private boolean includeDataMembersInFilter;
 
 	public DataTypesProvider(DataTypeManagerPlugin plugin, String providerName) {
+		this(plugin, providerName, false);
+	}
+
+	public DataTypesProvider(DataTypeManagerPlugin plugin, String providerName,
+			boolean isTransient) {
 		super(plugin.getTool(), providerName, plugin.getName(), DataTypesActionContext.class);
 		this.plugin = plugin;
+
+		if (isTransient) {
+			setTransient();
+		}
 
 		setTitle(TITLE);
 		setIcon(new GIcon("icon.plugin.datatypes.provider"));
@@ -357,7 +367,10 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 
 	@Override // overridden to handle special logic in plugin
 	public void closeComponent() {
-		plugin.closeProvider(this);
+		super.closeComponent();
+		if (isTransient()) {
+			dispose();
+		}
 	}
 
 	private void buildComponent() {
@@ -442,6 +455,7 @@ public class DataTypesProvider extends ComponentProviderAdapter {
 		previewPane = new GHtmlTextPane();
 		previewPane.setEditable(false);
 		previewPane.setBorder(BorderFactory.createLoweredBevelBorder());
+		previewPane.setBackground(Colors.BACKGROUND);
 
 		// This listener responds to the user hovering/clicking the preview's hyperlinks
 		previewPane.addHyperlinkListener(event -> {

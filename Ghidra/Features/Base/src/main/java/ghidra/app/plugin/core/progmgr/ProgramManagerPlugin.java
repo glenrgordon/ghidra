@@ -16,7 +16,6 @@
 package ghidra.app.plugin.core.progmgr;
 
 import java.awt.Component;
-import java.awt.event.ActionListener;
 import java.beans.PropertyEditor;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -83,7 +82,6 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 	private MultiProgramManager programMgr;
 	private ProgramSaveManager programSaveMgr;
 	private int transactionID = -1;
-	private OpenVersionedFileDialog<Program> openDialog;
 	private boolean locked = false;
 	private UndoAction undoAction;
 	private RedoAction redoAction;
@@ -567,6 +565,7 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 			});
 		dialog.setHelpLocation(new HelpLocation(HelpTopics.PROGRAM, "Program_Options"));
 		tool.showDialog(dialog);
+		dialog.dispose();
 	}
 
 	/**
@@ -605,22 +604,23 @@ public class ProgramManagerPlugin extends Plugin implements ProgramManager {
 	}
 
 	private void open() {
-		if (openDialog == null) {
-			ActionListener listener = e -> {
-				DomainFile domainFile = openDialog.getDomainFile();
-				int version = openDialog.getVersion();
-				if (domainFile == null) {
-					openDialog.setStatusText("Please choose a Program");
-				}
-				else {
-					openDialog.close();
-					doOpenProgram(domainFile, version, OPEN_CURRENT);
-				}
-			};
-			openDialog = new OpenVersionedFileDialog<>(tool, "Open Program", Program.class);
-			openDialog.setHelpLocation(new HelpLocation(HelpTopics.PROGRAM, "Open_File_Dialog"));
-			openDialog.addOkActionListener(listener);
-		}
+
+		OpenVersionedFileDialog<Program> openDialog =
+			new OpenVersionedFileDialog<>(tool, "Open Program", Program.class);
+		openDialog.setHelpLocation(new HelpLocation(HelpTopics.PROGRAM, "Open_File_Dialog"));
+
+		openDialog.addOkActionListener(e -> {
+			DomainFile domainFile = openDialog.getDomainFile();
+			int version = openDialog.getVersion();
+			if (domainFile == null) {
+				openDialog.setStatusText("Please choose a Program");
+			}
+			else {
+				openDialog.close();
+				doOpenProgram(domainFile, version, OPEN_CURRENT);
+			}
+		});
+
 		tool.showDialog(openDialog);
 		contextChanged();
 	}

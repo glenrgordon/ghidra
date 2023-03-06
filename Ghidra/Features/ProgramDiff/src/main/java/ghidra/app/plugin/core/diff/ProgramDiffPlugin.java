@@ -580,6 +580,11 @@ public class ProgramDiffPlugin extends ProgramPlugin
 		if (diffDetailsProvider != null) {
 			diffDetailsProvider.removeActionListener(diffDetailsListener);
 		}
+
+		if (executeDiffDialog != null) {
+			executeDiffDialog.dispose();
+		}
+
 		actionManager.dispose();
 		applySettingsMgr.dispose();
 		markerManager.dispose();
@@ -804,7 +809,7 @@ public class ProgramDiffPlugin extends ProgramPlugin
 			return;
 		}
 
-		if (primaryProgram.getCurrentTransaction() != null) {
+		if (primaryProgram.getCurrentTransactionInfo() != null) {
 			String msg = "Cannot apply differences while another task is modifying \"" +
 				primaryProgram.getName() + "\"." +
 				"\nTry again when the currently executing task has completed.";

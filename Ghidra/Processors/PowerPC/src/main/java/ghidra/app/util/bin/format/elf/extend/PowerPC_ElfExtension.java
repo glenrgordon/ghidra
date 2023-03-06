@@ -118,10 +118,10 @@ public class PowerPC_ElfExtension extends ElfExtension {
 				// Update first got entry normally updated by link editor to refer to dynamic table
 				int dynamicOffset =
 					memory.getInt(gotAddr) + (int) elfLoadHelper.getImageBaseWordAdjustmentOffset();
-				elfLoadHelper.addFakeRelocTableEntry(gotAddr, 4);
+				elfLoadHelper.addArtificialRelocTableEntry(gotAddr, 4);
 				memory.setInt(gotAddr, dynamicOffset);
 			}
-			catch (MemoryAccessException | AddressOverflowException e) {
+			catch (MemoryAccessException e) {
 				elfLoadHelper.log(e);
 			}
 		}

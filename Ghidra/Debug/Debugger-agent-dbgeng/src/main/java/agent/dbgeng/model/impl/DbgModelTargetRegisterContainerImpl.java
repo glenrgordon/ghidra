@@ -21,9 +21,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import agent.dbgeng.manager.*;
+import agent.dbgeng.manager.impl.DbgManagerImpl;
 import agent.dbgeng.manager.impl.DbgRegister;
 import agent.dbgeng.model.iface2.*;
 import ghidra.async.AsyncUtils;
+import ghidra.dbg.DebuggerObjectModel.RefreshBehavior;
 import ghidra.dbg.error.DebuggerRegisterAccessException;
 import ghidra.dbg.target.TargetObject;
 import ghidra.dbg.target.TargetRegisterBank;
@@ -56,7 +58,7 @@ public class DbgModelTargetRegisterContainerImpl extends DbgModelTargetObjectImp
 		this.thread = thread.getThread();
 
 		if (!getModel().isSuppressDescent()) {
-			requestElements(false);
+			requestElements(RefreshBehavior.REFRESH_NEVER);
 			changeAttributes(List.of(), List.of(), Map.of( //
 				TargetRegisterBank.DESCRIPTIONS_ATTRIBUTE_NAME, this //
 			), "Initialized");
@@ -64,7 +66,7 @@ public class DbgModelTargetRegisterContainerImpl extends DbgModelTargetObjectImp
 	}
 
 	@Override
-	public CompletableFuture<Void> requestElements(boolean refresh) {
+	public CompletableFuture<Void> requestElements(RefreshBehavior refresh) {
 		return thread.listRegisters().thenAccept(regs -> {
 			if (regs.size() != registersByName.size()) {
 				DbgModelImpl impl = (DbgModelImpl) model;
@@ -108,7 +110,7 @@ public class DbgModelTargetRegisterContainerImpl extends DbgModelTargetObjectImp
 			Collection<String> names) {
 		return model.gateFuture(thread.listRegisters().thenCompose(regs -> {
 			if (regs.size() != registersByName.size() || getCachedElements().isEmpty()) {
-				return requestElements(false);
+				return requestElements(RefreshBehavior.REFRESH_NEVER);
 			}
 			return AsyncUtils.NIL;
 		}).thenCompose(__ -> {
@@ -141,8 +143,9 @@ public class DbgModelTargetRegisterContainerImpl extends DbgModelTargetObjectImp
 
 	@Override
 	public CompletableFuture<Void> writeRegistersNamed(Map<String, byte[]> values) {
+		DbgManagerImpl manager = getManager();
 		return model.gateFuture(thread.listRegisters().thenCompose(regs -> {
-			return requestElements(false);
+			return requestElements(RefreshBehavior.REFRESH_NEVER);
 		}).thenCompose(__ -> {
 			Map<String, ? extends TargetObject> regs = getCachedElements();
 			Map<DbgRegister, BigInteger> toWrite = new LinkedHashMap<>();
@@ -159,6 +162,8 @@ public class DbgModelTargetRegisterContainerImpl extends DbgModelTargetObjectImp
 			return thread.writeRegisters(toWrite);
 			// TODO: Should probably filter only effective and normalized writes in the callback
 		}).thenAccept(__ -> {
+			manager.getEventListeners().fire.threadStateChanged(thread, thread.getState(),
+				DbgCause.Causes.UNCLAIMED, DbgReason.Reasons.NONE);
 			broadcast().registersUpdated(getProxy(), values);
 		}));
 	}

@@ -30,6 +30,8 @@ import javax.swing.event.CellEditorListener;
 import javax.swing.event.ChangeEvent;
 import javax.swing.filechooser.FileSystemView;
 
+import org.apache.commons.lang3.StringUtils;
+
 import docking.*;
 import docking.widgets.*;
 import docking.widgets.combobox.GComboBox;
@@ -68,7 +70,7 @@ import util.HistoryList;
  *  <li>This class provides shortcut buttons similar to those of the Windows native chooser</li>
  * </ol>
  */
-public class GhidraFileChooser extends DialogComponentProvider implements FileFilter {
+public class GhidraFileChooser extends ReusableDialogComponentProvider implements FileFilter {
 
 	static final String UP_BUTTON_NAME = "UP_BUTTON";
 	private static final Color FOREROUND_COLOR = new GColor("color.fg.filechooser");
@@ -185,9 +187,9 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 	private SwingUpdateManager modelUpdater = new SwingUpdateManager(this::updateDirectoryModels);
 
 	/**
-	 * The last input component to take focus (the text field or file view). 
-	 * 
-	 * <p>This may annoy users that are using the keyboard to perform navigation operations via 
+	 * The last input component to take focus (the text field or file view).
+	 *
+	 * <p>This may annoy users that are using the keyboard to perform navigation operations via
 	 * the toolbar buttons, as we will keep putting focus back into the last input item.  We
 	 * may need a way to set this field to null when the user is working in this fashion.
 	 */
@@ -202,6 +204,8 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 	// Listener for selections on the filename drop-down
 	private SelectionListener<File> selectionListener;
 
+	private String lastDirectoryPreferencKey;
+
 	/**
 	 * Constructs a new ghidra file chooser.
 	 * @param parent the parent component
@@ -212,7 +216,7 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 	/**
 	 * Constructs a new ghidra file chooser
-	 * 
+	 *
 	 * @param model the file chooser model
 	 * @param parent the parent component
 	 */
@@ -677,9 +681,9 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 	}
 
 	/**
-	 * Sets the text used in the <code>OK</code> button 
-	 * 
-	 * @param buttonText the text 
+	 * Sets the text used in the <code>OK</code> button
+	 *
+	 * @param buttonText the text
 	 */
 	public void setApproveButtonText(String buttonText) {
 		setOkButtonText(buttonText);
@@ -687,7 +691,7 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 	/**
 	 * Sets the tooltip text used in the <code>OK</code> button
-	 * 
+	 *
 	 * @param tooltipText the tooltip text
 	 */
 	public void setApproveButtonToolTipText(String tooltipText) {
@@ -806,10 +810,10 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 		}
 
 		// we only get here if the new dir is the current dir and we are not forcing an update
-		// TODO this code causes unexpected behavior when in 'directories only' mode in that 
-		// this will cause the current directory to change.  The behavior can be seen by 
+		// TODO this code causes unexpected behavior when in 'directories only' mode in that
+		// this will cause the current directory to change.  The behavior can be seen by
 		// putting this code back in and then running the tests.   No tests are failing with this
-		// code removed.  We are leaving this code here for a couple releases in case we find 
+		// code removed.  We are leaving this code here for a couple releases in case we find
 		// a code path that requires it.
 		// setSelectedFileAndUpdateDisplay((isFilesOnly() ? null : directory));
 	}
@@ -849,10 +853,33 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 	}
 
 	/**
-	 * Returns the selected file. This can be set either by the  programmer via 
-	 * {@link #setSelectedFile(File)} or by a user action, such as either typing the 
+	 * Sets the preference key for this chooser to use when saving the last directory that was used
+	 * to successfully choose a file.
+	 * @param newKey the key
+	 */
+	public void setLastDirectoryPreference(String newKey) {
+		this.lastDirectoryPreferencKey = newKey;
+
+		if (StringUtils.isBlank(newKey)) {
+			return;
+		}
+
+		String path = Preferences.getProperty(newKey);
+		if (path == null) {
+			return;
+		}
+
+		File dir = new File(path);
+		if (isDirectory(dir)) {
+			updateDirOnly(dir, true);
+		}
+	}
+
+	/**
+	 * Returns the selected file. This can be set either by the  programmer via
+	 * {@link #setSelectedFile(File)} or by a user action, such as either typing the
 	 * filename into the UI or selecting the file from a list in the UI.
-	 * 
+	 *
 	 * @return the selected file; null if cancelled or no file was selected
 	 */
 	public File getSelectedFile() {
@@ -1036,16 +1063,21 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 	@Override
 	public void close() {
+		closeCleanup();
+		super.close();
+	}
+
+	private void closeCleanup() {
 		clearBackHistory();
 		cancelEdits();
 		clearStatusText();
 		savePreferences();
-		super.close();
 	}
 
 	private void savePreferences() {
 		saveSize();
 		saveViewStyle();
+		saveLastDirectory();
 		Preferences.store();
 	}
 
@@ -1068,6 +1100,24 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 		String titleKey = getTitle();
 		String detailsString = showDetails ? DETAILS_VIEW_STYLE : SIMPLE_VIEW_STYLE;
 		Preferences.setProperty(VIEW_STYLE_PREFIX + titleKey, detailsString);
+	}
+
+	private void saveLastDirectory() {
+		if (lastDirectoryPreferencKey == null) {
+			return;
+		}
+
+		File file = validatedFiles.getFile();
+		if (file == null) {
+			return;
+		}
+
+		File dir = file.getParentFile();
+		if (dir == null) {
+			return;
+		}
+
+		Preferences.setProperty(lastDirectoryPreferencKey, dir.getPath());
 	}
 
 	private void restoreSize() {
@@ -1465,8 +1515,13 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 	@Override
 	public void dispose() {
+		super.dispose();
+		closeCleanup();
+		modelUpdater.dispose();
 		actionManager.dispose();
-		close();
+		optionsDialog.dispose();
+
+		worker.dispose();
 		fileChooserModel = null;
 	}
 
@@ -1803,7 +1858,7 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 		}
 
 		//
-		// Handle the case where the current directly name can get double appended
+		// Handle the case where the current directory name can get double appended
 		//
 		if (!testFile.exists() && testFile.getName().equals(currentDirectory.getName())) {
 			testFile = currentDirectory;
@@ -1908,8 +1963,17 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 		@Override
 		public void run(TaskMonitor monitor) {
+			if (monitor.isCancelled() || worker.isDisposed()) {
+				return;
+			}
+
 			run();
-			SystemUtilities.runSwingLater(() -> runSwing());
+
+			Swing.runLater(() -> {
+				if (!monitor.isCancelled() && !worker.isDisposed()) {
+					runSwing();
+				}
+			});
 		}
 
 		public void run() {
@@ -1975,10 +2039,6 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 		@Override
 		public void run() {
-			if (fileChooserModel == null) {
-				return;
-			}
-
 			loadedFiles =
 				new ArrayList<>(fileChooserModel.getListing(directory, GhidraFileChooser.this));
 			Collections.sort(loadedFiles, new FileComparator(fileChooserModel));
@@ -2007,9 +2067,6 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 
 		@Override
 		public void run() {
-			if (fileChooserModel == null) {
-				return;
-			}
 			roots = new ArrayList<>(fileChooserModel.getRoots(forceUpdate));
 			Collections.sort(roots);
 		}
@@ -2123,7 +2180,7 @@ public class GhidraFileChooser extends DialogComponentProvider implements FileFi
 	 * size.  The list also allows us to clear and set a value in one method call.  We are
 	 * essentially using this list to hold selected files, where in certain modes, there will only
 	 * be a single file selection.
-	 * 
+	 *
 	 * <P>The methods on the class are synchronized to ensure thread visibility.
 	 */
 	private class FileList {

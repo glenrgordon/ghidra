@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -113,7 +113,6 @@ public abstract class PluginTool extends AbstractDockingTool {
 
 	private OptionsChangeListener optionsListener = new ToolOptionsListener();
 	protected ManagePluginsDialog manageDialog;
-	protected ExtensionTableProvider extensionTableProvider;
 
 	protected ToolIconURL iconURL = new ToolIconURL("view_detailed.png");
 
@@ -121,6 +120,7 @@ public abstract class PluginTool extends AbstractDockingTool {
 
 	private boolean isConfigurable = true;
 	protected boolean isDisposed = false;
+	private boolean restoringDataState;
 
 	/**
 	 * Construct a new PluginTool.
@@ -335,11 +335,7 @@ public abstract class PluginTool extends AbstractDockingTool {
 	 * Displays the extensions installation dialog.
 	 */
 	public void showExtensions() {
-		if (extensionTableProvider != null) {
-			extensionTableProvider.close();
-		}
-		extensionTableProvider = new ExtensionTableProvider(this);
-		showDialog(extensionTableProvider);
+		showDialog(new ExtensionTableProvider(this));
 	}
 
 	/**
@@ -574,8 +570,14 @@ public abstract class PluginTool extends AbstractDockingTool {
 	}
 
 	public void restoreDataStateFromXml(Element root) {
-		pluginMgr.restoreDataStateFromXml(root);
-		setConfigChanged(false);
+		restoringDataState = true;
+		try {
+			pluginMgr.restoreDataStateFromXml(root);
+			setConfigChanged(false);
+		}
+		finally {
+			restoringDataState = false;
+		}
 	}
 
 	public Element saveDataStateToXml(boolean savingProject) {
@@ -986,9 +988,8 @@ public abstract class PluginTool extends AbstractDockingTool {
 		optionsAction.setAddToAllWindows(true);
 		optionsAction.setHelpLocation(
 			new HelpLocation(ToolConstants.FRONT_END_HELP_TOPIC, "Tool Options"));
-		MenuData menuData =
-			new MenuData(new String[] { ToolConstants.MENU_EDIT, "&Tool Options..." }, null,
-				ToolConstants.TOOL_OPTIONS_MENU_GROUP);
+		MenuData menuData = new MenuData(new String[] { ToolConstants.MENU_EDIT, "&Tool Options" },
+			null, ToolConstants.TOOL_OPTIONS_MENU_GROUP);
 		menuData.setMenuSubGroup(ToolConstants.TOOL_OPTIONS_MENU_GROUP);
 		optionsAction.setMenuBarData(menuData);
 
@@ -1500,6 +1501,10 @@ public abstract class PluginTool extends AbstractDockingTool {
 			return;
 		}
 		super.contextChanged(provider);
+	}
+
+	public boolean isRestoringDataState() {
+		return restoringDataState;
 	}
 
 //==================================================================================================

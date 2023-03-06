@@ -35,10 +35,13 @@ import ghidra.program.model.data.Undefined;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.mem.*;
+import ghidra.program.model.reloc.Relocation.Status;
+import ghidra.program.model.reloc.RelocationResult;
 import ghidra.program.model.symbol.*;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.Msg;
-import ghidra.util.exception.*;
+import ghidra.util.exception.CancelledException;
+import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
 
 public class CoffLoader extends AbstractLibrarySupportLoader {
@@ -173,21 +176,15 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 
 		FileBytes fileBytes = MemoryBlockUtils.createFileBytes(program, provider, monitor);
 
-		int id = program.startTransaction("loading program from COFF");
-		boolean success = false;
 		try {
 			processSectionHeaders(provider, header, program, fileBytes, monitor, log, sectionsMap,
 				performFakeLinking);
 			processSymbols(header, program, monitor, log, sectionsMap, symbolsMap);
 			processEntryPoint(header, program, monitor, log);
 			processRelocations(header, program, sectionsMap, symbolsMap, log, monitor);
-			success = true;
 		}
 		catch (AddressOverflowException e) {
 			throw new IOException(e);
-		}
-		finally {
-			program.endTransaction(id, success);
 		}
 	}
 
@@ -666,6 +663,9 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 					sectionStartAddr.add(relocation.getAddress() - section.getVirtualAddress());
 				short relocationType = relocation.getType();
 
+				Status status = Status.FAILURE;
+				int byteLength = 0;
+
 				if (handler == null) {
 					++failureCount;
 					handleRelocationError(program, address, relocationType,
@@ -677,6 +677,7 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 							// skip relocation if previous failed relocation was at the same address
 							// since it is likely dependent on the previous failed relocation result
 							++failureCount;
+							status = Status.SKIPPED;
 
 							String logMessage =
 								String.format("Skipped dependent COFF Relocation type 0x%x at %s",
@@ -684,20 +685,24 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 							Msg.error(this, program.getName() + ": " + logMessage);
 						}
 						else {
-							handler.relocate(address, relocation, relocationContext);
+							RelocationResult result =
+								handler.relocate(address, relocation, relocationContext);
+							status = result.status();
+							byteLength = result.byteLength();
+
+							if (status == Status.UNSUPPORTED) {
+								++failureCount;
+								failedAddr = address;
+								handleRelocationError(program, address, relocationType,
+									"Unsupported COFF relocation type", null);
+							}
 						}
 					}
 					catch (MemoryAccessException e) {
 						++failureCount;
 						failedAddr = address;
 						handleRelocationError(program, address, relocationType,
-							"Error accessing memory", null);
-					}
-					catch (NotFoundException e) {
-						++failureCount;
-						failedAddr = address;
-						handleRelocationError(program, address, relocationType,
-							"Unsupported COFF relocation type", null);
+							"error accessing memory", null);
 					}
 					catch (RelocationException e) {
 						++failureCount;
@@ -705,7 +710,7 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 						handleRelocationError(program, address, relocationType, e.getMessage(),
 							null);
 					}
-					catch (Exception e) {
+					catch (Exception e) { // handle unexpected exceptions
 						++failureCount;
 						failedAddr = address;
 						String msg = e.getMessage();
@@ -721,13 +726,9 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 				Symbol symbol =
 					symbolsMap.get(header.getSymbolAtIndex(relocation.getSymbolIndex()));
 
-				// TODO: There may be multiple relocations at the same address.  
-				// The RelocationTable for retaining relocations needs to be revised to handle
-				// this.  At present only the last one will remain in the DB-backed address-based 
-				// table. (see GP-2128)
 				program.getRelocationTable()
-						.add(address, relocation.getType(),
-							new long[] { relocation.getSymbolIndex() }, null,
+						.add(address, status, relocation.getType(),
+							new long[] { relocation.getSymbolIndex() }, byteLength,
 							symbol != null ? symbol.getName() : "<null>");
 			}
 		}

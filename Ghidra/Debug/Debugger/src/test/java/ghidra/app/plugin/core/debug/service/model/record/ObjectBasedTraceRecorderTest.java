@@ -512,12 +512,12 @@ public class ObjectBasedTraceRecorderTest extends AbstractGhidraHeadedDebuggerGU
 		TraceObjectThread thread = (TraceObjectThread) recorder.getTraceThread(mb.testThread1);
 		assertNotNull(thread);
 
-		assertEquals(mb.testBank1, recorder.getTargetRegisterBank(thread, 0));
+		assertEquals(Set.of(mb.testBank1), recorder.getTargetRegisterBanks(thread, 0));
 		assertEquals(thread, recorder.getTraceThreadForSuccessor(mb.testBank1));
 
 		TraceObject traceBank = thread.getObject()
 				.querySuccessorsTargetInterface(Lifespan.at(recorder.getSnap()),
-					TargetRegisterBank.class)
+					TargetRegisterBank.class, false)
 				.map(p -> p.getDestination(thread.getObject()))
 				.findAny()
 				.orElseThrow();

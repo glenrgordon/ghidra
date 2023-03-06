@@ -33,6 +33,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
+import db.Transaction;
 import docking.action.DockingAction;
 import docking.widgets.fieldpanel.FieldPanel;
 import generic.Unique;
@@ -65,7 +66,6 @@ import ghidra.trace.model.*;
 import ghidra.trace.model.breakpoint.TraceBreakpointKind;
 import ghidra.trace.model.program.TraceProgramView;
 import ghidra.util.SystemUtilities;
-import ghidra.util.database.UndoableTransaction;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
@@ -109,7 +109,7 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		programManager.openProgram(program);
 		waitForSwing();
 
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Create function")) {
+		try (Transaction tx = program.openTransaction("Create function")) {
 			entry = addr(program, 0x00400000);
 			program.getMemory()
 					.createInitializedBlock(".text", entry, 0x1000, (byte) 0,
@@ -133,8 +133,7 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 
 	protected void addStaticMemoryAndBreakpoint() throws LockException, DuplicateNameException,
 			MemoryConflictException, AddressOverflowException, CancelledException {
-		try (UndoableTransaction tid =
-			UndoableTransaction.start(program, "Add bookmark break")) {
+		try (Transaction tx = program.openTransaction("Add bookmark break")) {
 			program.getMemory()
 					.createInitializedBlock(".text", addr(program, 0x00400000), 0x1000, (byte) 0,
 						TaskMonitor.DUMMY, false);
@@ -145,7 +144,7 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 	}
 
 	protected void addMapping(Trace trace) throws Exception {
-		try (UndoableTransaction tid = UndoableTransaction.start(trace, "Add mapping")) {
+		try (Transaction tx = trace.openTransaction("Add mapping")) {
 			DebuggerStaticMappingUtils.addMapping(
 				new DefaultTraceLocation(trace, null, Lifespan.nowOn(0), addr(trace, 0x55550123)),
 				new ProgramLocation(program, addr(program, 0x00400123)), 0x1000, false);
@@ -449,14 +448,15 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		}
 		waitForPass(() -> assertEquals(0, breakpointService.getAllBreakpoints().size()));
 
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Disassemble")) {
+		try (Transaction tx = program.openTransaction("Disassemble")) {
 			Disassembler.getDisassembler(program, TaskMonitor.DUMMY, msg -> {
 			}).disassemble(addr(program, 0x00400123), set(rng(program, 0x00400123, 0x00400123)));
 		}
 		waitForDomainObject(program);
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			staticCtx(addr(program, 0x00400123)), false);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, false);
 		DebuggerPlaceBreakpointDialog dialog =
 			waitForDialogComponent(DebuggerPlaceBreakpointDialog.class);
 		runSwing(() -> dialog.okCallback());
@@ -477,13 +477,14 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		}
 		waitForPass(() -> assertEquals(0, breakpointService.getAllBreakpoints().size()));
 
-		try (UndoableTransaction tid = UndoableTransaction.start(program, "Disassemble")) {
+		try (Transaction tx = program.openTransaction("Disassemble")) {
 			program.getListing().createData(addr(program, 0x00400123), ByteDataType.dataType);
 		}
 		waitForDomainObject(program);
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			staticCtx(addr(program, 0x00400123)), false);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, false);
 		DebuggerPlaceBreakpointDialog dialog =
 			waitForDialogComponent(DebuggerPlaceBreakpointDialog.class);
 		runSwing(() -> dialog.okCallback());
@@ -502,13 +503,14 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		addMappedBreakpointOpenAndWait();
 		LogicalBreakpoint lb = Unique.assertOne(breakpointService.getAllBreakpoints());
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			staticCtx(addr(program, 0x00400123)), false);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, false);
 
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeState()));
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			staticCtx(addr(program, 0x00400123)), false);
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, false);
 
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeState()));
 	}
@@ -522,13 +524,14 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		// NB. addMappedBreakpointOpenAndWait already makes this assertion. Just a reminder:
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeStateForTrace(trace)));
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		ProgramLocationActionContext ctx = dynamicCtx(trace, addr(trace, 0x55550123));
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeStateForTrace(trace)));
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeStateForTrace(trace)));
 
@@ -538,8 +541,8 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		lb.disableForProgram();
 		waitForPass(() -> assertEquals(State.INCONSISTENT_ENABLED, lb.computeStateForTrace(trace)));
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, true);
 
 		// NB. toggling from dynamic view, this toggles trace bpt, not logical/program bpt
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeStateForTrace(trace)));
@@ -548,8 +551,8 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		waitForPass(
 			() -> assertEquals(State.INCONSISTENT_DISABLED, lb.computeStateForTrace(trace)));
 
-		performAction(breakpointMarkerPlugin.actionToggleBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		assertTrue(breakpointMarkerPlugin.actionToggleBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionToggleBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeStateForTrace(trace)));
 	}
@@ -558,7 +561,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 			Set<TraceBreakpointKind> expectedKinds) throws Throwable {
 		addMappedBreakpointOpenAndWait(); // Adds an unneeded breakpoint. Aw well.
 
-		performAction(action, staticCtx(addr(program, 0x0400321)), false);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x0400321));
+		assertTrue(action.isAddToPopup(ctx));
+		performAction(action, ctx, false);
 		DebuggerPlaceBreakpointDialog dialog =
 			waitForDialogComponent(DebuggerPlaceBreakpointDialog.class);
 		runSwing(() -> {
@@ -580,7 +585,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		TraceRecorder recorder = addMappedBreakpointOpenAndWait(); // Adds an unneeded breakpoint. Aw well.
 		Trace trace = recorder.getTrace();
 
-		performAction(action, dynamicCtx(trace, addr(trace, 0x55550321)), false);
+		ProgramLocationActionContext ctx = dynamicCtx(trace, addr(trace, 0x55550321));
+		assertTrue(action.isAddToPopup(ctx));
+		performAction(action, ctx, false);
 		DebuggerPlaceBreakpointDialog dialog =
 			waitForDialogComponent(DebuggerPlaceBreakpointDialog.class);
 		runSwing(() -> dialog.okCallback());
@@ -664,8 +671,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		lb.disable();
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeState()));
 
-		performAction(breakpointMarkerPlugin.actionEnableBreakpoint,
-			staticCtx(addr(program, 0x00400123)), true);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionEnableBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionEnableBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeState()));
 	}
@@ -678,8 +686,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		lb.disable();
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeState()));
 
-		performAction(breakpointMarkerPlugin.actionEnableBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		ProgramLocationActionContext ctx = dynamicCtx(trace, addr(trace, 0x55550123));
+		assertTrue(breakpointMarkerPlugin.actionEnableBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionEnableBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.ENABLED, lb.computeStateForTrace(trace)));
 		// TODO: Same test but with multiple traces
@@ -690,8 +699,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		addMappedBreakpointOpenAndWait();
 		LogicalBreakpoint lb = Unique.assertOne(breakpointService.getAllBreakpoints());
 
-		performAction(breakpointMarkerPlugin.actionDisableBreakpoint,
-			staticCtx(addr(program, 0x00400123)), true);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionDisableBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionDisableBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeState()));
 	}
@@ -702,8 +712,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		Trace trace = recorder.getTrace();
 		LogicalBreakpoint lb = Unique.assertOne(breakpointService.getAllBreakpoints());
 
-		performAction(breakpointMarkerPlugin.actionDisableBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		ProgramLocationActionContext ctx = dynamicCtx(trace, addr(trace, 0x55550123));
+		assertTrue(breakpointMarkerPlugin.actionDisableBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionDisableBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.DISABLED, lb.computeStateForTrace(trace)));
 		// TODO: Same test but with multiple traces
@@ -713,8 +724,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 	public void testActionClearBreakpointProgram() throws Throwable {
 		addMappedBreakpointOpenAndWait();
 
-		performAction(breakpointMarkerPlugin.actionClearBreakpoint,
-			staticCtx(addr(program, 0x00400123)), true);
+		ProgramLocationActionContext ctx = staticCtx(addr(program, 0x00400123));
+		assertTrue(breakpointMarkerPlugin.actionClearBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionClearBreakpoint, ctx, true);
 
 		waitForPass(() -> assertTrue(breakpointService.getAllBreakpoints().isEmpty()));
 	}
@@ -725,8 +737,9 @@ public class DebuggerBreakpointMarkerPluginTest extends AbstractGhidraHeadedDebu
 		Trace trace = recorder.getTrace();
 		LogicalBreakpoint lb = Unique.assertOne(breakpointService.getAllBreakpoints());
 
-		performAction(breakpointMarkerPlugin.actionClearBreakpoint,
-			dynamicCtx(trace, addr(trace, 0x55550123)), true);
+		ProgramLocationActionContext ctx = dynamicCtx(trace, addr(trace, 0x55550123));
+		assertTrue(breakpointMarkerPlugin.actionClearBreakpoint.isAddToPopup(ctx));
+		performAction(breakpointMarkerPlugin.actionClearBreakpoint, ctx, true);
 
 		waitForPass(() -> assertEquals(State.NONE, lb.computeStateForTrace(trace)));
 		// TODO: Same test but with multiple traces

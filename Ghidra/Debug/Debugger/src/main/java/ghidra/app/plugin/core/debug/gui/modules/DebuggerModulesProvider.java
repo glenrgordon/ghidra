@@ -418,7 +418,6 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 	private final DebuggerBlockChooserDialog blockChooserDialog;
 	private final DebuggerModuleMapProposalDialog moduleProposalDialog;
 	private final DebuggerSectionMapProposalDialog sectionProposalDialog;
-	private DataTreeDialog programChooserDialog; // Already lazy
 
 	private DebuggerCoordinates current = DebuggerCoordinates.NOWHERE;
 	private Program currentProgram;
@@ -470,6 +469,7 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 		GhidraFileChooser chooser = new GhidraFileChooser(getComponent());
 		chooser.setSelectedFile(new File(module.getName()));
 		File file = chooser.getSelectedFile();
+		chooser.dispose();
 		if (file == null) { // Perhaps cancelled
 			return;
 		}
@@ -511,10 +511,10 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 				consoleService.removeResolutionAction(actionMapMissingModule);
 			}
 		}
-	}
 
-	protected static boolean isLegacy(Trace trace) {
-		return trace != null && trace.getObjectManager().getRootSchema() == null;
+		blockChooserDialog.dispose();
+		moduleProposalDialog.dispose();
+		sectionProposalDialog.dispose();
 	}
 
 	@Override
@@ -659,8 +659,13 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 		if (currentProgram == null || current.getTrace() == null) {
 			return;
 		}
-		staticMappingService.addIdentityMapping(current.getTrace(), currentProgram,
-			Lifespan.nowOn(traceManager.getCurrentSnap()), true);
+		try {
+			staticMappingService.addIdentityMapping(current.getTrace(), currentProgram,
+				Lifespan.nowOn(traceManager.getCurrentSnap()), false);
+		}
+		catch (TraceConflictedMappingException e) {
+			Msg.showError(this, null, "Map Identically", e.getMessage());
+		}
 	}
 
 	private void activatedMapManually(ActionContext ignored) {
@@ -728,12 +733,10 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 			Msg.error(this, "Import service is not present");
 		}
 		importModuleFromFileSystem(context.getModule());
-		consoleService.removeFromLog(context); // TODO: Should remove when mapping is created
 	}
 
 	private void activatedMapMissingModule(DebuggerMissingModuleActionContext context) {
 		mapModuleTo(context.getModule());
-		consoleService.removeFromLog(context); // TODO: Should remove when mapping is created
 	}
 
 	private void toggledFilter(ActionContext ignored) {
@@ -1028,7 +1031,7 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 
 		current = coordinates;
 
-		if (isLegacy(coordinates.getTrace())) {
+		if (Trace.isLegacy(coordinates.getTrace())) {
 			modulesPanel.coordinatesActivated(DebuggerCoordinates.NOWHERE);
 			sectionsPanel.coordinatesActivated(DebuggerCoordinates.NOWHERE);
 			legacyModulesPanel.coordinatesActivated(coordinates);
@@ -1059,7 +1062,7 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 	}
 
 	public void setSelectedModules(Set<TraceModule> sel) {
-		if (isLegacy(current.getTrace())) {
+		if (Trace.isLegacy(current.getTrace())) {
 			legacyModulesPanel.setSelectedModules(sel);
 		}
 		else {
@@ -1068,7 +1071,7 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 	}
 
 	public void setSelectedSections(Set<TraceSection> sel) {
-		if (isLegacy(current.getTrace())) {
+		if (Trace.isLegacy(current.getTrace())) {
 			legacySectionsPanel.setSelectedSections(sel);
 		}
 		else {
@@ -1077,27 +1080,24 @@ public class DebuggerModulesProvider extends ComponentProviderAdapter {
 	}
 
 	private DataTreeDialog getProgramChooserDialog() {
-		if (programChooserDialog != null) {
-			return programChooserDialog;
-		}
+
 		DomainFileFilter filter = df -> Program.class.isAssignableFrom(df.getDomainObjectClass());
 
 		// TODO regarding the hack note below, I believe it's fixed, but not sure how to test
-		return programChooserDialog =
-			new DataTreeDialog(null, "Map Module to Program", DataTreeDialog.OPEN, filter) {
-				{ // TODO/HACK: I get an NPE setting the default selection if I don't fake this.
-					dialogShown();
-				}
-			};
+		return new DataTreeDialog(null, "Map Module to Program", DataTreeDialog.OPEN, filter) {
+			{ // TODO/HACK: I get an NPE setting the default selection if I don't fake this.
+				dialogShown();
+			}
+		};
 	}
 
 	public DomainFile askProgram(Program program) {
-		getProgramChooserDialog();
+		DataTreeDialog dialog = getProgramChooserDialog();
 		if (program != null) {
-			programChooserDialog.selectDomainFile(program.getDomainFile());
+			dialog.selectDomainFile(program.getDomainFile());
 		}
-		tool.showDialog(programChooserDialog);
-		return programChooserDialog.getDomainFile();
+		tool.showDialog(dialog);
+		return dialog.getDomainFile();
 	}
 
 	public Entry<Program, MemoryBlock> askBlock(TraceSection section, Program program,

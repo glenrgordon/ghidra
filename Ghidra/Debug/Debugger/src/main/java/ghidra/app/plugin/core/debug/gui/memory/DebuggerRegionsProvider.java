@@ -204,8 +204,9 @@ public class DebuggerRegionsProvider extends ComponentProviderAdapter {
 		createActions();
 	}
 
-	protected static boolean isLegacy(Trace trace) {
-		return trace != null && trace.getObjectManager().getRootSchema() == null;
+	void dispose() {
+		blockChooserDialog.dispose();
+		regionProposalDialog.dispose();
 	}
 
 	protected void buildMainPanel() {
@@ -246,7 +247,7 @@ public class DebuggerRegionsProvider extends ComponentProviderAdapter {
 	@Override
 	public ActionContext getActionContext(MouseEvent event) {
 		final ActionContext context;
-		if (isLegacy(current.getTrace())) {
+		if (Trace.isLegacy(current.getTrace())) {
 			context = legacyPanel.getActionContext();
 		}
 		else {
@@ -395,7 +396,7 @@ public class DebuggerRegionsProvider extends ComponentProviderAdapter {
 	}
 
 	public void setSelectedRegions(Set<TraceMemoryRegion> sel) {
-		if (isLegacy(current.getTrace())) {
+		if (Trace.isLegacy(current.getTrace())) {
 			legacyPanel.setSelectedRegions(sel);
 		}
 		else {
@@ -465,7 +466,7 @@ public class DebuggerRegionsProvider extends ComponentProviderAdapter {
 
 		current = coordinates;
 
-		if (isLegacy(coordinates.getTrace())) {
+		if (Trace.isLegacy(coordinates.getTrace())) {
 			panel.coordinatesActivated(DebuggerCoordinates.NOWHERE);
 			legacyPanel.coordinatesActivated(coordinates);
 			if (ArrayUtils.indexOf(mainPanel.getComponents(), legacyPanel) == -1) {

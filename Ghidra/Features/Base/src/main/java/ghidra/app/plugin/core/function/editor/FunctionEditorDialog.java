@@ -25,12 +25,14 @@ import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.event.*;
+import javax.swing.plaf.TableUI;
 import javax.swing.table.TableCellEditor;
 
 import org.apache.commons.lang3.StringUtils;
 
 import docking.*;
 import docking.widgets.OptionDialog;
+import docking.widgets.button.GButton;
 import docking.widgets.checkbox.GCheckBox;
 import docking.widgets.combobox.GComboBox;
 import docking.widgets.label.GLabel;
@@ -422,15 +424,7 @@ public class FunctionEditorDialog extends DialogComponentProvider implements Mod
 		paramTableModel = new ParameterTableModel(model);
 		parameterTable = new ParameterTable(paramTableModel);
 		selectionListener = e -> model.setSelectedParameterRow(parameterTable.getSelectedRows());
-		parameterTable.getSelectionModel().addListSelectionListener(selectionListener);
-		// set the preferred viewport height smaller that the button panel, otherwise it is huge!
-		parameterTable.setPreferredScrollableViewportSize(new Dimension(600, 100));
-		parameterTable.setDefaultEditor(DataType.class,
-			new ParameterDataTypeCellEditor(this, service));
-		parameterTable.setDefaultRenderer(DataType.class, new ParameterDataTypeCellRenderer());
-		parameterTable.setDefaultEditor(VariableStorage.class, new StorageTableCellEditor(model));
-		parameterTable.setDefaultRenderer(VariableStorage.class, new VariableStorageCellRenderer());
-		parameterTable.setDefaultRenderer(String.class, new VariableStringCellRenderer());
+
 		JScrollPane tableScroll = new JScrollPane(parameterTable);
 		panel.add(tableScroll, BorderLayout.CENTER);
 		panel.add(buildButtonPanel(), BorderLayout.EAST);
@@ -440,10 +434,10 @@ public class FunctionEditorDialog extends DialogComponentProvider implements Mod
 	private Component buildButtonPanel() {
 		JPanel panel = new JPanel(new VerticalLayout(5));
 		panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		addButton = new JButton(Icons.ADD_ICON);
-		removeButton = new JButton(Icons.DELETE_ICON);
-		upButton = new JButton(new GIcon("icon.up"));
-		downButton = new JButton(new GIcon("icon.down"));
+		addButton = new GButton(Icons.ADD_ICON);
+		removeButton = new GButton(Icons.DELETE_ICON);
+		upButton = new GButton(new GIcon("icon.up"));
+		downButton = new GButton(new GIcon("icon.down"));
 		addButton.setToolTipText("Add parameter");
 		removeButton.setToolTipText("Delete selected parameters");
 		upButton.setToolTipText("Move selected parameter up");
@@ -685,15 +679,43 @@ public class FunctionEditorDialog extends DialogComponentProvider implements Mod
 		private FocusListener focusListener = new FocusAdapter() {
 			@Override
 			public void focusLost(FocusEvent e) {
-				e.getComponent().removeFocusListener(this);
-				if (cellEditor != null) {
-					cellEditor.stopCellEditing();
+				Component component = e.getComponent();
+				Component opposite = e.getOppositeComponent();
+				if (opposite == null) {
+					return; // this implies a non-Java app has taken focus
+				}
+				if (!SwingUtilities.isDescendingFrom(opposite, component)) {
+					component.removeFocusListener(this);
+					if (cellEditor != null) {
+						cellEditor.stopCellEditing();
+					}
+				}
+				else {
+					// One of the editor's internal components has gotten focus.  Listen to that as
+					// well to know when to stop the edit.
+					opposite.removeFocusListener(this);
+					opposite.addFocusListener(this);
 				}
 			}
 		};
 
 		ParameterTable(ParameterTableModel model) {
 			super(model);
+		}
+
+		@Override
+		public void setUI(TableUI ui) {
+			super.setUI(ui);
+
+			getSelectionModel().addListSelectionListener(selectionListener);
+			// set the preferred viewport height smaller that the button panel, otherwise it is huge!
+			setPreferredScrollableViewportSize(new Dimension(600, 100));
+			setDefaultEditor(DataType.class,
+				new ParameterDataTypeCellEditor(FunctionEditorDialog.this, service));
+			setDefaultRenderer(DataType.class, new ParameterDataTypeCellRenderer());
+			setDefaultEditor(VariableStorage.class, new StorageTableCellEditor(model));
+			setDefaultRenderer(VariableStorage.class, new VariableStorageCellRenderer());
+			setDefaultRenderer(String.class, new VariableStringCellRenderer());
 		}
 
 		@Override

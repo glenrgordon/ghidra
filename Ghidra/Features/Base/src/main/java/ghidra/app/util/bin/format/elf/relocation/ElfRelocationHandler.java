@@ -27,6 +27,7 @@ import ghidra.program.model.data.DataUtilities.ClearDataMode;
 import ghidra.program.model.data.PointerTypedef;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.mem.MemoryAccessException;
+import ghidra.program.model.reloc.RelocationResult;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.Msg;
 import ghidra.util.classfinder.ExtensionPoint;
@@ -37,6 +38,12 @@ import ghidra.util.exception.NotFoundException;
  * ELF relocation handlers.  
  */
 abstract public class ElfRelocationHandler implements ExtensionPoint {
+
+	/**
+	 * Fabricated Global Offset Table (GOT) name/prefix to be used when processing an object module
+	 * and a GOT must be fabricated to allow relocation processing.
+	 */
+	public static final String GOT_BLOCK_NAME = "%got";
 
 	abstract public boolean canRelocate(ElfHeader elf);
 
@@ -55,12 +62,11 @@ abstract public class ElfRelocationHandler implements ExtensionPoint {
 	 * Relocation context for a specific Elf image and relocation table.  The relocation context
 	 * is used to process relocations and manage any data required to process relocations.
 	 * @param loadHelper Elf load helper
-	 * @param relocationTable Elf relocation table
 	 * @param symbolMap Elf symbol placement map
 	 * @return relocation context or null if unsupported
 	 */
 	public ElfRelocationContext createRelocationContext(ElfLoadHelper loadHelper,
-			ElfRelocationTable relocationTable, Map<ElfSymbol, Address> symbolMap) {
+			Map<ElfSymbol, Address> symbolMap) {
 		return null;
 	}
 
@@ -69,10 +75,11 @@ abstract public class ElfRelocationHandler implements ExtensionPoint {
 	 * @param elfRelocationContext relocation context
 	 * @param relocation ELF relocation
 	 * @param relocationAddress relocation target address (fixup location)
+	 * @return applied relocation result (conveys status and applied byte-length)
 	 * @throws MemoryAccessException memory access failure
 	 * @throws NotFoundException required relocation data not found
 	 */
-	abstract public void relocate(ElfRelocationContext elfRelocationContext,
+	abstract public RelocationResult relocate(ElfRelocationContext elfRelocationContext,
 			ElfRelocation relocation, Address relocationAddress)
 			throws MemoryAccessException, NotFoundException;
 
