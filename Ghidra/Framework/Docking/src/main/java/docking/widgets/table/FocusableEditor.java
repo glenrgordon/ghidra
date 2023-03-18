@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package agent.dbgmodel.dbgmodel.err;
+package docking.widgets.table;
 
 /**
- * The base exception for unchecked {@code dbgmodel.dll} wrapper-related errors.
+ * Signals that the implementing cell editor desires to be notified when editing begins so that the
+ * editor can request focus on the right widget.
  */
-public class DbgModelRuntimeException extends RuntimeException {
-	public DbgModelRuntimeException() {
-		super();
-	}
+public interface FocusableEditor {
 
-	public DbgModelRuntimeException(String message) {
-		super(message);
-	}
+	/**
+	 * Called with the editor should take focus.
+	 */
+	public void focusEditor();
 }
