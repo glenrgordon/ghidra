@@ -34,8 +34,7 @@ import javax.swing.tree.TreePath;
 import org.apache.commons.collections4.map.LinkedMap;
 import org.apache.commons.lang3.StringUtils;
 
-import docking.ActionContext;
-import docking.WindowPosition;
+import docking.*;
 import docking.action.*;
 import docking.action.builder.ActionBuilder;
 import docking.action.builder.ToggleActionBuilder;
@@ -62,6 +61,7 @@ import ghidra.dbg.target.*;
 import ghidra.dbg.target.TargetConsole.Channel;
 import ghidra.dbg.target.TargetExecutionStateful.TargetExecutionState;
 import ghidra.dbg.target.TargetMethod.ParameterDescription;
+import ghidra.dbg.target.TargetMethod.TargetParameterMap;
 import ghidra.dbg.target.TargetSteppable.TargetStepKind;
 import ghidra.dbg.util.DebuggerCallbackReorderer;
 import ghidra.dbg.util.PathUtils;
@@ -704,7 +704,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 		plugin.fireObjectUpdated(object);
 	}
 
-	class ObjectActionContext extends ActionContext {
+	class ObjectActionContext extends DefaultActionContext {
 
 		private DebuggerObjectsProvider provider;
 
@@ -1412,7 +1412,15 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 			list.toArray(new String[] {}), lastMethod, OptionDialog.QUESTION_MESSAGE);
 		if (choice != null) {
 			TargetMethod method = (TargetMethod) attributes.get(choice);
-			Map<String, ?> args = methodDialog.promptArguments(method.getParameters());
+			TargetParameterMap parameters = method.getParameters();
+			if (parameters.isEmpty()) {
+				method.invoke(new HashMap<String, Object>());
+				if (!choice.equals("unload")) {
+					lastMethod = choice;
+				}
+				return;
+			}
+			Map<String, ?> args = methodDialog.promptArguments(parameters);
 			if (args != null) {
 				String script = (String) args.get("Script");
 				if (script != null && !script.isEmpty()) {
@@ -1669,7 +1677,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 		TargetObject result = null;
 		try {
 			result = DebugModelConventions.findSuitable(TargetExecutionStateful.class, object)
-					.get(100, TimeUnit.MILLISECONDS);
+				.get(100, TimeUnit.MILLISECONDS);
 		}
 		catch (Exception e) {
 			// IGNORE

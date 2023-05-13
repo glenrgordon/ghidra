@@ -18,6 +18,8 @@
 #include "double.hh"
 #include "subflow.hh"
 
+namespace ghidra {
+
 /// \brief A stack equation
 struct StackEqn {
   int4 var1;			///< Variable with 1 coefficient
@@ -1464,14 +1466,8 @@ void ActionFuncLink::funcLinkInput(FuncCallSpecs *fc,Funcdata &data)
 	data.opInsertInput(op,data.newVarnode(param->getSize(),param->getAddress()),op->numInput());
     }
   }
-  if (spacebase != (AddrSpace *)0) {	// If we need it, create the stackplaceholder
-    PcodeOp *op = fc->getOp();
-    int4 slot = op->numInput();
-    Varnode *loadval = data.opStackLoad(spacebase,0,1,op,(Varnode *)0,false);
-    data.opInsertInput(op,loadval,slot);
-    fc->setStackPlaceholderSlot(slot);
-    loadval->setSpacebasePlaceholder();
-  }
+  if (spacebase != (AddrSpace *)0)	// If we need it, create the stackplaceholder
+    fc->createPlaceholder(data, spacebase);
 }
 
 /// \brief Set up the return value recovery process for a single sub-function call
@@ -2393,7 +2389,7 @@ int4 ActionSetCasts::castOutput(PcodeOp *op,Funcdata &data,CastStrategy *castStr
   if (tokenct == outHighType) {
     if (tokenct->needsResolution()) {
       // operation copies directly to outvn AS a union
-      ResolvedUnion resolve(tokenct);
+      ResolvedUnion resolve(tokenct);	// Force the varnode to resolve to the parent data-type
       data.setUnionField(tokenct, op, -1, resolve);
     }
     // Short circuit more sophisticated casting tests.  If they are the same type, there is no cast
@@ -2866,8 +2862,7 @@ int4 ActionMarkExplicit::baseExplicit(Varnode *vn,int4 maxref)
     else if (useOp->code() == CPUI_PIECE) {
       Varnode *rootVn = PieceNode::findRoot(vn);
       if (vn == rootVn) return -1;
-      Datatype *ct = rootVn->getStructuredType();
-      if (ct != (Datatype *)0) {
+      if (rootVn->getDef()->isPartialRoot()) {
 	// Getting PIECEd into a structured thing.  Unless vn is a leaf, it should be implicit
 	if (def->code() != CPUI_PIECE) return -1;
 	if (vn->loneDescend() == (PcodeOp *)0) return -1;
@@ -3619,6 +3614,7 @@ void ActionDeadCode::propagateConsumed(vector<Varnode *> &worklist)
     pushConsumed(b,op->getIn(2), worklist);
     break;
   case CPUI_POPCOUNT:
+  case CPUI_LZCOUNT:
     a = 16 * op->getIn(0)->getSize() - 1;	// Mask for possible bits that could be set
     a &= outc;					// Of the bits that could be set, which are consumed
     b = (a == 0) ? 0 : ~((uintb)0);		// if any consumed, treat all input bits as consumed
@@ -4732,16 +4728,19 @@ void ActionInferTypes::buildLocaltypes(Funcdata &data)
   Datatype *ct;
   Varnode *vn;
   VarnodeLocSet::const_iterator iter;
+  TypeFactory *typegrp = data.getArch()->types;
 
   for(iter=data.beginLoc();iter!=data.endLoc();++iter) {
     vn = *iter;
     if (vn->isAnnotation()) continue;
     if ((!vn->isWritten())&&(vn->hasNoDescend())) continue;
     bool needsBlock = false;
-    if (vn->getSymbolEntry() != (SymbolEntry *)0) {
-      ct = data.checkSymbolType(vn);
-      if (ct == (Datatype *)0)
-	ct = vn->getLocalType(needsBlock);
+    SymbolEntry *entry = vn->getSymbolEntry();
+    if (entry != (SymbolEntry *)0 && !vn->isTypeLock() && entry->getSymbol()->isTypeLocked()) {
+      int4 curOff = (vn->getAddr().getOffset() - entry->getAddr().getOffset()) + entry->getOffset();
+      ct = typegrp->getExactPiece(entry->getSymbol()->getType(), curOff, vn->getSize());
+      if (ct == (Datatype *)0 || ct->getMetatype() == TYPE_UNKNOWN)	// If we can't resolve, or resolve to UNKNOWN
+	ct = vn->getLocalType(needsBlock);		// Let data-type float, even though parent symbol is type-locked
     }
     else
       ct = vn->getLocalType(needsBlock);
@@ -4956,13 +4955,9 @@ void ActionInferTypes::propagateRef(Funcdata &data,Varnode *vn,const Address &ad
     if ((cursize!=lastsize)||(curoff!=lastoff)) {
       lastoff = curoff;
       lastsize = cursize;
-      Datatype *cur = ct;
-      do {
-	lastct = cur;
-	cur = cur->getSubType(curoff,&curoff);
-      } while(cur != (Datatype *)0);
+      lastct = typegrp->getExactPiece(ct, curoff, cursize);
     }
-    if (lastct->getSize() != cursize) continue;
+    if (lastct == (Datatype *)0) continue;
 
     // Try to propagate the reference type into a varnode that is pointed to by that reference
     if (0>lastct->typeOrder(*curvn->getTempType())) {
@@ -5203,7 +5198,7 @@ void ActionDatabase::buildDefaultGroups(void)
   const char *members[] = { "base", "protorecovery", "protorecovery_a", "deindirect", "localrecovery",
 			    "deadcode", "typerecovery", "stackptrflow",
 			    "blockrecovery", "stackvars", "deadcontrolflow", "switchnorm",
-			    "cleanup", "merge", "dynamic", "casts", "analysis",
+			    "cleanup", "splitcopy", "splitpointer", "merge", "dynamic", "casts", "analysis",
 			    "fixateglobals", "fixateproto",
 			    "segment", "returnsplit", "nodejoin", "doubleload", "doubleprecis",
 			    "unreachable", "subvar", "floatprecision",
@@ -5314,6 +5309,7 @@ void ActionDatabase::universalAction(Architecture *conf)
 	actprop->addRule( new RuleAndDistribute("analysis") );
 	actprop->addRule( new RuleAndCommute("analysis") );
 	actprop->addRule( new RuleAndPiece("analysis") );
+	actprop->addRule( new RuleAndZext("analysis") );
 	actprop->addRule( new RuleAndCompare("analysis") );
 	actprop->addRule( new RuleDoubleSub("analysis") );
 	actprop->addRule( new RuleDoubleShift("analysis") );
@@ -5390,6 +5386,7 @@ void ActionDatabase::universalAction(Architecture *conf)
 	actprop->addRule( new RulePopcountBoolXor("analysis") );
 	actprop->addRule( new RuleOrMultiBool("analysis") );
 	actprop->addRule( new RuleXorSwap("analysis") );
+	actprop->addRule( new RuleLzcountShiftBool("analysis") );
 	actprop->addRule( new RuleSubvarAnd("subvar") );
 	actprop->addRule( new RuleSubvarSubpiece("subvar") );
 	actprop->addRule( new RuleSplitFlow("subvar") );
@@ -5468,6 +5465,9 @@ void ActionDatabase::universalAction(Architecture *conf)
     actcleanup->addRule( new RulePtrsubCharConstant("cleanup") );
     actcleanup->addRule( new RuleExtensionPush("cleanup") );
     actcleanup->addRule( new RulePieceStructure("cleanup") );
+    actcleanup->addRule( new RuleSplitCopy("splitcopy") );
+    actcleanup->addRule( new RuleSplitLoad("splitpointer") );
+    actcleanup->addRule( new RuleSplitStore("splitpointer") );
   }
   act->addAction( actcleanup );
 
@@ -5498,3 +5498,5 @@ void ActionDatabase::universalAction(Architecture *conf)
   act->addAction( new ActionPrototypeWarnings("protorecovery") );
   act->addAction( new ActionStop("base") );
 }
+
+} // End namespace ghidra

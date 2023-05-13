@@ -16,6 +16,8 @@
 #include "op.hh"
 #include "funcdata.hh"
 
+namespace ghidra {
+
 ElementId ELEM_IOP = ElementId("iop",113);
 ElementId ELEM_UNIMPL = ElementId("unimpl",114);
 
@@ -642,6 +644,10 @@ uintb PcodeOp::getNZMaskLocal(bool cliploop) const
   case CPUI_POPCOUNT:
     sz1 = popcount(getIn(0)->getNZMask());
     resmask = coveringmask((uintb)sz1);
+    resmask &= fullmask;
+    break;
+  case CPUI_LZCOUNT:
+    resmask = coveringmask(getIn(0)->getSize() * 8);
     resmask &= fullmask;
     break;
   case CPUI_SUBPIECE:
@@ -1325,3 +1331,5 @@ bool functionalDifference(Varnode *vn1,Varnode *vn2,int4 depth)
       return true;
   return false;
 }
+
+} // End namespace ghidra

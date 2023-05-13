@@ -104,12 +104,17 @@ public class DebuggerMemoryBytesProvider extends ProgramByteViewerComponentProvi
 		}
 
 		@Override
+		protected GoToInput getDefaultInput() {
+			return trackingTrait.getDefaultGoToInput(currentLocation);
+		}
+
+		@Override
 		protected boolean goToAddress(Address address) {
 			TraceProgramView view = current.getView();
 			if (view == null) {
 				return false;
 			}
-			return goTo(view, new ProgramLocation(view, address));
+			return DebuggerMemoryBytesProvider.this.goTo(view, new ProgramLocation(view, address));
 		}
 	}
 
@@ -372,7 +377,7 @@ public class DebuggerMemoryBytesProvider extends ProgramByteViewerComponentProvi
 		if (location == null) {
 			return false;
 		}
-		if (blockSet.getByteBlockInfo(location.getAddress()) == null) {
+		if (blockSet == null || blockSet.getByteBlockInfo(location.getAddress()) == null) {
 			return false;
 		}
 		if (!super.goTo(gotoProgram, location)) {
@@ -488,6 +493,10 @@ public class DebuggerMemoryBytesProvider extends ProgramByteViewerComponentProvi
 		}
 		TraceProgramView curView = current.getView();
 		Swing.runIfSwingOrRunLater(() -> {
+			if (curView != current.getView()) {
+				// Trace changed before Swing scheduled us
+				return;
+			}
 			goToAndUpdateTrackingLabel(curView, loc);
 		});
 	}

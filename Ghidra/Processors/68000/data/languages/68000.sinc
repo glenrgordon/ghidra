@@ -819,7 +819,12 @@ macro rotateRightExtended(count, register, width) {
 
 with : extGUARD=1 {
 
-:abcd Tyb,Txb			is op=12 & op48=16 & Tyb & Txb					{ CF = carry(Tyb,carry(Txb,XF)); Tyb = Tyb + Txb + XF; Tyb = bcdAdjust(Tyb); bcdflags(Tyb); }
+:abcd Tyb,Txb			is op=12 & op48=16 & Tyb & Txb {
+	CF = carry(Txb,carry(Tyb,XF));
+	Txb = Txb + Tyb + XF;
+	XF = bcdAdjust(Txb);
+	bcdflags(Txb);
+}
 
 :add.b eab,reg9dnb		is (op=13 & reg9dnb & op68=0)... & eab				{ addflags(eab,reg9dnb); reg9dnb = reg9dnb + eab; resflags(reg9dnb); }
 :add.w eaw,reg9dnw		is (op=13 & reg9dnw & op68=1)... & eaw				{ addflags(eaw,reg9dnw); reg9dnw = reg9dnw + eaw; resflags(reg9dnw); }
@@ -931,8 +936,6 @@ with : extGUARD=1 {
    logflags(); tmp:4 = e2l; getbitfield(tmp, f_off, f_wd); f_reg = tmp; resbitflags(f_reg, f_wd-1);
 }
 
-define pcodeop countLeadingZeros;
-
 :bfffo e2l{f_off:f_wd},f_reg	is opbig=0xed & op67=3 & $(DAT_DIR_CTL_ADDR_MODES); f_off & f_wd & f_reg & flddo=0 & fldoffdat=0 & flddw=0 & fldwddat=0; e2l
 					[ savmod2=savmod1; regtsan=regtfan; ] {
 	# "Find First One in Bit Field" pronounced "boo-foe"
@@ -945,7 +948,7 @@ define pcodeop countLeadingZeros;
 	ZF = (tmp == 0);
 	VF = 0;
 	CF = 0;
-	tmp2:4 = countLeadingZeros(tmp);
+	tmp2:4 = lzcount(tmp);
 	# NB- it seems the MSB left most bit is really at offset 0,
 	# and the right LSB is at offset 31
 	tmp3:4 = tmp2 % 32:4; # need mod for when there are all zeros, when tmp2 would = 32
@@ -1291,6 +1294,10 @@ subdiv: regdr:regdq		is regdq & regdr & divsz=1 & divsgn=1				{ divi:8 = (sext(r
 :ext.w regdnw			is op=4 & reg9dn=4 & op68=2 & op35=0 & regdnw			{ local tmp =regdnw:1; regdnw = sext(tmp); }
 :ext.l regdn			is op=4 & reg9dn=4 & op68=3 & op35=0 & regdn			{ local tmp =regdn:2; regdn = sext(tmp); }
 :extb.l regdn			is op=4 & reg9dn=4 & op68=7 & op35=0 & regdn			{ local tmp =regdn:1; regdn = sext(tmp); }
+
+@ifdef COLDFIRE
+:halt			is d16=0x4ac8							unimpl
+@endif
 
 :illegal			is d16=0x4afc							unimpl
 
@@ -1684,7 +1691,7 @@ submul: regdr-regdq		is regdq & divsgn=0 & divsz=1 & regdr			{ tmp1:8 = zext(glb
 :mul^mulsize e2l,submul		is opbig=0x4c & op67=0 & $(DAT_ALTER_ADDR_MODES); submul & mulsize; e2l [ savmod2=savmod1; regtsan=regtfan; ] { glbdenom=e2l; build submul; }
 
 :nbcd eab			is (opbig=0x48 & op67=0 & $(DAT_ALTER_ADDR_MODES))... & eab
-                   {  tmp:1 = eab; CF = (tmp != 0) || (XF == 1);  tmp = 0 - tmp - XF; eab = bcdAdjust(tmp); bcdflags(tmp); }
+{  tmp:1 = eab; CF = (tmp != 0) || (XF == 1);  tmp = 0 - tmp - XF; eab = bcdAdjust(tmp); bcdflags(tmp); }
 
 
 # NB: For the neg insn the CF carry flag is not set like other insns, from the manual:
@@ -1920,8 +1927,12 @@ ptestLevel: "#"^mregn	is mregn  { export *[const]:1 mregn; }
 
 :rts				is opbig=0x4e & op37=14 & op02=5				{ PC = *SP; SP = SP+4; return [PC]; }
 
-:sbcd Tyb,Txb			is op=8 & op48=16 & Txb & Tyb
-                    {  CF = (Tyb < Txb) || ( (XF == 1) && (Tyb == Txb) );  Tyb = Tyb - Txb - XF; Tyb = bcdAdjust(Tyb); bcdflags(Tyb); }
+:sbcd Tyb,Txb			is op=8 & op48=16 & Txb & Tyb {
+	CF = (Txb < Tyb) || ( (XF == 1) && (Txb == Tyb) );
+	Txb = Txb - Tyb - XF;
+	Txb = bcdAdjust(Txb);
+	bcdflags(Txb);
+}
 
 :s^cc eab			is (op=5 & cc & op67=3 & $(DAT_ALTER_ADDR_MODES))... & eab				{ eab = -cc; }
 
@@ -1999,7 +2010,7 @@ ptestLevel: "#"^mregn	is mregn  { export *[const]:1 mregn; }
 :tst.l eal			is (opbig=0x4a & op67=2)... & eal				{ logflags(); resflags(eal); }
 
 @ifdef COLDFIRE
-:tas eab			is (opbig=0x4a & op67=3)... & eab				{ logflags(); resflags(eab); eab = eab | 0x80; } 
+:tas eab			is (opbig=0x4a & op67=3 & $(MEM_ALTER_ADDR_MODES))... & eab				{ logflags(); resflags(eab); eab = eab | 0x80; }
 @endif # COLDFIRE
 
 :unlk regan			is opbig=0x4e & op37=11 & regan					{ SP = regan; regan = *SP; SP = SP+4; }
