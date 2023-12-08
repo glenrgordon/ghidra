@@ -79,8 +79,7 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 	 */
 	protected ByteViewerComponent(ByteViewerPanel vpanel, ByteViewerLayoutModel layoutModel,
 			DataFormatModel model, int bytesPerLine, FontMetrics fm) {
-		super(layoutModel, "Byte Viewer");
-		setFieldDescriptionProvider((l, f) -> getFieldDescription(l, f));
+		super(layoutModel);
 
 		this.panel = vpanel;
 		this.model = model;
@@ -483,7 +482,8 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 			else {
 				++endFieldOffset;
 			}
-			fsel.addRange(new FieldLocation(startLoc.getIndex(), startLoc.getFieldNum(), 0, 0),
+			fsel.addRange(
+				new FieldLocation(startLoc.getIndex(), startLoc.getFieldNum(), 0, 0),
 				new FieldLocation(endIndex, endFieldOffset, 0, 0));
 		}
 		return fsel;

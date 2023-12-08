@@ -37,7 +37,8 @@ import ghidra.app.plugin.core.codebrowser.LayeredColorModel;
 import ghidra.app.plugin.core.codebrowser.hover.ListingHoverService;
 import ghidra.app.services.ButtonPressedListener;
 import ghidra.app.util.ListingHighlightProvider;
-import ghidra.app.util.viewer.field.*;
+import ghidra.app.util.viewer.field.FieldFactory;
+import ghidra.app.util.viewer.field.ListingField;
 import ghidra.app.util.viewer.format.FieldHeader;
 import ghidra.app.util.viewer.format.FormatManager;
 import ghidra.app.util.viewer.util.*;
@@ -165,9 +166,7 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 
 	// extension point
 	protected FieldPanel createFieldPanel(LayoutModel model) {
-		FieldPanel fp = new FieldPanel(model, "Listing");
-		fp.setFieldDescriptionProvider(new ListingFieldDescriptionProvider());
-		return fp;
+		return new FieldPanel(model);
 	}
 
 	// extension point
@@ -1184,8 +1183,7 @@ public class ListingPanel extends JPanel implements FieldMouseListener, FieldLoc
 	}
 
 	public void setFormatManager(FormatManager formatManager) {
-		List<ListingHighlightProvider> highlightProviders =
-			this.formatManager.getHighlightProviders();
+		List<ListingHighlightProvider> highlightProviders = this.formatManager.getHighlightProviders();
 
 		this.formatManager = formatManager;
 
