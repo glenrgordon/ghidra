@@ -107,14 +107,7 @@ public class TerminalPanel extends JPanel implements FieldLocationListener, Fiel
 
 	protected class TerminalFieldPanel extends FieldPanel {
 		public TerminalFieldPanel(LayoutModel model) {
-			super(model, "Terminal");
-			setFieldDescriptionProvider((l, f) -> {
-				if (f == null) {
-					return null;
-				}
-				// TODO: Adjust, because lines in the history should not be counted
-				return "line " + (l.getIndex().intValue() + 1) + ": " + f.getText();
-			});
+			super(model);
 			paintContext.setFocusedCursorColor(COLOR_CURSOR_FOCUSED);
 			paintContext.setNotFocusedCursorColor(COLOR_CURSOR_UNFOCUSED);
 			paintContext.setCursorFocused(true);
