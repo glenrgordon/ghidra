@@ -122,11 +122,13 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 	private void build() {
 		outputTextPane = new JTextPane();
 		outputTextPane.setName("Interpreter Output Display");
+		outputTextPane.getAccessibleContext().setAccessibleName("Output");
 		outputScrollPane = new JScrollPane(outputTextPane);
 		outputScrollPane.setBorder(BorderFactory.createEmptyBorder());
 		promptTextPane = new JTextPane();
 		inputTextPane = new JTextPane();
 		inputTextPane.setName("Interpreter Input Field");
+		inputTextPane.getAccessibleContext().setAccessibleName("input");
 
 		outputTextPane.setBackground(BG_COLOR);
 		promptTextPane.setBackground(BG_COLOR);
@@ -138,7 +140,7 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 
 		history = new HistoryManagerImpl();
 
-		outputScrollPane.setFocusable(false);
+		//outputScrollPane.setFocusable(false);
 		promptTextPane.setFocusable(false);
 
 		stdin = new IPStdin();
@@ -147,8 +149,8 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 		outWriter = new PrintWriter(stdout, true);
 		errWriter = new PrintWriter(stderr, true);
 
-		outputTextPane.setEditable(false);
-		promptTextPane.setEditable(false);
+		//outputTextPane.setEditable(false);
+		//promptTextPane.setEditable(false);
 
 		JPanel interior = new JPanel();
 		interior.setLayout(new BorderLayout());
@@ -158,8 +160,11 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 		setLayout(new BorderLayout());
 		add(outputScrollPane, BorderLayout.CENTER);
 		add(interior, BorderLayout.SOUTH);
-
-		AbstractDocument document = (AbstractDocument) inputTextPane.getDocument();
+if (false)
+	return;
+else {
+	
+	AbstractDocument document = (AbstractDocument) inputTextPane.getDocument();
 		document.setDocumentFilter(new DocumentFilter() {
 			private String extractAndExecuteCommands(FilterBypass fb, int offset, int length,
 					String newText) {
@@ -217,7 +222,7 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 				}
 
 				// Send everything else down to the inputTextPane.
-				KeyBindingUtils.retargetEvent(inputTextPane, e);
+				//KeyBindingUtils.retargetEvent(inputTextPane, e);
 			}
 
 			@Override
@@ -324,7 +329,7 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 		FocusTraversalPolicy policy = new FocusTraversalPolicy() {
 			@Override
 			public Component getLastComponent(Container aContainer) {
-				return inputTextPane;
+				return outputTextPane;
 			}
 
 			@Override
@@ -347,9 +352,10 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 				return inputTextPane;
 			}
 		};
-		setFocusCycleRoot(true);
-		setFocusTraversalPolicy(policy);
-		setFocusTraversalPolicyProvider(true);
+		//setFocusCycleRoot(true);
+		//setFocusTraversalPolicy(policy);
+		//setFocusTraversalPolicyProvider(true);
+}
 	}
 
 	private void completionWindowTriggered(CodeCompletionWindow completionWindow) {
@@ -549,6 +555,9 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 			StyledDocument document = outputTextPane.getStyledDocument();
 			renderer.renderString(document, text, attributes);
 			repositionScrollpane();
+			if (renderer != stdInRenderer && !text.isEmpty() &&
+					!text.startsWith(">>>"))
+				outputTextPane.getAccessibleContext().firePropertyChange("AccessibleNotification","NewText" ,text);
 		}
 		catch (BadLocationException e) {
 			Msg.error(this, "internal document positioning error", e);

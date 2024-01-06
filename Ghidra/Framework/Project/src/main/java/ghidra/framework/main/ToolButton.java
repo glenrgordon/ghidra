@@ -23,6 +23,7 @@ import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.List;
 
+import javax.accessibility.*;
 import javax.swing.*;
 
 import org.jdesktop.animation.timing.TimingTarget;
@@ -101,6 +102,7 @@ class ToolButton extends EmptyBorderButton implements Draggable, Droppable {
 		associatedRunningTool = tool;
 		this.template = template;
 		setUpDragDrop();
+		putClientProperty(AccessibleContext.ACCESSIBLE_NAME_PROPERTY,this.template.getName());
 
 		// configure the look and feel of the button
 		setVerticalTextPosition(SwingConstants.BOTTOM);

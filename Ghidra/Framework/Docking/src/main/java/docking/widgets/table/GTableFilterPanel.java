@@ -20,6 +20,7 @@ import java.awt.Rectangle;
 import java.beans.PropertyChangeListener;
 import java.util.*;
 
+import javax.accessibility.*;
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.*;
@@ -391,6 +392,7 @@ public class GTableFilterPanel<ROW_OBJECT> extends JPanel {
 		});
 
 		filterStateButton.setToolTipText("Filter Options");
+		filterStateButton.putClientProperty(AccessibleContext.ACCESSIBLE_NAME_PROPERTY,getToolTipText());
 		updateFilterFactory();
 		return filterStateButton;
 	}

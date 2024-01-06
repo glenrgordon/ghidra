@@ -770,7 +770,7 @@ public abstract class PluginTool extends AbstractDockingTool {
 	}
 
 	@Override
-	public ToolOptions getOptions(String categoryName) {
+public ToolOptions getOptions(String categoryName) {
 		return optionsMgr.getOptions(categoryName);
 	}
 

@@ -15,6 +15,7 @@
  */
 package agent.dbgeng.jna.dbgeng;
 
+import java.io.File;
 import java.util.List;
 
 import com.sun.jna.*;
@@ -29,7 +30,52 @@ import agent.dbgeng.dbgeng.DebugValue.*;
 
 public interface DbgEngNative extends StdCallLibrary {
 	//DbgEngNative INSTANCE = Native.loadLibrary("dbgeng", DbgEngNative.class);
-	DbgEngNative INSTANCE = Native.load("dbgeng.dll", DbgEngNative.class);
+	DbgEngNative INSTANCE = Native.load(getPathOfMostPromisingDbgEng(), DbgEngNative.class);
+	public static String 	 getPathOfMostPromisingDbgEng()
+	{
+	String dbgEngFilename = "dbgeng.dll";
+		String fallbackDirectory = null;
+		for (String directoryName:System.getenv("path").split(";"))
+		{
+			if (new File(directoryName,dbgEngFilename).exists())
+			{
+				if (new File(directoryName,"winext" ).isDirectory())
+					{
+						return directoryName + "\\" + dbgEngFilename;
+		}
+				if (fallbackDirectory == null)
+					fallbackDirectory = directoryName;
+		}
+		}
+		String windowsKitsVersion = findDbgEngInWindowsSdk();
+		if (windowsKitsVersion != null)
+		return windowsKitsVersion;
+		if (fallbackDirectory != null)
+			return fallbackDirectory + "\\" + dbgEngFilename;
+		return dbgEngFilename;
+	}
+	private static String findDbgEngInWindowsSdk()
+	{
+	String programFilesX86Dir = System.getenv("ProgramFiles(x86)");
+	if (programFilesX86Dir == null)
+	return null;
+	String pathToDbgEng = programFilesX86Dir + "\\Windows Kits\\10\\debuggers\\" + determineArchitectureDebugDirectory() + "\\dbgeng.dll";
+	if (new File(pathToDbgEng).exists())
+	return pathToDbgEng;
+	System.out.printf("not fiound %s\n",pathToDbgEng);
+			return null;
+	}
+	
+	private static String determineArchitectureDebugDirectory()
+	{
+	String arch = System.getProperty("os.arch");
+	if (arch.equals("amd64"))
+	return "x64";
+	if (arch.equals("aarch64"))
+	return "arm64";
+	return arch;
+	}
+	
 
 	HRESULT DebugConnect(String RemoteOptions, REFIID InterfaceId, PointerByReference Interface);
 
