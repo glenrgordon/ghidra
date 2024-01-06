@@ -16,6 +16,7 @@
 package docking.widgets.fieldpanel;
 
 import static docking.widgets.EventTrigger.*;
+import static org.junit.Assume.assumeNotNull;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -2300,7 +2301,7 @@ public class FieldPanel extends JPanel
 
 		@Override
 		public int getCharCount() {
-			return 512000;
+			return 256;
 		}
 
 		@Override
@@ -2363,7 +2364,8 @@ public class FieldPanel extends JPanel
 			boolean justOneField =startFieldNum == endFieldNum;
 			for ( int fieldNum = startFieldNum;fieldNum <= endFieldNum;fieldNum++) {
 				Field field = layout .getField(fieldNum);
-				if (field == null) continue;
+				if (field == null || field.getNumRows() <= startRow)
+					continue;
 				String fieldText = field.getText();
 				if (fieldText == null)
 					continue;
@@ -2387,7 +2389,13 @@ public class FieldPanel extends JPanel
 
 		@Override
 		public AccessibleTextSequence getTextSequenceAt(int part, int index) {
-			Field field = getCurrentField();
+						AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex()); 
+			if (layout == null) return null;
+			int fieldNum = fieldNumFromSimulatedOffset(index);
+			int row = rowFromSimulatedOffset(index);
+			int col = colFromSimulatedOffset(index);
+
+			Field field =  layout.getField(fieldNum);
 			if (field == null) 
 				return null;
 			var text = field.getText();
@@ -2397,30 +2405,24 @@ public class FieldPanel extends JPanel
 			switch (part) {
 			case AccessibleText.CHARACTER:
 			{
-				int offset = field.screenLocationToTextOffset(cursorPosition.row,cursorPosition.col);
+				int offset = field.screenLocationToTextOffset(row,col);
 				if (offset >= text.length())
 					return null;
-				//System.out.printf("char sequence: %d %d/%d, %s\n",cursorPosition.fieldNum,cursorPosition.row,cursorPosition.col,text.substring(offset,offset+1));
-				int simulatedOffset = toSimulatedOffset(cursorPosition.fieldNum,cursorPosition.row,cursorPosition.col);
-				return new AccessibleTextSequence(simulatedOffset,simulatedOffset+1,text.substring(offset,offset+1));
+				return new AccessibleTextSequence(index,index+1,text.substring(offset,offset+1));
 			}
 			
 			case AccessibleText.WORD:
 			{
-				int simulatedStartOffset = toSimulatedOffset(cursorPosition.fieldNum,cursorPosition.row,0);
-				int simulatedEndOffset = simulatedStartOffset+field.getNumCols(cursorPosition.row);
+				int simulatedStartOffset = toSimulatedOffset(fieldNum,row,0);
+				int simulatedEndOffset = simulatedStartOffset+field.getNumCols(row);
 				return new AccessibleTextSequence(simulatedStartOffset,simulatedEndOffset,text);
 			}
 			case AccessibleExtendedText.LINE:
 			{
-				AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex());
-				if (layout ==null)
-						return null;;
-				int firstFieldNum = layout.getBeginRowFieldNum(cursorPosition.fieldNum);
+				int firstFieldNum = layout.getBeginRowFieldNum(fieldNum);
 				Field firstField =  layout.getField(firstFieldNum);
 
 				int lastFieldNum = layout.getEndRowFieldNum(firstFieldNum);
-				//System.out.printf("get line Sequence for line %d, field %d, %d, %d\n",cursorPosition.getIndex(),cursorPosition.fieldNum,firstFieldNum,lastFieldNum);
 				
 				if (firstFieldNum == lastFieldNum)
 					return null;
@@ -2428,19 +2430,17 @@ public class FieldPanel extends JPanel
 				while (lastFieldNum > firstFieldNum)
 				{
 					Field testField =  layout.getField(lastFieldNum-1);
-					if (cursorPosition.row < testField.getNumRows()) {
+					if (row < testField.getNumRows()) {
 						lastField = testField;
 						break;
 					}
 
 					lastFieldNum--;
-					//System.out.printf("reducing last field num to %d\n",lastFieldNum);				
 					}
 				if (lastField == null)
 					return null;
-				//System.out.printf("last field cols %d, %s\n",lastField.getNumCols(cursorPosition.row),lastField.getText());
-				int simulatedStart = toSimulatedOffset(firstFieldNum, cursorPosition.row,0);
-				int simulatedEnd =toSimulatedOffset(lastFieldNum-1, cursorPosition.row,lastField.getNumCols(cursorPosition.row));
+				int simulatedStart = toSimulatedOffset(firstFieldNum, row,0);
+				int simulatedEnd =toSimulatedOffset(lastFieldNum-1, row,lastField.getNumCols(row));
 				return new AccessibleTextSequence(simulatedStart,simulatedEnd,"dummy");
 			}
 			default:
@@ -2487,21 +2487,79 @@ public class FieldPanel extends JPanel
 		}
 		int toSimulatedOffset(int fieldNum,int row, int col)
 		{
+			AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout ==null)
+				return 0;
+			int fieldCount = layout.getNumFields();
+			if (fieldCount == 0)
+				return 0;
+			int accumulatedLength = 0;
+			for (int rowIdx = 0; rowIdx <= row;rowIdx++)
+			{
+				for (int fieldIdx = 0;fieldIdx< fieldCount;fieldIdx++)
+				{
+					Field field = layout.getField(fieldIdx);
+					if (field == null || rowIdx >= field.getNumRows())
+						continue;
+					if (row == rowIdx && fieldNum == fieldIdx) {
+						accumulatedLength  +=col;
+						return accumulatedLength;
+					}
+ 					accumulatedLength += field.getNumCols(rowIdx);
+				}
+				}
+				return accumulatedLength;
+			}
+		
+		FieldLocation fromSimulatedOffset(int offset) {
+			AnchoredLayout layout =findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout ==null)
+				return null;
+			int fieldCount = layout.getNumFields();
+			if (fieldCount == 0)
+				return null;
+			int accumulatedLength = 0;
+			int  lastValidRowIdx = 0;
+			for (int rowIdx = 0; rowIdx <= 5;rowIdx++)
+			{
+				for (int fieldIdx = 0;fieldIdx< fieldCount;fieldIdx++)
+				{
+					Field field = layout.getField(fieldIdx);
+					if (field == null || rowIdx >= field.getNumRows())
+						continue;
+					lastValidRowIdx = rowIdx;
+					if (offset <= accumulatedLength +field.getNumCols(rowIdx)) {
+						return new FieldLocation(cursorPosition.getIndex(),fieldIdx,rowIdx,offset-accumulatedLength);
+					}
+					accumulatedLength += field.getNumCols(rowIdx);
+				}
+				}
+						return new FieldLocation(cursorPosition.getIndex(),fieldCount-1,lastValidRowIdx,99);
+}
+
+int toSimulatedOffsetOld(int fieldNum,int row, int col)
+		{
 			fieldNum <<= 16;
 			row <<= 8;
 			return fieldNum | row|col;
 		}
 		int fieldNumFromSimulatedOffset(int offset)
 		{
-			return (offset & 0xff0000) >> 16;
+			//			return (offset & 0xff0000) >> 16;
+			FieldLocation loc = fromSimulatedOffset(offset);
+			return (loc!= null)?loc.fieldNum:0;
 		}
 		int rowFromSimulatedOffset(int offset)
 		{
-			return (offset & 0xff00) >>8;
+			//			return (offset & 0xff00) >>8;
+			FieldLocation loc = fromSimulatedOffset(offset);
+			return (loc!= null)?loc.row:0;
 		}
 		int colFromSimulatedOffset(int offset)
 		{
-	return (offset & 0xff);
+			//	return (offset & 0xff);
+			FieldLocation loc = fromSimulatedOffset(offset);
+			return (loc!= null)?loc.col:0;
 		}
 
 	}
