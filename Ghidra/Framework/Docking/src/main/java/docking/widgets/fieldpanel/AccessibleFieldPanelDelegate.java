@@ -450,4 +450,29 @@ public class AccessibleFieldPanelDelegate {
 			return layout.getIndex();
 		}
 	}
+
+	public Rectangle getTextBounds(int startIndex, int endIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public String getTextRange(int startIndex, int endIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public AccessibleTextSequence getTextSequenceAfter(int part, int index) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public AccessibleTextSequence getTextSequenceAt(int part, int index) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public AccessibleTextSequence getTextSequenceBefore(int part, int index) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

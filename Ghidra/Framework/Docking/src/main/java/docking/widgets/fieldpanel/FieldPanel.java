@@ -1393,7 +1393,8 @@ public class FieldPanel extends JPanel
 	// We are forced to declare this as an inner class because AccessibleJComponent is a 
 	// non-static inner class. So this is just a stub and defers all its logic to
 	// the AccessibleFieldPanelDelegate.
-	class AccessibleFieldPanel extends AccessibleJComponent implements AccessibleText {
+	class AccessibleFieldPanel extends AccessibleJComponent
+		implements AccessibleText, AccessibleExtendedText, AccessibleEditableText {
 		private AccessibleFieldPanelDelegate delegate;
 
 		AccessibleFieldPanel() {
@@ -1413,16 +1414,6 @@ public class FieldPanel extends JPanel
 		}
 
 		@Override
-		public String getAccessibleDescription() {
-			return delegate.getFieldDescription();
-		}
-
-		@Override
-		public String getAccessibleName() {
-			return name;
-		}
-
-		@Override
 		public AccessibleText getAccessibleText() {
 			return this;
 		}
@@ -1434,22 +1425,6 @@ public class FieldPanel extends JPanel
 			accessibleStateSet.add(AccessibleState.MULTI_LINE);
 			accessibleStateSet.add(AccessibleState.MANAGES_DESCENDANTS);
 			return accessibleStateSet;
-		}
-
-		@Override
-		public int getAccessibleChildrenCount() {
-			return delegate.getFieldCount();
-		}
-
-		@Override
-		public Accessible getAccessibleChild(int i) {
-			AccessibleField field = delegate.getAccessibleField(i);
-			return field;
-		}
-
-		@Override
-		public Accessible getAccessibleAt(Point p) {
-			return delegate.getAccessibleAt(p);
 		}
 
 		public void updateLayouts() {
@@ -1517,6 +1492,78 @@ public class FieldPanel extends JPanel
 			return delegate.getSelectedText();
 		}
 
+		@Override
+		public String  getTextRange(int startIndex, int endIndex) {
+			return delegate.getTextRange(startIndex, endIndex);
+		}
+
+		@Override
+		public AccessibleTextSequence getTextSequenceAt(int part, int index) {
+			return delegate.getTextSequenceAt(part, index);
+		}
+		
+		@Override
+		public AccessibleTextSequence getTextSequenceAfter(int part, int index) {
+			return delegate.getTextSequenceAfter(part, index);
+		}
+
+		@Override
+		public AccessibleTextSequence getTextSequenceBefore(int part, int index) {
+			return delegate.getTextSequenceBefore(part, index);
+		}
+
+		@Override
+		public Rectangle getTextBounds(int startIndex, int endIndex) {
+			return delegate.getTextBounds(startIndex, endIndex);
+		}
+
+		@Override
+		public void setTextContents(String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void insertTextAtIndex(int index, String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void delete(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void cut(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void paste(int startIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void replaceText(int startIndex, int endIndex, String s) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void selectText(int startIndex, int endIndex) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void setAttributes(int startIndex, int endIndex, AttributeSet as) {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 
 	private class FieldPanelMouseAdapter extends MouseAdapter {
