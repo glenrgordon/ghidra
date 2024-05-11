@@ -14,6 +14,7 @@ data/languages/evx.sinc||GHIDRA||||END|
 data/languages/g2.sinc||GHIDRA||||END|
 data/languages/lmwInstructions.sinc||GHIDRA||||END|
 data/languages/lswInstructions.sinc||GHIDRA||||END|
+data/languages/mulhwInstructions.sinc||GHIDRA||||END|
 data/languages/old/oldPPC.lang||GHIDRA||||END|
 data/languages/old/oldPPC.trans||GHIDRA||||END|
 data/languages/ppc.dwarf||GHIDRA||||END|
@@ -62,5 +63,6 @@ data/languages/vsx.sinc||GHIDRA||||END|
 data/manuals/PowerISA.idx||GHIDRA||||END|
 data/manuals/PowerPC.idx||GHIDRA||||END|
 data/patterns/PPC_BE_patterns.xml||GHIDRA||||END|
+data/patterns/PPC_LE_patterns.xml||GHIDRA||||END|
 data/patterns/patternconstraints.xml||GHIDRA||||END|
 data/ppc64-r2CallStubs.xml||GHIDRA||||END|

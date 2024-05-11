@@ -662,7 +662,7 @@ public class ByteViewerPanel extends JPanel implements LayoutModel, LayoutListen
 
 		// for the index/address column
 		indexFactory = new IndexFieldFactory(fontMetrics);
-		indexPanel = new FieldPanel(this, "Byte Viewer");
+		indexPanel = new FieldPanel(this);
 
 		indexPanel.enableSelection(false);
 		indexPanel.setCursorOn(false);

@@ -242,7 +242,7 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 			Address address = null;
 			try {
 				short sectionNum = symbol.getSectionNumber();
-				if (sectionNum == 0) {//external symbols
+				if (sectionNum == CoffSymbolSectionNumber.N_UNDEF) {//external symbols
 					address = externalAddress;
 					String name = symbol.getName();
 					Symbol sym = symbolTable.getGlobalSymbol(name, address);
@@ -255,13 +255,17 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 					externalAddress = externalAddress
 							.add(getPointerSizeAligned(externalAddress.getAddressSpace()));
 				}
-				else if (sectionNum <= -2) {
+				else if (sectionNum < CoffSymbolSectionNumber.N_DEBUG) {
 					log.appendMsg("Strange symbol " + symbol + " : " + symbol.getBasicType() +
 						" - from section " + sectionNum);
 				}
+				else if (sectionNum == CoffSymbolSectionNumber.N_DEBUG) {
+					// skip debug symbols
+					continue;
+				}
 				else {
 					CoffSectionHeader section = null;
-					if (sectionNum == -1) { // absolute symbols
+					if (sectionNum == CoffSymbolSectionNumber.N_ABS) { // absolute symbols {
 						// usually corresponds to IO or memory registers
 						address = CoffSectionHeader.getAddress(program.getLanguage(),
 							symbol.getValue(), program.getLanguage().getDefaultDataSpace());
@@ -344,6 +348,9 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 
 				// assume any value in external is writable.
 				block.setWrite(true);
+
+				// Mark block as an artificial fabrication
+				block.setArtificial(true);
 
 				Address current = externalAddressStart;
 				while (current.compareTo(externalAddress) < 0) {
@@ -694,7 +701,13 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 								++failureCount;
 								failedAddr = address;
 								handleRelocationError(program, address, relocationType,
-									"Unsupported COFF relocation type", null);
+									"unsupported type", null);
+							}
+							else if (status == Status.FAILURE) {
+								++failureCount;
+								failedAddr = address;
+								handleRelocationError(program, address, relocationType,
+									"unknown reason", null);
 							}
 						}
 					}
@@ -741,8 +754,8 @@ public class CoffLoader extends AbstractLibrarySupportLoader {
 		}
 	}
 
-	private void handleRelocationError(Program program, Address address,
-			Short relocationType, String message, Exception causeToReport) {
+	private void handleRelocationError(Program program, Address address, Short relocationType,
+			String message, Exception causeToReport) {
 		String bookmarkMessage =
 			String.format("Failed to apply COFF Relocation type 0x%x: %s", relocationType, message);
 		program.getBookmarkManager()

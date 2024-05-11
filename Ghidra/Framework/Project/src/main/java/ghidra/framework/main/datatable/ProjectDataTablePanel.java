@@ -54,9 +54,9 @@ public class ProjectDataTablePanel extends JPanel {
 	public Set<DomainFile> filesPendingSelection;
 
 	private GHtmlLabel capacityExceededText =
-		new GHtmlLabel("<HTML><CENTER><I>Table view disabled for very large projects, or<BR>" +
+		new GHtmlLabel("<html><CENTER><I>Table view disabled for very large projects, or<BR>" +
 			"if an older project/repository filesystem is in use.<BR>" +
-			"View will remain disabled until project is closed.</I></CENTER></HTML>");
+			"View will remain disabled until project is closed.</I></CENTER></html>");
 
 	private GGlassPanePainter painter = new TableGlassPanePainter();
 
@@ -95,12 +95,20 @@ public class ProjectDataTablePanel extends JPanel {
 				checkOpen(e);
 			}
 		});
-		gTable.getSelectionModel().addListSelectionListener(
-			e -> plugin.getTool().contextChanged(null));
+		gTable.getSelectionModel()
+				.addListSelectionListener(e -> plugin.getTool().contextChanged(null));
 		gTable.setDefaultRenderer(Date.class, new DateCellRenderer());
 		gTable.setDefaultRenderer(DomainFileType.class, new TypeCellRenderer());
 
 		new ProjectDataTableDnDHandler(gTable, model);
+	}
+
+	/**
+	 * Determine if table capacity has been exceeded and files are not shown
+	 * @return true if files are not shown in project data table, else false
+	 */
+	public boolean isCapacityExceeded() {
+		return capacityExceeded;
 	}
 
 	public void dispose() {
@@ -275,7 +283,7 @@ public class ProjectDataTablePanel extends JPanel {
 
 //==================================================================================================
 // Inner Classes
-//==================================================================================================	
+//==================================================================================================
 
 	private class ProjectDataTableDomainFolderChangeListener implements DomainFolderChangeListener {
 
@@ -364,11 +372,6 @@ public class ProjectDataTablePanel extends JPanel {
 		}
 
 		@Override
-		public void domainFolderSetActive(DomainFolder folder) {
-			// don't care
-		}
-
-		@Override
 		public void domainFileStatusChanged(DomainFile file, boolean fileIDset) {
 			if (ignoreChanges()) {
 				return;
@@ -378,24 +381,6 @@ public class ProjectDataTablePanel extends JPanel {
 			plugin.getTool().contextChanged(null);
 		}
 
-		@Override
-		public void domainFileObjectReplaced(DomainFile file, DomainObject oldObject) {
-			if (ignoreChanges()) {
-				return;
-			}
-			clearInfo(file);
-			table.repaint();
-		}
-
-		@Override
-		public void domainFileObjectOpenedForUpdate(DomainFile file, DomainObject object) {
-			// don't care
-		}
-
-		@Override
-		public void domainFileObjectClosed(DomainFile file, DomainObject object) {
-			// don't care
-		}
 	}
 
 	/**

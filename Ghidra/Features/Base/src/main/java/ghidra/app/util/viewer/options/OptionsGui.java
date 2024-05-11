@@ -40,7 +40,6 @@ import generic.theme.GThemeDefaults.Colors.Palette;
 import ghidra.GhidraOptions;
 import ghidra.app.util.viewer.field.ListingColors;
 import ghidra.app.util.viewer.field.ListingColors.*;
-import ghidra.util.SystemUtilities;
 
 /**
  * Class for displaying and manipulating field colors and fonts.
@@ -139,7 +138,7 @@ public class OptionsGui extends JPanel {
 	 */
 	public OptionsGui(Font font, PropertyChangeListener listener) {
 		propertyChangeListener = listener;
-		setBaseFont(SystemUtilities.adjustForFontSizeOverride(font));
+		setBaseFont(font);
 		genLayouts();
 		buildPanel();
 		fieldPanel.setBackgroundColor(BACKGROUND.getColor());

@@ -44,6 +44,7 @@ import utility.application.ApplicationLayout;
 
 public class BSimLaunchable implements GhidraLaunchable {
 
+	// BSim log4j config file resides at root of resource directory
 	private static final String BSIM_LOGGING_CONFIGURATION_FILE = "bsim.log4j.xml";
 
 	private static final int DEFAULT_LIST_EXE_LIMIT = 20;
@@ -157,7 +158,7 @@ public class BSimLaunchable implements GhidraLaunchable {
 	private static final Set<String> LIST_FUNCTIONS_OPTIONS = 
 			Set.of(MD5_OPTION, NAME_OPTION, ARCH_OPTION, COMPILER_OPTION, PRINT_SELF_SIGNIFICANCE_OPTION, CALL_GRAPH_OPTION, PRINT_JUST_EXE_OPTION, MAX_FUNC_OPTION);
 	private static final Set<String> GET_EXECUTABLES_OPTIONS = 
-			Set.of(MD5_OPTION, NAME_OPTION, ARCH_OPTION, COMPILER_OPTION, SORT_COL_OPTION, INCLUDE_LIBS_OPTION);
+			Set.of(MD5_OPTION, NAME_OPTION, ARCH_OPTION, COMPILER_OPTION, SORT_COL_OPTION, LIMIT_OPTION, INCLUDE_LIBS_OPTION);
 	private static final Set<String> GET_EXECUTABLES_COUNT_OPTIONS = 
 			Set.of(MD5_OPTION, NAME_OPTION, ARCH_OPTION, COMPILER_OPTION, INCLUDE_LIBS_OPTION);
 	//@formatter:on
@@ -930,9 +931,26 @@ public class BSimLaunchable implements GhidraLaunchable {
 		}
 	}
 
+	private static void printMaxMemory() {
+		// division is used since default case may not use even multiples of 1024
+		long maxMemoryBytes = Runtime.getRuntime().maxMemory();
+		float maxMem = maxMemoryBytes / (1024 * 1024); // MBytes
+		String units = " MBytes";
+		if (maxMem >= 1024) {
+			maxMem /= 1024;
+			units = " GBytes";
+		}
+		String maxMemStr = String.format("%.1f", maxMem);
+		if (maxMemStr.endsWith(".0")) {
+			// don't show .0
+			maxMemStr = maxMemStr.substring(0, maxMemStr.length() - 2);
+		}
+		System.out.println("Max-Memory: " + maxMemStr + units);
+	}
+
 	private static void printUsage() {
 		//@formatter:off
-		System.err.println(
+		System.err.println("\n" +
 			"USAGE: bsim [command]       required-args... [OPTIONS...]\n" + 
 			"            createdatabase  <bsimURL> <config_template> [--name|-n \"<name>\"] [--owner|-o \"<owner>\"] [--description|-d \"<text>\"] [--nocallgraph]\n" + 
 			"            setmetadata     <bsimURL> [--name|-n \"<name>\"] [--owner|-o \"<owner>\"] [--description|-d \"<text>\"]\n" + 
@@ -978,6 +996,9 @@ public class BSimLaunchable implements GhidraLaunchable {
 
 	@Override
 	public void launch(GhidraApplicationLayout ghidraLayout, String[] params) {
+
+		printMaxMemory();
+
 		if (params.length == 0) {
 			printUsage();
 			return;
@@ -1036,18 +1057,9 @@ public class BSimLaunchable implements GhidraLaunchable {
 		 */
 		System.setProperty(SystemUtilities.HEADLESS_PROPERTY, Boolean.TRUE.toString());
 
-		try {
-			URL configFileUrl =
-				BSimLaunchable.class.getClassLoader().getResource(BSIM_LOGGING_CONFIGURATION_FILE);
-			System.setProperty(LoggingInitialization.LOG4J2_CONFIGURATION_PROPERTY,
-				configFileUrl.toURI().toString());
-		}
-		catch (URISyntaxException e) {
-			System.err.println("ERROR: " + e.getMessage());
-		}
-
-		// Allows handling of old content which did not have a content type property
-		DomainObjectAdapter.setDefaultContentClass(ProgramDB.class);
+		// Use BSim log config to ensure we get desired console output
+		System.setProperty(LoggingInitialization.LOG4J2_CONFIGURATION_PROPERTY,
+			BSIM_LOGGING_CONFIGURATION_FILE); 
 
 		ApplicationConfiguration config;
 		switch (type) {

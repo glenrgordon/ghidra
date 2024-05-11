@@ -1986,6 +1986,7 @@ public class FieldPanel extends JPanel
 			// Make sure the position is valid
 			if ((index.compareTo(BigInteger.ZERO) < 0) ||
 				(index.compareTo(model.getNumIndexes()) >= 0)) {
+				notifyCursorChanged(trigger);
 				return false;
 			}
 
