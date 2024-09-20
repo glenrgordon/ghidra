@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -86,7 +86,7 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 	 * </ol>
 	 * Ghidra has altered this flow to be:
 	 * <ol>
-	 *     <li><b>Reserved keybinding actions</b>
+	 *     <li><b>Reserved keybinding actions</b></li>
 	 *     <li>KeyListeners on the focused Component</li>
 	 *     <li>InputMap and ActionMap actions for the Component</li>
 	 *     <li><b>Ghidra tool-level actions</b></li>
@@ -127,8 +127,8 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 			return false; // let the normal event flow continue
 		}
 
-		// *Special*, reserved key bindings--these can always be processed
-		if (processReservedKeyActionsPrecedence(action, event)) {
+		// *Special*, System key bindings--these can always be processed and are a higher priority
+		if (processSystemActionPrecedence(action, event)) {
 			return true;
 		}
 
@@ -245,6 +245,16 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 		return true; // default case; allow it through
 	}
 
+	private boolean isSettingKeyBindings(KeyEvent event) {
+		Component destination = event.getComponent();
+		if (destination == null) {
+			Component focusOwner = focusProvider.getFocusOwner();
+			destination = focusOwner;
+		}
+
+		return destination instanceof KeyEntryTextField;
+	}
+
 	private boolean willBeHandledByTextComponent(KeyEvent event) {
 
 		Component destination = event.getComponent();
@@ -301,10 +311,16 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 		throw new AssertException("New precedence added to KeyBindingPrecedence?");
 	}
 
-	private boolean processReservedKeyActionsPrecedence(DockingKeyBindingAction action,
+	private boolean processSystemActionPrecedence(DockingKeyBindingAction action,
 			KeyEvent event) {
 
-		if (!action.isReservedKeybindingPrecedence()) {
+		if (isSettingKeyBindings(event)) {
+			// This means the user is setting keybindings.  Do not process System actions during 
+			// this operation so that the user can assign those keybindings.
+			return false;
+		}
+
+		if (!action.isSystemKeybindingPrecedence()) {
 			return false;
 		}
 

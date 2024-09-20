@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -478,6 +478,7 @@ public class PcodeDataTypeManager {
 		}
 		encoder.writeString(ATTRIB_METATYPE, "struct");
 		encoder.writeSignedInteger(ATTRIB_SIZE, sz);
+		encoder.writeSignedInteger(ATTRIB_ALIGNMENT, type.getAlignment());
 		DataTypeComponent[] comps = type.getDefinedComponents();
 		for (DataTypeComponent comp : comps) {
 			if (comp.isBitFieldComponent() || comp.getLength() == 0) {
@@ -509,6 +510,7 @@ public class PcodeDataTypeManager {
 		encodeNameIdAttributes(encoder, unionType);
 		encoder.writeString(ATTRIB_METATYPE, "union");
 		encoder.writeSignedInteger(ATTRIB_SIZE, unionType.getLength());
+		encoder.writeSignedInteger(ATTRIB_ALIGNMENT, unionType.getAlignment());
 		DataTypeComponent[] comps = unionType.getDefinedComponents();
 		for (DataTypeComponent comp : comps) {
 			if (comp.getLength() == 0) {
@@ -539,14 +541,8 @@ public class PcodeDataTypeManager {
 	private void encodeEnum(Encoder encoder, Enum type, int size) throws IOException {
 		encoder.openElement(ELEM_TYPE);
 		encodeNameIdAttributes(encoder, type);
+		String metatype = type.isSigned() ? "int" : "uint";
 		long[] keys = type.getValues();
-		String metatype = "uint";
-		for (long key : keys) {
-			if (key < 0) {
-				metatype = "int";
-				break;
-			}
-		}
 		encoder.writeString(ATTRIB_METATYPE, metatype);
 		encoder.writeSignedInteger(ATTRIB_SIZE, type.getLength());
 		encoder.writeBool(ATTRIB_ENUM, true);
@@ -830,8 +826,8 @@ public class PcodeDataTypeManager {
 
 	/**
 	 * Encode a TypeDef data-type to the stream.  Generally this sends
-	 * a \<def> element with a \<typeref> reference to the underlying data-type being typedefed,
-	 * but we check for Settings on the TypeDef object that can indicate
+	 * a {@code <def>} element with a {@code <typeref>} reference to the underlying data-type being
+	 * typedefed, but we check for Settings on the TypeDef object that can indicate
 	 * specialty data-types with their own encodings.
 	 * @param encoder is the stream encoder
 	 * @param type is the TypeDef to build the XML for
@@ -1289,6 +1285,19 @@ public class PcodeDataTypeManager {
 		}
 		if (tp instanceof Array) {
 			return TYPE_ARRAY;
+		}
+		if (tp instanceof CharDataType) {
+			return ((CharDataType) tp).isSigned() ? TYPE_INT : TYPE_UINT;
+		}
+		if (tp instanceof WideCharDataType || tp instanceof WideChar16DataType ||
+			tp instanceof WideChar32DataType) {
+			return TYPE_INT;
+		}
+		if (tp instanceof Enum) {
+			return ((Enum) tp).isSigned() ? TYPE_INT : TYPE_UINT;
+		}
+		if (tp instanceof FunctionDefinition) {
+			return TYPE_CODE;
 		}
 		return TYPE_UNKNOWN;
 	}

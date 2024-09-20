@@ -115,10 +115,10 @@ public record AttributeId(String name, int id) {
 	public static final AttributeId ATTRIB_CHAR = new AttributeId("char", 49);
 	public static final AttributeId ATTRIB_CORE = new AttributeId("core", 50);
 	public static final AttributeId ATTRIB_ENUM = new AttributeId("enum", 51);
-	public static final AttributeId ATTRIB_ENUMSIGNED = new AttributeId("enumsigned", 52);
-	public static final AttributeId ATTRIB_ENUMSIZE = new AttributeId("enumsize", 53);
-	public static final AttributeId ATTRIB_INTSIZE = new AttributeId("intsize", 54);
-	public static final AttributeId ATTRIB_LONGSIZE = new AttributeId("longsize", 55);
+//	public static final AttributeId ATTRIB_ENUMSIGNED = new AttributeId("enumsigned", 52);  // deprecated
+//	public static final AttributeId ATTRIB_ENUMSIZE = new AttributeId("enumsize", 53);  // deprecated
+//	public static final AttributeId ATTRIB_INTSIZE = new AttributeId("intsize", 54);  // deprecated
+//	public static final AttributeId ATTRIB_LONGSIZE = new AttributeId("longsize", 55);  // deprecated
 	public static final AttributeId ATTRIB_OPAQUESTRING = new AttributeId("opaquestring", 56);
 	public static final AttributeId ATTRIB_SIGNED = new AttributeId("signed", 57);
 	public static final AttributeId ATTRIB_STRUCTALIGN = new AttributeId("structalign", 58);
@@ -171,7 +171,7 @@ public record AttributeId(String name, int id) {
 
 	// space
 	public static final AttributeId ATTRIB_BASE = new AttributeId("base", 89);
-	public static final AttributeId ATTRIB_DEADCODEDELAY = new AttributeId("deadcodedelay", 90);
+//	public static final AttributeId ATTRIB_DEADCODEDELAY = new AttributeId("deadcodedelay", 90);
 	public static final AttributeId ATTRIB_DELAY = new AttributeId("delay", 91);
 	public static final AttributeId ATTRIB_LOGICALSIZE = new AttributeId("logicalsize", 92);
 	public static final AttributeId ATTRIB_PHYSICAL = new AttributeId("physical", 93);
@@ -234,6 +234,11 @@ public record AttributeId(String name, int id) {
 //	public static final AttributeId ATTRIB_TARGET = new AttributeId("target", 142);
 //	public static final AttributeId ATTRIB_VARIANT = new AttributeId("variant", 143);
 //	public static final AttributeId ATTRIB_VERSION = new AttributeId("version", 144);
+
+	// signature
+	public static final AttributeId ATTRIB_BADDATA = new AttributeId("baddata", 145);
+	public static final AttributeId ATTRIB_HASH = new AttributeId("hash", 146);
+	public static final AttributeId ATTRIB_UNIMPL = new AttributeId("unimpl", 147);
 
 // public static final AttributeId ATTRIB_ADDRESS = new AttributeId("address", 148);
 	public static final AttributeId ATTRIB_STORAGE = new AttributeId("storage", 149);

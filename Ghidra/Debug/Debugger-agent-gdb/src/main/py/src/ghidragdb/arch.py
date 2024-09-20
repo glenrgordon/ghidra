@@ -18,9 +18,11 @@ from ghidratrace.client import Address, RegVal
 import gdb
 
 # NOTE: This map is derived from the ldefs using a script
+# i386 is hand-patched
 language_map = {
     'aarch64': ['AARCH64:BE:64:v8A', 'AARCH64:LE:64:AppleSilicon', 'AARCH64:LE:64:v8A'],
     'aarch64:ilp32': ['AARCH64:BE:32:ilp32', 'AARCH64:LE:32:ilp32', 'AARCH64:LE:64:AppleSilicon'],
+    'arm': ['ARM:BE:32:v8', 'ARM:BE:32:v8T', 'ARM:LE:32:v8', 'ARM:LE:32:v8T'],
     'arm_any': ['ARM:BE:32:v8', 'ARM:BE:32:v8T', 'ARM:LE:32:v8', 'ARM:LE:32:v8T'],
     'armv2': ['ARM:BE:32:v4', 'ARM:LE:32:v4'],
     'armv2a': ['ARM:BE:32:v4', 'ARM:LE:32:v4'],
@@ -48,6 +50,7 @@ language_map = {
     'avr:51': ['avr8:LE:16:atmega256'],
     'avr:6': ['avr8:LE:16:atmega256'],
     'hppa2.0w': ['pa-risc:BE:32:default'],
+    'i386': ['x86:LE:32:default'],
     'i386:intel': ['x86:LE:32:default'],
     'i386:x86-64': ['x86:LE:64:default'],
     'i386:x86-64:intel': ['x86:LE:64:default'],
@@ -83,9 +86,9 @@ data64_compiler_map = {
 
 x86_compiler_map = {
     'GNU/Linux': 'gcc',
-    'Windows': 'Visual Studio',
+    'Windows': 'windows',
     # This may seem wrong, but Ghidra cspecs really describe the ABI
-    'Cygwin': 'Visual Studio',
+    'Cygwin': 'windows',
 }
 
 compiler_map = {
@@ -102,7 +105,7 @@ def get_arch():
 
 def get_endian():
     parm = gdb.parameter('endian')
-    if parm != 'auto':
+    if not parm in ['', 'auto', 'default']:
         return parm
     # Once again, we have to hack using the human-readable 'show'
     show = gdb.execute('show endian', to_string=True)
@@ -115,7 +118,7 @@ def get_endian():
 
 def get_osabi():
     parm = gdb.parameter('osabi')
-    if not parm in ['auto', 'default']:
+    if not parm in ['', 'auto', 'default']:
         return parm
     # We have to hack around the fact the GDB won't give us the current OS ABI
     # via the API if it is "auto" or "default". Using "show", we can get it, but
@@ -130,7 +133,7 @@ def get_osabi():
 def compute_ghidra_language():
     # First, check if the parameter is set
     lang = gdb.parameter('ghidra-language')
-    if lang != 'auto':
+    if not lang in ['', 'auto', 'default']:
         return lang
 
     # Get the list of possible languages for the arch. We'll need to sift
@@ -155,7 +158,7 @@ def compute_ghidra_language():
 def compute_ghidra_compiler(lang):
     # First, check if the parameter is set
     comp = gdb.parameter('ghidra-compiler')
-    if comp != 'auto':
+    if not comp in ['', 'auto', 'default']:
         return comp
 
     # Check if the selected lang has specific compiler recommendations

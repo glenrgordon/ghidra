@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,12 +33,13 @@ import docking.DialogComponentProvider;
 import docking.widgets.checkbox.GCheckBox;
 import docking.widgets.combobox.GhidraComboBox;
 import docking.widgets.label.*;
+import docking.widgets.list.GComboBoxCellRenderer;
 import docking.widgets.list.GListCellRenderer;
 import docking.widgets.spinner.IntegerSpinner;
 import docking.widgets.table.threaded.ThreadedTableModelListener;
 import generic.jar.ResourceFile;
 import generic.theme.GThemeDefaults;
-import ghidra.app.services.GoToService;
+import generic.theme.Gui;
 import ghidra.app.services.StringTranslationService;
 import ghidra.app.services.StringTranslationService.TranslateOptions;
 import ghidra.docking.settings.Settings;
@@ -71,6 +72,8 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 		Map.entry(CharsetInfo.UTF8, StringUTF8DataType.dataType),
 		Map.entry(CharsetInfo.UTF16, UnicodeDataType.dataType),
 		Map.entry(CharsetInfo.UTF32, Unicode32DataType.dataType));
+
+	private static final String BUTTON_FONT_ID = "font.plugin.strings.buttons";
 
 	private final PluginTool tool;
 	private final EncodedStringsPlugin plugin;
@@ -148,7 +151,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param charsetName set the charset
 	 */
 	public void setSelectedCharset(String charsetName) {
@@ -157,7 +160,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setRequireValidStringOption(boolean b) {
@@ -167,7 +170,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setAllowLatinScriptOption(boolean b) {
@@ -178,7 +181,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setAllowCommonScriptOption(boolean b) {
@@ -189,7 +192,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setAllowAnyScriptOption(boolean b) {
@@ -200,7 +203,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param requiredScript unicode script
 	 */
 	public void setRequiredScript(UnicodeScript requiredScript) {
@@ -210,7 +213,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setShowAdvancedOptions(boolean b) {
@@ -221,7 +224,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setShowScriptOptions(boolean b) {
@@ -232,7 +235,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setExcludeCodecErrors(boolean b) {
@@ -243,7 +246,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @param b boolean
 	 */
 	public void setExcludeNonStdCtrlChars(boolean b) {
@@ -254,7 +257,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @return table model
 	 */
 	public EncodedStringsTableModel getStringModel() {
@@ -263,7 +266,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	/**
 	 * For test/screen shot use
-	 * 
+	 *
 	 * @return button
 	 */
 	public JButton getCreateButton() {
@@ -423,8 +426,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 		table.setPreferredScrollableViewportSize(new Dimension(350, 150));
 		table.getSelectionModel().addListSelectionListener(e -> selectedRowChange());
 
-		GoToService goToService = tool.getService(GoToService.class);
-		table.installNavigation(goToService, goToService.getDefaultNavigatable());
+		table.installNavigation(tool);
 
 		filterPanel = new GhidraTableFilterPanel<>(table, tableModel);
 	}
@@ -454,7 +456,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 			public void keyPressed(KeyEvent e) {
 				// Note: we override the [ENTER] key handling to allow the user to invoke the
 				// dialog and just hit enter to create the string without having to do any
-				// clicking (otherwise the charset combobox consumes the keystroke) 
+				// clicking (otherwise the charset combobox consumes the keystroke)
 				if (e.getKeyChar() == '\n') {
 					e.consume();
 					if (charsetComboBox.isPopupVisible()) {
@@ -604,10 +606,10 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 		scriptFailedCountLabel
 				.setToolTipText("Number of strings excluded due to failing script requirements.");
 
-		Font font = new JPanel().getFont().deriveFont(10.0f);
 		allowLatinScriptButton = new JToggleButton("A-Z");
 		allowLatinScriptButton.setName("ALLOW_LATIN_SCRIPT");
-		allowLatinScriptButton.setFont(font);
+		Gui.registerFont(allowLatinScriptButton, BUTTON_FONT_ID);
+
 		allowLatinScriptButton.setToolTipText(
 			"Allow Latin characters (e.g. A-Z, etc) to also be present in the string.");
 		allowLatinScriptButton.setSelected(true);
@@ -620,7 +622,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 		allowCommonScriptButton = new JToggleButton("0-9,!?");
 		allowCommonScriptButton.setName("ALLOW_COMMON_SCRIPT");
-		allowCommonScriptButton.setFont(font);
+		Gui.registerFont(allowCommonScriptButton, BUTTON_FONT_ID);
 		allowCommonScriptButton.setToolTipText(
 			"Allow common characters (e.g. 0-9, space, punctuation, etc) to also be present in the string.");
 		allowCommonScriptButton.setSelected(true);
@@ -633,7 +635,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 		allowAnyScriptButton = new JToggleButton("Any");
 		allowAnyScriptButton.setName("ALLOW_ANY_SCRIPT");
-		allowAnyScriptButton.setFont(font);
+		Gui.registerFont(allowAnyScriptButton, BUTTON_FONT_ID);
 		allowAnyScriptButton.setToolTipText(
 			"Allow all other character scripts to also be present in the string.");
 		allowAnyScriptButton.setSelected(true);
@@ -663,7 +665,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 			translateComboBox.setSelectedItem(defaultSTS);
 		}
 
-		translateComboBox.setRenderer(GListCellRenderer.createDefaultCellTextRenderer(
+		translateComboBox.setRenderer(GComboBoxCellRenderer.createDefaultTextRenderer(
 			sts -> sts != null ? sts.getTranslationServiceName() : ""));
 	}
 
@@ -747,13 +749,12 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 		executeMonitoredRunnable("Creating Strings", true, true, 100, this::createStringsAndClose);
 	}
 
-	private void setActionItemEnablement(boolean b) {
-		createButton.setEnabled(b);
-		cancelButton.setEnabled(b);
+	private void setActionItemEnablement(boolean enabled) {
+		createButton.setEnabled(enabled);
+		cancelButton.setEnabled(enabled);
 		table.removeNavigation();
-		if (b) {
-			GoToService goToService = tool.getService(GoToService.class);
-			table.installNavigation(goToService, goToService.getDefaultNavigatable());
+		if (enabled) {
+			table.installNavigation(tool);
 		}
 	}
 
@@ -834,11 +835,10 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 			createButton.setEnabled(false);
 			return;
 		}
-		String createMessage = isSingleStringMode()
-				? "Create"
-				: "Create %s".formatted(rowCount == selectedRowCount || selectedRowCount == 0
-						? "All"
-						: "Selected (%d)".formatted(selectedRowCount));
+		String createMessage = isSingleStringMode() ? "Create"
+				: "Create %s"
+						.formatted(rowCount == selectedRowCount || selectedRowCount == 0 ? "All"
+								: "Selected (%d)".formatted(selectedRowCount));
 		createButton.setEnabled(true);
 		createButton.setText(createMessage);
 
@@ -954,8 +954,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 			return null;
 		}
 		File f = new File(filename);
-		ResourceFile rf = f.isAbsolute() && f.isFile()
-				? new ResourceFile(f)
+		ResourceFile rf = f.isAbsolute() && f.isFile() ? new ResourceFile(f)
 				: Application.findDataFileInAnyModule(filename);
 		if (rf == null) {
 			Msg.error(this, "Unable to find string model file: %s".formatted(filename));
@@ -1012,8 +1011,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	private StringTranslationService getSelectedStringTranslationService(boolean ifEnabled) {
 		boolean enabled = showTranslateOptionsButton.isSelected();
-		return ifEnabled && !enabled
-				? null
+		return ifEnabled && !enabled ? null
 				: (StringTranslationService) translateComboBox.getSelectedItem();
 	}
 
@@ -1063,7 +1061,11 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 
 	private ComboBoxModel<UnicodeScript> getScriptListModel(EncodedStringsFilterStats stats) {
 		List<UnicodeScript> scripts = new ArrayList<>(stats.foundScriptCounts.keySet());
-		Collections.sort(scripts, (us1, us2) -> us1.name().compareTo(us2.name()));
+		Collections.sort(scripts, (us1, us2) -> {
+			int us1Count = stats.foundScriptCounts.get(us1);
+			int us2Count = stats.foundScriptCounts.get(us2);
+			return Integer.compare(us2Count, us1Count); // descending
+		});
 		scripts.add(0, CharacterScriptUtils.ANY_SCRIPT_ALIAS);
 
 		return new DefaultComboBoxModel<>(new Vector<>(scripts));
@@ -1077,7 +1079,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 	 * Execute a non-modal task that has progress and can be cancelled.
 	 * <p>
 	 * See {@link #executeProgressTask(Task, int)}.
-	 * 
+	 *
 	 * @param taskTitle String title of task
 	 * @param canCancel boolean flag, if true task can be canceled by the user
 	 * @param hasProgress boolean flag, if true the task has a progress meter
@@ -1152,7 +1154,7 @@ public class EncodedStringsDialog extends DialogComponentProvider {
 				return "%s%s (%d)".formatted(name, example, count);
 			};
 
-			setRenderer(GListCellRenderer.createDefaultCellTextRenderer(cellToTextMappingFunction));
+			setRenderer(GListCellRenderer.createDefaultTextRenderer(cellToTextMappingFunction));
 		}
 	}
 

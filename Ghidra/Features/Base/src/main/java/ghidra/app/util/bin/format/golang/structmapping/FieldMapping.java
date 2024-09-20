@@ -15,8 +15,8 @@
  */
 package ghidra.app.util.bin.format.golang.structmapping;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.*;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -44,10 +44,10 @@ public @interface FieldMapping {
 	 * Overrides the field name that is matched in the structure.
 	 * <p>
 	 * Can be a single name, or a list of names that will be used to find the structure
-	 * field. 
+	 * field.  The name is case-insensitive.
 	 * 
-	 * @return name, or list of names, of the structure field to map, or unset to use the 
-	 * java field's name
+	 * @return name, or list of names (case insensitive), of the structure field to map,
+	 * or unset to use the java field's name
 	 */
 	String[] fieldName() default "";
 
@@ -61,6 +61,22 @@ public @interface FieldMapping {
 	 * required
 	 */
 	boolean optional() default false;
+
+	/**
+	 * Marks this field as only present in certain context configurations.
+	 * <p>
+	 * The specified string is interpreted by the specific {@link DataTypeMapper} and its
+	 * {@link DataTypeMapperContext context}.
+	 * <p>
+	 * For example, a version number could be used to allow some optional fields to be skipped
+	 * depending on the the concrete {@link DataTypeMapper}'s information during structure
+	 * mapping registration.
+	 * <p>
+	 * Similar to {@link #optional()}
+	 * 
+	 * @return String
+	 */
+	String presentWhen() default "";
 
 	/**
 	 * Specifies the name of a setter method that will be used to assign the deserialized value

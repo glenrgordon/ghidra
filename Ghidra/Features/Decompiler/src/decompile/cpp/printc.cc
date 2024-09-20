@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -675,15 +675,7 @@ void PrintC::opCallother(const PcodeOp *op)
 {
   UserPcodeOp *userop = glb->userops.getOp(op->getIn(0)->getOffset());
   uint4 display = userop->getDisplay();
-  if (display == UserPcodeOp::annotation_assignment) {
-    pushOp(&assignment,op);
-    pushVn(op->getIn(2),op,mods);
-    pushVn(op->getIn(1),op,mods);
-  }
-  else if (display == UserPcodeOp::no_operator) {
-    pushVn(op->getIn(1),op,mods);
-  }
-  else {	// Emit using functional syntax
+  if (display == 0) {	// Emit using functional syntax
     string nm = op->getOpcode()->getOperatorName(op);
     pushOp(&function_call,op);
     pushAtom(Atom(nm,optoken,EmitMarkup::funcname_color,op));
@@ -697,6 +689,28 @@ void PrintC::opCallother(const PcodeOp *op)
     }
     else
       pushAtom(Atom(EMPTY_STRING,blanktoken,EmitMarkup::no_color));	// Push empty token for void
+  }
+  else if (display == UserPcodeOp::annotation_assignment) {
+    pushOp(&assignment,op);
+    pushVn(op->getIn(2),op,mods);
+    pushVn(op->getIn(1),op,mods);
+  }
+  else if (display == UserPcodeOp::no_operator) {
+    pushVn(op->getIn(1),op,mods);
+  }
+  else if (display == UserPcodeOp::display_string) {
+    const Varnode *vn = op->getOut();
+    Datatype *ct = vn->getType();
+    ostringstream str;
+    if (ct->getMetatype() == TYPE_PTR) {
+      ct = ((TypePointer *)ct)->getPtrTo();
+      if (!printCharacterConstant(str,op->getIn(1)->getAddr(),ct))
+	str << "\"badstring\"";
+    }
+    else
+      str << "\"badstring\"";
+
+    pushAtom(Atom(str.str(),vartoken,EmitMarkup::const_color,op,vn));
   }
 }
 
@@ -811,6 +825,19 @@ void PrintC::opBoolNegate(const PcodeOp *op)
     pushOp(&boolean_not,op);	// Otherwise print ourselves
     pushVn(op->getIn(0),op,mods); // And print our input
   }
+}
+
+void PrintC::opFloatInt2Float(const PcodeOp *op)
+
+{
+  const PcodeOp *zextOp = TypeOpFloatInt2Float::absorbZext(op);
+  const Varnode *vn0 = (zextOp != (const PcodeOp *)0) ? zextOp->getIn(0) : op->getIn(0);
+  Datatype *dt = op->getOut()->getHighTypeDefFacing();
+  if (!option_nocasts) {
+    pushOp(&typecast,op);
+    pushType(dt);
+  }
+  pushVn(vn0,op,mods);
 }
 
 void PrintC::opSubpiece(const PcodeOp *op)
@@ -1374,19 +1401,11 @@ void PrintC::push_float(uintb val,int4 sz,tagtype tag,const Varnode *vn,const Pc
 	token = "NAN";
     }
     else {
-      ostringstream t;
       if ((mods & force_scinote)!=0) {
-	t.setf( ios::scientific ); // Set to scientific notation
-	t.precision(format->getDecimalPrecision()-1);
-	t << floatval;
-	token = t.str();
+	token = format->printDecimal(floatval, true);
       }
       else {
-	// Try to print "minimal" accurate representation of the float
-	t.unsetf( ios::floatfield );	// Use "default" notation
-	t.precision(format->getDecimalPrecision());
-	t << floatval;
-	token = t.str();
+	token = format->printDecimal(floatval, false);
 	bool looksLikeFloat = false;
 	for(int4 i=0;i<token.size();++i) {
 	  char c = token[i];
@@ -1955,7 +1974,6 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
 	entry.token = &object_member;
 	entry.field = field;
 	entry.parent = ct;
-	entry.fieldname = field->name;
 	entry.hilite = EmitMarkup::no_color;
 	ct = field->type;
 	succeeded = true;
@@ -1968,9 +1986,8 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
 	stack.emplace_back();
 	PartialSymbolEntry &entry( stack.back() );
 	entry.token = &subscript;
-	ostringstream s;
-	s << dec << el;
-	entry.fieldname = s.str();
+	entry.offset = el;
+	entry.size = 0;
 	entry.field = (const TypeField *)0;
 	entry.hilite = EmitMarkup::const_color;
 	ct = arrayof;
@@ -1987,7 +2004,6 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
 	entry.token = &object_member;
 	entry.field = field;
 	entry.parent = ct;
-	entry.fieldname = entry.field->name;
 	entry.hilite = EmitMarkup::no_color;
 	ct = field->type;
 	succeeded = true;
@@ -1997,8 +2013,10 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
     }
     else if (inslot >= 0) {
       Datatype *outtype = vn->getHigh()->getType();
-      if (castStrategy->isSubpieceCastEndian(outtype,ct,off,
-					     sym->getFirstWholeMap()->getAddr().getSpace()->isBigEndian())) {
+      AddrSpace *spc = sym->getFirstWholeMap()->getAddr().getSpace();
+      if (spc == (AddrSpace *)0)
+	spc = vn->getSpace();
+      if (castStrategy->isSubpieceCastEndian(outtype,ct,off,spc->isBigEndian())) {
 	// Treat truncation as SUBPIECE style cast
 	finalcast = outtype;
 	ct = (Datatype*)0;
@@ -2011,7 +2029,8 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
       entry.token = &object_member;
       if (sz == 0)
 	sz = ct->getSize() - off;
-      entry.fieldname = unnamedField(off, sz);	// If nothing else works, generate artificial field name
+      entry.offset = off;	// Generate artificial name, based on offset and size of entry
+      entry.size = sz;
       entry.field = (const TypeField *)0;
       entry.hilite = EmitMarkup::no_color;
       ct = (Datatype *)0;
@@ -2027,11 +2046,17 @@ void PrintC::pushPartialSymbol(const Symbol *sym,int4 off,int4 sz,
     pushOp(stack[i].token,op);
   pushSymbol(sym,vn,op);	// Push base symbol name
   for(int4 i=0;i<stack.size();++i) {
-    const TypeField *field = stack[i].field;
-    if (field == (const TypeField *)0)
-      pushAtom(Atom(stack[i].fieldname,syntax,stack[i].hilite,op));
+    PartialSymbolEntry &entry (stack[i]);
+    if (entry.field == (const TypeField *)0) {
+      if (entry.size <= 0)
+	push_integer(entry.offset, entry.size, (entry.offset < 0), syntax, (Varnode *)0, op);
+      else {
+	string field = unnamedField(entry.offset,entry.size);
+	pushAtom(Atom(field,syntax,entry.hilite,op));
+      }
+    }
     else
-      pushAtom(Atom(stack[i].fieldname,fieldtoken,stack[i].hilite,stack[i].parent,field->ident,op));
+      pushAtom(Atom(entry.field->name,fieldtoken,stack[i].hilite,stack[i].parent,entry.field->ident,op));
   }
 }
 

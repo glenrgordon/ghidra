@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 package ghidradev.ghidraprojectcreator.utils;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.*;
 
@@ -43,6 +44,7 @@ import utility.module.ModuleUtilities;
 /**
  * Utility methods for working with Eclipse Ghidra projects.
  */
+@SuppressWarnings("restriction")
 public class GhidraProjectUtils {
 
 	/**
@@ -290,14 +292,17 @@ public class GhidraProjectUtils {
 		IJavaProject javaProject = JavaCore.create(project);
 		project.open(monitor);
 
+		// Set the project's default encoding
+		project.setDefaultCharset(StandardCharsets.UTF_8.displayName(), monitor);
+
 		// Clear the project's classpath
 		javaProject.setRawClasspath(new IClasspathEntry[0], monitor);
 
 		// Configure Java compiler for the project
 		configureJavaCompiler(javaProject, javaConfig);
 
-		// Setup bin folder
-		IFolder binFolder = project.getFolder("bin");
+		// Setup default bin folder
+		IFolder binFolder = project.getFolder("bin/default");
 		javaProject.setOutputLocation(binFolder.getFullPath(), monitor);
 
 		// Add Eclipse's built-in JUnit to classpath

@@ -14,17 +14,21 @@
 #  limitations under the License.
 ##
 from ghidratrace.client import Address, RegVal
-
 from pybag import pydbg
 
 from . import util
 
+
 language_map = {
-    'ARM': ['AARCH64:BE:64:v8A', 'AARCH64:LE:64:AppleSilicon', 'AARCH64:LE:64:v8A', 'ARM:BE:64:v8', 'ARM:LE:64:v8'],
+    'AARCH64': ['AARCH64:LE:64:AppleSilicon'],
+    'ARM': ['ARM:LE:32:v8'],
     'Itanium': [],
     'x86': ['x86:LE:32:default'],
     'x86_64': ['x86:LE:64:default'],
     'EFI': ['x86:LE:64:default'],
+    'MIPS': ['MIPS:LE:64:default'],
+    'MIPS-BE': ['MIPS:BE:64:default'],
+    'SH4': ['SuperH4:LE:32:default'],
 }
 
 data64_compiler_map = {
@@ -36,7 +40,11 @@ x86_compiler_map = {
     'Cygwin': 'windows',
 }
 
-arm_compiler_map = {
+default_compiler_map = {
+    'windows': 'default',
+}
+
+windows_compiler_map = {
     'windows': 'windows',
 }
 
@@ -45,31 +53,78 @@ compiler_map = {
     'DATA:LE:64:default': data64_compiler_map,
     'x86:LE:32:default': x86_compiler_map,
     'x86:LE:64:default': x86_compiler_map,
-    'AARCH64:BE:64:v8A': arm_compiler_map,
-    'AARCH64:LE:64:AppleSilicon': arm_compiler_map,
-    'AARCH64:LE:64:v8A': arm_compiler_map,
-    'ARM:BE:64:v8': arm_compiler_map,
-    'ARM:LE:64:v8': arm_compiler_map,
+    'AARCH64:LE:64:AppleSilicon': default_compiler_map,
+    'ARM:LE:32:v8': windows_compiler_map,
+    'MIPS:BE:64:default': default_compiler_map,
+    'MIPS:LE:64:default': windows_compiler_map,
+    'SuperH4:LE:32:default': windows_compiler_map,
 }
 
 
 def get_arch():
     try:
-        type = util.get_debugger()._control.GetActualProcessorType()
+        type = util.dbg.get_actual_processor_type()
     except Exception:
+        print("Error getting actual processor type.")
         return "Unknown"
     if type is None:
         return "x86_64"
     if type == 0x8664:
         return "x86_64"
+    if type == 0xAA64:
+        return "AARCH64"
     if type == 0x014c:
         return "x86"
-    if type == 0x01c0:
+    if type == 0x0160: # R3000 BE
+        return "MIPS-BE"
+    if type == 0x0162: # R3000 LE
+        return "MIPS"
+    if type == 0x0166: # R4000 LE
+        return "MIPS"
+    if type == 0x0168: # R10000 LE
+        return "MIPS"
+    if type == 0x0169: # WCE v2 LE
+        return "MIPS"
+    if type == 0x0266: # MIPS 16
+        return "MIPS"
+    if type == 0x0366: # MIPS FPU
+        return "MIPS"
+    if type == 0x0466: # MIPS FPU16
+        return "MIPS"
+    if type == 0x0184: # Alpha AXP
+        return "Alpha"
+    if type == 0x0284: # Aplha 64
+        return "Alpha"
+    if type >= 0x01a2 and type < 0x01a6:
+        return "SH"
+    if type == 0x01a6:
+        return "SH4"
+    if type == 0x01a6:
+        return "SH5"
+    if type == 0x01c0: # ARM LE
         return "ARM"
-    if type == 0x0200:
+    if type == 0x01c2: # ARM Thumb/Thumb-2 LE
+        return "ARM"
+    if type == 0x01c4: # ARM Thumb-2 LE
+        return "ARM"
+    if type == 0x01d3: # AM33
+        return "ARM"
+    if type == 0x01f0 or type == 0x1f1: # PPC
+        return "PPC"
+    if type == 0x0200: 
         return "Itanium"
+    if type == 0x0520:
+        return "Infineon"
+    if type == 0x0CEF:
+        return "CEF"
     if type == 0x0EBC:
         return "EFI"
+    if type == 0x8664: # AMD64 (K8)
+        return "x86_64"
+    if type == 0x9041: # M32R
+        return "M32R"
+    if type == 0xC0EE:
+        return "CEE"
     return "Unknown"
 
 
@@ -85,10 +140,11 @@ def get_osabi():
     if not parm in ['auto', 'default']:
         return parm
     try:
-        os = util.get_debugger().cmd("vertarget")
-        if "Windows" not in  os:
+        os = util.dbg.cmd("vertarget")
+        if "Windows" not in os:
             return "default"
     except Exception:
+        print("Error getting target OS/ABI")
         pass
     return "windows"
 
@@ -148,13 +204,18 @@ class DefaultMemoryMapper(object):
         self.defaultSpace = defaultSpace
 
     def map(self, proc: int, offset: int):
-        space = self.defaultSpace
+        if proc == 0:
+            space = self.defaultSpace
+        else:
+            space = f'{self.defaultSpace}{proc}'
         return self.defaultSpace, Address(space, offset)
 
     def map_back(self, proc: int, address: Address) -> int:
-        if address.space == self.defaultSpace:
+        if address.space == self.defaultSpace and proc == 0:
             return address.offset
-        raise ValueError(f"Address {address} is not in process {proc.GetProcessID()}")
+        if address.space == f'{self.defaultSpace}{proc}':
+            return address.offset
+        raise ValueError(f"Address {address} is not in process {proc}")
 
 
 DEFAULT_MEMORY_MAPPER = DefaultMemoryMapper('ram')
@@ -179,14 +240,13 @@ class DefaultRegisterMapper(object):
     def map_name(self, proc, name):
         return name
 
-
     def map_value(self, proc, name, value):
         try:
-            ### TODO: this seems half-baked
+            # TODO: this seems half-baked
             av = value.to_bytes(8, "big")
         except Exception:
             raise ValueError("Cannot convert {}'s value: '{}', type: '{}'"
-                                .format(name, value, type(value)))
+                             .format(name, value, type(value)))
         return RegVal(self.map_name(proc, name), av)
 
     def map_name_back(self, proc, name):
@@ -237,4 +297,3 @@ def compute_register_mapper(lang):
         if ':LE:' in lang:
             return DEFAULT_LE_REGISTER_MAPPER
     return register_mappers[lang]
-    

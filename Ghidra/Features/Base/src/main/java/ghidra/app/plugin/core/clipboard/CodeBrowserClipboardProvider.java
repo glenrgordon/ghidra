@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import docking.ActionContext;
 import docking.ComponentProvider;
 import docking.dnd.GenericDataFlavor;
+import docking.dnd.StringTransferable;
 import docking.widgets.fieldpanel.Layout;
 import docking.widgets.fieldpanel.internal.*;
 import generic.text.TextLayoutGraphics;
@@ -41,13 +42,15 @@ import ghidra.app.plugin.core.codebrowser.CodeViewerActionContext;
 import ghidra.app.services.ClipboardContentProviderService;
 import ghidra.app.util.*;
 import ghidra.app.util.viewer.listingpanel.ListingModel;
-import ghidra.framework.cmd.Command;
 import ghidra.framework.model.DomainFile;
 import ghidra.framework.plugintool.PluginTool;
+import ghidra.program.database.mem.AddressSourceInfo;
 import ghidra.program.database.symbol.CodeSymbol;
 import ghidra.program.database.symbol.FunctionSymbol;
 import ghidra.program.model.address.*;
 import ghidra.program.model.listing.*;
+import ghidra.program.model.mem.Memory;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.*;
 import ghidra.program.util.*;
 import ghidra.util.Msg;
@@ -65,6 +68,14 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		new ClipboardType(DataFlavor.stringFlavor, "Address");
 	public static final ClipboardType ADDRESS_TEXT_WITH_OFFSET_TYPE =
 		new ClipboardType(DataFlavor.stringFlavor, "Address w/ Offset");
+	public static final ClipboardType BYTE_SOURCE_OFFSET_TYPE =
+		new ClipboardType(DataFlavor.stringFlavor, "Byte Source Offset");
+	public static final ClipboardType FUNCTION_OFFSET_TYPE =
+		new ClipboardType(DataFlavor.stringFlavor, "Function Offset");
+	public static final ClipboardType IMAGEBASE_OFFSET_TYPE =
+		new ClipboardType(DataFlavor.stringFlavor, "Imagebase Offset");
+	public static final ClipboardType BLOCK_OFFSET_TYPE =
+		new ClipboardType(DataFlavor.stringFlavor, "Memory Block Offset");
 	public static final ClipboardType CODE_TEXT_TYPE =
 		new ClipboardType(DataFlavor.stringFlavor, "Formatted Code");
 	public static final ClipboardType LABELS_COMMENTS_TYPE =
@@ -94,6 +105,10 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		list.add(CPP_BYTE_ARRAY_TYPE);
 		list.add(ADDRESS_TEXT_TYPE);
 		list.add(ADDRESS_TEXT_WITH_OFFSET_TYPE);
+		list.add(BYTE_SOURCE_OFFSET_TYPE);
+		list.add(BLOCK_OFFSET_TYPE);
+		list.add(FUNCTION_OFFSET_TYPE);
+		list.add(IMAGEBASE_OFFSET_TYPE);
 
 		return list;
 	}
@@ -220,6 +235,18 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		}
 		else if (copyType == ADDRESS_TEXT_WITH_OFFSET_TYPE) {
 			return copySymbolString(monitor);
+		}
+		else if (copyType == BYTE_SOURCE_OFFSET_TYPE) {
+			return copyByteSourceOffset(monitor);
+		}
+		else if (copyType == BLOCK_OFFSET_TYPE) {
+			return copyBlockSourceOffset(monitor);
+		}
+		else if (copyType == FUNCTION_OFFSET_TYPE) {
+			return copyFunctionSourceOffset(monitor);
+		}
+		else if (copyType == IMAGEBASE_OFFSET_TYPE) {
+			return copyImagebaseSourceOffset(monitor);
 		}
 		else if (copyType == CODE_TEXT_TYPE) {
 			return copyCode(monitor);
@@ -382,6 +409,66 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		return createStringTransferable(StringUtils.join(strings, "\n"));
 	}
 
+	private Transferable copyByteSourceOffset(TaskMonitor monitor) {
+		AddressSetView addrs = getSelectedAddresses();
+		Memory currentMemory = currentProgram.getMemory();
+		List<String> strings = new ArrayList<>();
+		AddressIterator addresses = addrs.getAddresses(true);
+		while (addresses.hasNext() && !monitor.isCancelled()) {
+			AddressSourceInfo addressSourceInfo =
+				currentMemory.getAddressSourceInfo(addresses.next());
+			if (addressSourceInfo != null) {
+				long fileOffset = addressSourceInfo.getFileOffset();
+				String fileOffsetString =
+					fileOffset != -1 ? "%x".formatted(fileOffset) : "<NO_OFFSET>";
+				strings.add(fileOffsetString);
+			}
+		}
+		return createStringTransferable(String.join("\n", strings));
+	}
+
+	private Transferable copyBlockSourceOffset(TaskMonitor monitor) {
+		AddressSetView addrs = getSelectedAddresses();
+		Memory mem = currentProgram.getMemory();
+		List<String> strings = new ArrayList<>();
+		AddressIterator addresses = addrs.getAddresses(true);
+		while (addresses.hasNext() && !monitor.isCancelled()) {
+			Address addr = addresses.next();
+			MemoryBlock block = mem.getBlock(addr);
+			strings.add(
+				block != null ? "%x".formatted(addr.subtract(block.getStart())) : "<NO_OFFSET>");
+		}
+		return createStringTransferable(String.join("\n", strings));
+	}
+
+	private Transferable copyFunctionSourceOffset(TaskMonitor monitor) {
+		AddressSetView addrs = getSelectedAddresses();
+		Listing listing = currentProgram.getListing();
+		List<String> strings = new ArrayList<>();
+		AddressIterator addresses = addrs.getAddresses(true);
+		while (addresses.hasNext() && !monitor.isCancelled()) {
+			Address addr = addresses.next();
+			Function function = listing.getFunctionContaining(addr);
+			strings.add(function != null ? "%x".formatted(addr.subtract(function.getEntryPoint()))
+					: "<NO_OFFSET>");
+		}
+		return createStringTransferable(String.join("\n", strings));
+	}
+
+	private Transferable copyImagebaseSourceOffset(TaskMonitor monitor) {
+		AddressSetView addrs = getSelectedAddresses();
+		List<String> strings = new ArrayList<>();
+		AddressIterator addresses = addrs.getAddresses(true);
+		while (addresses.hasNext() && !monitor.isCancelled()) {
+			Address addr = addresses.next();
+			Address imagebase = currentProgram.getImageBase();
+			strings.add(
+				addr.hasSameAddressSpace(imagebase) ? "%x".formatted(addr.subtract(imagebase))
+						: "<NO_OFFSET>");
+		}
+		return createStringTransferable(String.join("\n", strings));
+	}
+
 	protected Transferable copyCode(TaskMonitor monitor) {
 
 		AddressSetView addressSet = getSelectedAddresses();
@@ -453,8 +540,8 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 			List<?> list =
 				(List<?>) pasteData.getTransferData(CodeUnitInfoTransferable.localDataTypeFlavor);
 			List<CodeUnitInfo> infos = CollectionUtils.asList(list, CodeUnitInfo.class);
-			Command cmd = new CodeUnitInfoPasteCmd(currentLocation.getAddress(), infos, pasteLabels,
-				pasteComments);
+			CodeUnitInfoPasteCmd cmd = new CodeUnitInfoPasteCmd(currentLocation.getAddress(), infos,
+				pasteLabels, pasteComments);
 			return tool.execute(cmd, currentProgram);
 		}
 		catch (Exception e) {
@@ -724,7 +811,7 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 // Inner Classes
 //==================================================================================================
 
-	private static class LabelStringTransferable implements Transferable {
+	private static class LabelStringTransferable extends StringTransferable {
 
 		public static final DataFlavor labelStringFlavor = new GenericDataFlavor(
 			DataFlavor.javaJVMLocalObjectMimeType + "; class=java.lang.String",
@@ -733,20 +820,18 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		private final DataFlavor[] flavors = { labelStringFlavor, DataFlavor.stringFlavor };
 		private final List<DataFlavor> flavorList = Arrays.asList(flavors);
 
-		private String symbolName;
-
 		LabelStringTransferable(String name) {
-			this.symbolName = name;
+			super(name);
 		}
 
 		@Override
 		public Object getTransferData(DataFlavor flavor)
 				throws UnsupportedFlavorException, IOException {
 			if (flavor.equals(labelStringFlavor)) {
-				return symbolName;
+				return data;
 			}
 			if (flavor.equals(DataFlavor.stringFlavor)) {
-				return symbolName;
+				return data;
 			}
 			throw new UnsupportedFlavorException(flavor);
 		}
@@ -762,7 +847,7 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		}
 	}
 
-	private static class NonLabelStringTransferable implements Transferable {
+	private static class NonLabelStringTransferable extends StringTransferable {
 
 		public static final DataFlavor nonLabelStringFlavor = new GenericDataFlavor(
 			DataFlavor.javaJVMLocalObjectMimeType + "; class=java.lang.String",
@@ -771,9 +856,11 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 		private final DataFlavor[] flavors = { nonLabelStringFlavor, DataFlavor.stringFlavor };
 		private final List<DataFlavor> flavorList = Arrays.asList(flavors);
 
-		private String text;
-
 		NonLabelStringTransferable(String[] text) {
+			super(combine(text));
+		}
+
+		private static String combine(String[] text) {
 			StringBuilder buildy = new StringBuilder();
 			for (String string : text) {
 				if (buildy.length() > 0) {
@@ -781,21 +868,21 @@ public class CodeBrowserClipboardProvider extends ByteCopier
 				}
 				buildy.append(string);
 			}
-			this.text = buildy.toString();
+			return buildy.toString();
 		}
 
 		NonLabelStringTransferable(String text) {
-			this.text = text;
+			super(text);
 		}
 
 		@Override
 		public Object getTransferData(DataFlavor flavor)
 				throws UnsupportedFlavorException, IOException {
 			if (flavor.equals(nonLabelStringFlavor)) {
-				return text;
+				return data;
 			}
 			if (flavor.equals(DataFlavor.stringFlavor)) {
-				return text;
+				return data;
 			}
 			throw new UnsupportedFlavorException(flavor);
 		}

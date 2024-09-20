@@ -33,6 +33,8 @@ public interface AddressSetView extends Iterable<AddressRange> {
 
 	/**
 	 * Test if the given address range is contained in this set.
+	 * The specified start and end addresses must form a valid range within
+	 * a single {@link AddressSpace}.
 	 * <P>
 	 * @param start the first address in the range.
 	 * @param end the last address in the range.
@@ -56,11 +58,19 @@ public interface AddressSetView extends Iterable<AddressRange> {
 	public boolean isEmpty();
 
 	/**
+	 * Get the minimum address for this address set.
+	 * NOTE: An {@link AddressRange} should generally not be formed using this address
+	 * and {@link #getMaxAddress()} since it may span multiple {@link AddressSpace}s.
+	 * 
 	 * @return the minimum address for this set. Returns null if the set is empty.
 	 */
 	public Address getMinAddress();
 
 	/**
+	 * Get the maximum address for this address set.
+	 * NOTE: An {@link AddressRange} should generally not be formed using this address
+	 * and {@link #getMaxAddress()} since it may span multiple {@link AddressSpace}s.
+	 * 
 	 * @return the maximum address for this set. Returns null if the set is empty.
 	 */
 	public Address getMaxAddress();
@@ -151,8 +161,9 @@ public interface AddressSetView extends Iterable<AddressRange> {
 	public boolean intersects(AddressSetView addrSet);
 
 	/**
-	 * Determine if the start and end range
-	 * intersects with the specified address set.
+	 * Determine if the start and end range intersects with the specified address set.
+	 * The specified start and end addresses must form a valid range within
+	 * a single {@link AddressSpace}.
 	 * @param start start of range
 	 * @param end end of range
 	 * @return true if the given range intersects this address set.
@@ -171,6 +182,8 @@ public interface AddressSetView extends Iterable<AddressRange> {
 	/**
 	 * Computes the intersection of this address set with the given address range.
 	 * This method does not modify this address set.
+	 * The specified start and end addresses must form a valid range within
+	 * a single {@link AddressSpace}.
 	 * @param start start of range
 	 * @param end end of range
 	 * @return AddressSet a new address set that contains all addresses that are
@@ -241,6 +254,26 @@ public interface AddressSetView extends Iterable<AddressRange> {
 	public Address findFirstAddressInCommon(AddressSetView set);
 
 	/**
+	 * Returns the number of address in this address set before the given address.
+	 * @param address the address after the last address to be counted
+	 * @return the number of address in this address set before the given address
+	 */
+	public default long getAddressCountBefore(Address address) {
+		long count = 0;
+		for (AddressRange range : getAddressRanges()) {
+			if (range.getMinAddress().compareTo(address) > 0) {
+				return count;
+			}
+			else if (range.contains(address)) {
+				count += address.subtract(range.getMinAddress());
+				return count;
+			}
+			count += range.getLength();
+		}
+		return count;
+	}
+
+	/**
 	 * Trim address set removing all addresses less-than-or-equal to specified 
 	 * address based upon {@link Address} comparison.
 	 * The address set may contain address ranges from multiple 
@@ -292,4 +325,5 @@ public interface AddressSetView extends Iterable<AddressRange> {
 		}
 		return trimmedSet;
 	}
+
 }

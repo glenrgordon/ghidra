@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,7 +22,9 @@ import java.util.*;
 import javax.swing.Icon;
 
 import ghidra.app.plugin.core.debug.gui.tracermi.launcher.ScriptAttributesParser.ScriptAttributes;
-import ghidra.dbg.target.TargetMethod.ParameterDescription;
+import ghidra.app.plugin.core.debug.gui.tracermi.launcher.ScriptAttributesParser.TtyCondition;
+import ghidra.debug.api.ValStr;
+import ghidra.debug.api.tracermi.LaunchParameter;
 import ghidra.debug.api.tracermi.TerminalSession;
 import ghidra.program.model.listing.Program;
 import ghidra.util.HelpLocation;
@@ -83,27 +85,46 @@ public abstract class AbstractScriptTraceRmiLaunchOffer extends AbstractTraceRmi
 	}
 
 	@Override
-	public Map<String, ParameterDescription<?>> getParameters() {
+	public Map<String, LaunchParameter<?>> getParameters() {
 		return attrs.parameters();
 	}
 
-	protected abstract void prepareSubprocess(List<String> commandLine, Map<String, String> env,
-			Map<String, ?> args, SocketAddress address);
+	@Override
+	protected int getConnectionTimeoutMillis() {
+		return attrs.timeoutMillis();
+	}
+
+	protected void prepareSubprocess(List<String> commandLine, Map<String, String> env,
+			Map<String, ValStr<?>> args, SocketAddress address) {
+		ScriptAttributesParser.processArguments(commandLine, env, script, attrs.parameters(), args,
+			address);
+	}
 
 	@Override
 	protected void launchBackEnd(TaskMonitor monitor, Map<String, TerminalSession> sessions,
-			Map<String, ?> args, SocketAddress address) throws Exception {
+			Map<String, ValStr<?>> args, SocketAddress address) throws Exception {
 		List<String> commandLine = new ArrayList<>();
 		Map<String, String> env = new HashMap<>(System.getenv());
 		prepareSubprocess(commandLine, env, args, address);
+		if (program != null) {
+			env.put("GHIDRA_LANGUAGE_ID", program.getLanguageID().toString());
+		}
 
-		for (String tty : attrs.extraTtys()) {
+		for (Map.Entry<String, TtyCondition> ent : attrs.extraTtys().entrySet()) {
+			if (!ent.getValue().isActive(args)) {
+				continue;
+			}
 			NullPtyTerminalSession ns = nullPtyTerminal();
-			env.put(tty, ns.name());
-			sessions.put(ns.name(), ns);
+			env.put(ent.getKey(), ns.name());
+			sessions.put(ent.getKey(), ns);
 		}
 
 		sessions.put("Shell",
 			runInTerminal(commandLine, env, script.getParentFile(), sessions.values()));
+	}
+
+	@Override
+	public boolean requiresImage() {
+		return !attrs.noImage();
 	}
 }

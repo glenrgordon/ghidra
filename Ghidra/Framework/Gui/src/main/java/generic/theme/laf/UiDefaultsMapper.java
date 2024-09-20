@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,16 +47,16 @@ import ghidra.util.Msg;
  * Some basic concepts:
  *  <UL>
  *  	<LI>UI Defaults - key-value pairs defined by the Java LaF; there are 2 key types, widget
- *                        keys and Java group/reusable keys (e.g., Button.background; control)
+ *                        keys and Java group/reusable keys (e.g., Button.background; control)</LI>
  *      <LI>UI Indirection - UI Defaults values are changed to point to custom terms we created to
- *                        allow for indirection (e.g., Button.background -> laf.color.Button.background)
+ *                        allow for indirection (e.g., Button.background -> laf.color.Button.background)</LI>
  *      <LI>Normalized Keys - keys we created to facilitate the UI Indirection, based upon the Java
- *                        keys (e.g., laf.color.Button.background)
+ *                        keys (e.g., laf.color.Button.background)</LI>
  *  	<LI>System Color/Font Keys - user facing terms for common color or font concepts into an
- *  					easy-to-change setting (e.g., system.color.fg.text)
+ *  					easy-to-change setting (e.g., system.color.fg.text)</LI>
  *      <LI>Palette Keys - dynamically generated color palette keys based on the LaF for any colors
  *      				  and fonts that were not mapped into an system color or font (e.g.,
- *      				  laf.palette.color.01)
+ *      				  laf.palette.color.01)</LI>
  *  </UL>
  *
  * <P>
@@ -65,7 +65,7 @@ import ghidra.util.Msg;
  * <LI>Extracts all color, font, and icon values from the UI Defaults.</LI>
  * <LI>Use the current LaF values to populate the pre-defined system colors and fonts.</LI>
  * <LI>Any UI Defaults values not assigned in the previous step will be assigned to a dynamic shared
- *     palette color or font.
+ *     palette color or font.</LI>
  * <LI>Update Java UI Defaults to use our indirection and system values.</LI>
  * </OL>
  *
@@ -153,8 +153,8 @@ public class UiDefaultsMapper {
 	 * the user changeable values for affecting the Java LookAndFeel colors, fonts, and icons.
 	 * <p>
 	 * The keys in the returned map have been normalized and all start with 'laf.'
-	 * 
-	 * 
+	 *
+	 *
 	 * @return a map of changeable values that affect java LookAndFeel values
 	 */
 	public GThemeValueMap getNormalizedJavaDefaults() {
@@ -184,7 +184,7 @@ public class UiDefaultsMapper {
 	 * Returns a mapping of normalized LaF Ids so that when fonts and icons get changed using the
 	 * normalized ids that are presented to the user, we know which LaF ids need to be updated in
 	 * the UiDefaults so that the LookAndFeel will pick up and use the changes.
-	 * 
+	 *
 	 * @return a mapping of normalized LaF ids to original LaF ids.
 	 */
 	public Map<String, String> getNormalizedIdToLafIdMap() {
@@ -281,7 +281,7 @@ public class UiDefaultsMapper {
 
 	/**
 	 * This allows clients to hard-code a chosen color for a group
-	 * 
+	 *
 	 * @param group the system color id to assign the given color
 	 * @param color the color to be assigned to the system color id
 	 */
@@ -291,7 +291,7 @@ public class UiDefaultsMapper {
 
 	/**
 	 * This allows clients to hard-code a chosen font for a group
-	 * 
+	 *
 	 * @param group the system font id to assign the given font
 	 * @param font the font to be assigned to the system font id
 	 */
@@ -693,7 +693,7 @@ public class UiDefaultsMapper {
 	 * Groups allow us to use the same group id for many components that by default have the same
 	 * value (Color or Font).  This grouper allows us to specify the precedence to use when
 	 * searching for the best group.
-	 * 
+	 *
 	 * @param <T> The theme value type (Color or Font)
 	 */
 	private abstract class ValueGrouper<T> {

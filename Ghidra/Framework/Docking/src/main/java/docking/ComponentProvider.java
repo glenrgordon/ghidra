@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,17 +49,17 @@ import utilities.util.reflection.ReflectionUtilities;
  * <p>
  * This also provides several useful convenience methods:
  * <ul>
- *  <li>{@link #addLocalAction(DockingActionIf)}
- *  <li>{@link #addToTool()}
- *  <li>{@link #setVisible(boolean)}
- *  <li>{@link #setTitle(String)}
- *  <li>{@link #setIcon(Icon)}
+ *  <li>{@link #addLocalAction(DockingActionIf)}</li>
+ *  <li>{@link #addToTool()}</li>
+ *  <li>{@link #setVisible(boolean)}</li>
+ *  <li>{@link #setTitle(String)}</li>
+ *  <li>{@link #setIcon(Icon)}</li>
  * </ul>
  * <p>
  * There are a handful of stub methods that can be overridden as desired:
  * <ul>
- *  <li>{@link #componentActivated()} and {@link #componentDeactived()}
- *  <li>{@link #componentHidden()} and {@link #componentShown()}
+ *  <li>{@link #componentActivated()} and {@link #componentDeactived()}</li>
+ *  <li>{@link #componentHidden()} and {@link #componentShown()}</li>
  * </ul>
  *
  * <p>
@@ -88,9 +88,13 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	protected Tool dockingTool;
 	private String name;
 	private final String owner;
+
 	private String title;
 	private String subTitle;
 	private String tabText;
+	private String customTitle;
+	private String customTabText;
+	private String customSubTitle;
 
 	private Set<DockingActionIf> actionSet = new LinkedHashSet<>();
 
@@ -115,6 +119,7 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	private String inceptionInformation;
 
 	private String registeredFontId;
+	private Component defaultFocusComponent;
 
 	private ThemeListener themeListener = this::themeChanged;
 
@@ -180,7 +185,7 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 		}
 
 		if (isVisible()) {
-			// if we are visible, then we don't need to update as the system updates all 
+			// if we are visible, then we don't need to update as the system updates all
 			// visible components
 			return;
 		}
@@ -225,21 +230,37 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 		return instanceID;
 	}
 
-	// Default implementation
-	public void requestFocus() {
-
-		JComponent component = getComponent();
-		if (component == null) {
-			return; // this shouldn't happen; this implies we have been disposed
-		}
-
-		KeyboardFocusManager kfm = KeyboardFocusManager.getCurrentKeyboardFocusManager();
-		Component focusOwner = kfm.getFocusOwner();
-		if (focusOwner != null && SwingUtilities.isDescendingFrom(focusOwner, component)) {
+	public final void requestFocus() {
+		if (!isVisible()) {
 			return;
 		}
 
-		component.requestFocus();
+		if (defaultFocusComponent != null) {
+			DockingWindowManager.requestFocus(defaultFocusComponent);
+			return;
+		}
+
+		JComponent component = getComponent();
+		Container parent = component == null ? null : component.getParent();
+		if (parent == null) {
+			return;	// we are either disposed or not added to the tool yet
+		}
+
+		Container focusCycleRoot = parent.getFocusCycleRootAncestor();
+		if (focusCycleRoot == null) {
+			return;
+		}
+
+		// Only request focus if next component in focus traversal belongs to this provider
+		FocusTraversalPolicy policy = focusCycleRoot.getFocusTraversalPolicy();
+		Component firstComponent = policy.getComponentAfter(focusCycleRoot, parent);
+		if (firstComponent != null && SwingUtilities.isDescendingFrom(firstComponent, parent)) {
+			DockingWindowManager.requestFocus(firstComponent);
+		}
+	}
+
+	protected void setDefaultFocusComponent(Component component) {
+		this.defaultFocusComponent = component;
 	}
 
 	/**
@@ -307,6 +328,14 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	}
 
 	/**
+	 * Returns all the local actions registered for this component provider.
+	 * @return all the local actions registered for this component provider
+	 */
+	public Set<DockingActionIf> getLocalActions() {
+		return dockingTool.getLocalActions(this);
+	}
+
+	/**
 	 * Removes all local actions from this component provider
 	 */
 	protected void removeAllLocalActions() {
@@ -360,7 +389,7 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	 * @return true if this provider is showing.
 	 */
 	public boolean isVisible() {
-		return dockingTool.isVisible(this);
+		return dockingTool != null && dockingTool.isVisible(this);
 	}
 
 	/**
@@ -524,6 +553,10 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	 * @param title the title string to use.
 	 */
 	public void setTitle(String title) {
+		if (customTitle != null) {
+			return;
+		}
+
 		this.title = title;
 		if (isInTool()) {
 			dockingTool.updateTitle(this);
@@ -536,6 +569,10 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	 * @param subTitle the sub-title string to use.
 	 */
 	public void setSubTitle(String subTitle) {
+		if (customSubTitle != null) {
+			return;
+		}
+
 		this.subTitle = subTitle;
 		if (isInTool()) {
 			dockingTool.updateTitle(this);
@@ -547,7 +584,56 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	 * @param tabText the tab text.
 	 */
 	public void setTabText(String tabText) {
+		if (customTabText != null) {
+			return;
+		}
+
 		this.tabText = tabText;
+		if (isInTool()) {
+			dockingTool.updateTitle(this);
+		}
+	}
+
+	/**
+	 * The new custom title.  Setting the title here prevents future calls to 
+	 * {@link #setTitle(String)} from having any effect.   This is done to preserve the custom 
+	 * title. 
+	 * @param title the title
+	 */
+	public void setCustomTitle(String title) {
+		this.customTitle = title;
+		this.title = title;
+		if (isInTool()) {
+			dockingTool.updateTitle(this);
+		}
+	}
+
+	/**
+	 * The new custom tab text.  Setting the text here prevents future calls to 
+	 * {@link #setTabText(String)} from having any effect.   This is done to preserve the custom 
+	 * tab text. 
+	 * @param tabText the text
+	 */
+	public void setCustomTabText(String tabText) {
+		this.customTabText = tabText;
+		this.tabText = tabText;
+		if (isInTool()) {
+			dockingTool.updateTitle(this);
+		}
+	}
+
+	/**
+	 * The new custom sub-title.  Setting the sub-title here prevents future calls to 
+	 * {@link #setSubTitle(String)} from having any effect.   This is done to preserve the custom 
+	 * sub-title. 
+	 * @param subTitle the sub-title
+	 */
+	public void setCustomSubTitle(String subTitle) {
+		this.customSubTitle = subTitle;
+		this.subTitle = subTitle;
+		if (isInTool()) {
+			dockingTool.updateTitle(this);
+		}
 	}
 
 	/**
@@ -618,6 +704,22 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 		}
 
 		dockingTool.getWindowManager().setIcon(this, icon);
+	}
+
+	/**
+	 * Get the icon provided to {@link #setIcon(Icon)}
+	 * 
+	 * <p>
+	 * This method is final, guaranteeing there is always a means for extensions of this class to
+	 * obtain the original icon. Some classes may override {@link #getIcon()} to apply modifications
+	 * when the icon is displayed in the UI. Further extensions of that class may wish to override
+	 * {@link #getIcon()}, too, and so might want access to the original base icon. This method
+	 * provides that access.
+	 * 
+	 * @return the base icon
+	 */
+	protected final Icon getBaseIcon() {
+		return icon;
 	}
 
 	/**
@@ -806,7 +908,7 @@ public abstract class ComponentProvider implements HelpDescriptor, ActionContext
 	 * will adjust the font for the registered font id if it has been registered using
 	 * {@link #registeredFontId}. Subclasses can override this method to a more comprehensive
 	 * adjustment to multiple fonts if necessary.
-	 * @param bigger if true, the font should be made bigger, otherwise the font should be made 
+	 * @param bigger if true, the font should be made bigger, otherwise the font should be made
 	 * smaller
 	 */
 	public void adjustFontSize(boolean bigger) {

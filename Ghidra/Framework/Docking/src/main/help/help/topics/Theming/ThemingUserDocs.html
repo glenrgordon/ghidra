@@ -19,10 +19,14 @@
     in their home application directory</P>
 
     <P>Users can also edit and create their own themes using the Theme Editor. Custom themes are
-    stored in the user's <code>&lt;home&gt;/.ghidra/.ghidra-&lt;version&gt/themes</code> directory. 
+    stored in the user's <code>&lt;user settings&gt;/themes</code> directory. 
     These theme files are simple text files that can
     easily be modified using any text editor. Also, users can share themes by exporting them to a
     file that can be given to other users who can them import them into their application.</P>
+	
+    <P><b>NOTE: </b> The <code>&lt;user settings&gt;</code> directory is platform/configuration
+    specific. Its value can be found in the Ghidra Front End GUI, under <code>Help -> 
+    Runtime Information -> Application Layout -> Settings Directory</code></P>
 
 	</BlOCKQUOTE>
     <H2>Theme Chooser Dialog<A name="Switch_Theme"></A></H2>
@@ -32,10 +36,10 @@
     <P align="center"><IMG alt="" src="images/ThemeChooserDialog.png"><BR>
      &nbsp;</P>
 
-    <P>The Theme Chooser dialog displays a list of all the know themes, both built-in and custom.
-    As you pick different themes, the application will switch to that theme. Press the "OK" button
-    when the desired theme is selected. Pressing the "Cancel" button will restore the theme to
-    the what it was when the dialog was invoked.</P>
+    <P>The Theme Chooser dialog displays a list of all the known themes, both built-in and custom.
+    Select the desired theme and press the "OK" button to have the application switch to that
+    theme. Pressing the "Cancel" button will exit the dialog without changing the theme. You
+    can also double click on a theme to switch to that theme and exit the dialog.</P>
     
     </BlOCKQUOTE>
     
@@ -243,7 +247,7 @@
 
       <P>Theme Files are used to store saved custom themes. They are simple text files and are 
       stored in the user's home application directory under 
-      <code>&lt;home&gt;/.ghidra/.ghidra-&lt;version&gt/themes</code>. The first three properties 
+      <code>&lt;user settings&gt;/themes</code>. The first three properties 
       are always the theme name, the Look and Feel name, and whether the theme uses standard 
       defaults or dark defaults. Finally, there is a list of overridden property "name = value" 
       lines. The format is:</P>

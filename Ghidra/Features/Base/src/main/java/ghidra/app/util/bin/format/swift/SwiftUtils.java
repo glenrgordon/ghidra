@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,6 +28,8 @@ import ghidra.program.model.mem.MemoryBlock;
  * Swift-related utility methods
  */
 public class SwiftUtils {
+
+	public static final String SWIFT_COMPILER = "swift";
 
 	/**
 	 * A {@link PointerTypedef pointer} to a relative 4-byte offset
@@ -51,6 +53,23 @@ public class SwiftUtils {
 		List<String> prefixes = List.of("__swift", "swift", ".sw5");
 		for (MemoryBlock block : program.getMemory().getBlocks()) {
 			if (prefixes.stream().anyMatch(prefix -> block.getName().startsWith(prefix))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Checks if the given {@link List} of section names contains a Swift section name
+	 * 
+	 * @param sectionNames The {@link List} of section names to check
+	 * @return True if the given {@link List} of section names contains a Swift section name; otherwise, 
+	 *   false
+	 */
+	public static boolean isSwift(List<String> sectionNames) {
+		List<String> prefixes = List.of("__swift", "swift", ".sw5");
+		for (String sectionName : sectionNames) {
+			if (prefixes.stream().anyMatch(prefix -> sectionName.startsWith(prefix))) {
 				return true;
 			}
 		}

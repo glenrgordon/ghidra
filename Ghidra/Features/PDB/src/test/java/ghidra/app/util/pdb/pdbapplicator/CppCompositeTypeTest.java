@@ -15,7 +15,7 @@
  */
 package ghidra.app.util.pdb.pdbapplicator;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.util.*;
 
@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import generic.test.AbstractGenericTest;
 import ghidra.app.plugin.core.checksums.MyTestMemory;
+import ghidra.app.util.SymbolPath;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressIterator;
 import ghidra.program.model.data.*;
@@ -476,14 +477,16 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 
 	private static CppCompositeType createStruct32(String name, int size) {
 		Composite composite = new StructureDataType(CategoryPath.ROOT, name, 0, dtm32);
+		SymbolPath symbolPath = new SymbolPath(name);
 		String mangledName = createMangledName(name, CppCompositeType.Type.STRUCT);
-		return CppCompositeType.createCppStructType(composite, name, mangledName, size);
+		return CppCompositeType.createCppStructType(symbolPath, composite, name, mangledName, size);
 	}
 
 	private static CppCompositeType createStruct64(String name, int size) {
 		Composite composite = new StructureDataType(CategoryPath.ROOT, name, 0, dtm64);
+		SymbolPath symbolPath = new SymbolPath(name);
 		String mangledName = createMangledName(name, CppCompositeType.Type.STRUCT);
-		return CppCompositeType.createCppStructType(composite, name, mangledName, 0);
+		return CppCompositeType.createCppStructType(symbolPath, composite, name, mangledName, 0);
 	}
 
 	private static String createMangledName(String className, CppCompositeType.Type type) {
@@ -3005,14 +3008,14 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure A {\n" +
 			"   0   A_direct   8      \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3061,14 +3064,14 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure A {\n" +
 			"   0   A_direct   8      \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3115,13 +3118,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure C {\n" +
 			"   0   C_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3168,13 +3171,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure C {\n" +
 			"   0   C_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3221,13 +3224,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure CC1 {\n" +
 			"   0   CC1_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3274,13 +3277,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure CC1 {\n" +
 			"   0   CC1_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3327,13 +3330,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure CC2 {\n" +
 			"   0   CC2_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3380,13 +3383,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure CC2 {\n" +
 			"   0   CC2_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3430,7 +3433,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"pack(disabled)\n" +
 			"Structure CC3 {\n" +
 			"}\n" +
-			"Size = 1   Actual Alignment = 1";
+			"Length: 0 Alignment: 1";
 		//@formatter:on
 		return expected;
 	}
@@ -3474,7 +3477,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"pack(disabled)\n" +
 			"Structure CC3 {\n" +
 			"}\n" +
-			"Size = 1   Actual Alignment = 1";
+			"Length: 0 Alignment: 1";
 		//@formatter:on
 		return expected;
 	}
@@ -3524,20 +3527,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure D {\n" +
 			"   0   D_direct   8      \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/D/D_direct\n" +
 			"pack()\n" +
 			"Structure D_direct {\n" +
 			"   0   C_direct   4      \"/D/BaseClass_C\"\n" +
 			"   4   undefined4   4   d1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3587,20 +3590,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure D {\n" +
 			"   0   D_direct   8      \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/D/D_direct\n" +
 			"pack()\n" +
 			"Structure D_direct {\n" +
 			"   0   C_direct   4      \"/D/BaseClass_C\"\n" +
 			"   4   undefined4   4   d1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3647,13 +3650,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure E {\n" +
 			"   0   E_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3700,13 +3703,13 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure E {\n" +
 			"   0   E_direct   4      \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4";
+			"Length: 4 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3759,19 +3762,19 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure F {\n" +
 			"   0   F_direct   12      \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/F/F_direct\n" +
 			"pack()\n" +
 			"Structure F_direct {\n" +
@@ -3779,7 +3782,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   4   E_direct   4      \"/F/BaseClass_E\"\n" +
 			"   8   undefined4   4   f1   \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4";
+			"Length: 12 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3832,19 +3835,19 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure F {\n" +
 			"   0   F_direct   12      \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/F/F_direct\n" +
 			"pack()\n" +
 			"Structure F_direct {\n" +
@@ -3852,7 +3855,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   4   E_direct   4      \"/F/BaseClass_E\"\n" +
 			"   8   undefined4   4   f1   \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4";
+			"Length: 12 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3910,20 +3913,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   G_direct   8      \"\"\n" +
 			"   8   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -3982,20 +3985,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   G_direct   16      \"\"\n" +
 			"   16   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4053,20 +4056,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   H_direct   8      \"\"\n" +
 			"   8   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4125,20 +4128,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   H_direct   16      \"\"\n" +
 			"   16   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4202,26 +4205,26 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   12   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 4\n" +
+			"Length: 16 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4286,26 +4289,26 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   20   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4369,26 +4372,26 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   12   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 4\n" +
+			"Length: 16 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4453,26 +4456,26 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   20   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4530,20 +4533,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG1_direct   8      \"\"\n" +
 			"   8   CC1_direct   4      \"(Virtual Base CC1)\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   4   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4602,20 +4605,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG1_direct   16      \"\"\n" +
 			"   16   CC1_direct   4      \"(Virtual Base CC1)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   8   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4673,20 +4676,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG2_direct   8      \"\"\n" +
 			"   8   CC2_direct   4      \"(Virtual Base CC2)\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   4   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4745,20 +4748,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG2_direct   16      \"\"\n" +
 			"   16   CC2_direct   4      \"(Virtual Base CC2)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   8   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4816,20 +4819,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG3_direct   8      \"\"\n" +
 			"   8   CC2_direct   4      \"(Virtual Base CC2)\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4\n" +
+			"Length: 12 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   4   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -4888,20 +4891,20 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   GG3_direct   16      \"\"\n" +
 			"   16   CC2_direct   4      \"(Virtual Base CC2)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8\n" +
+			"Length: 24 Alignment: 8\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   8   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -4961,14 +4964,14 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure GG4 {\n" +
 			"   0   GG4_direct   8      \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG4/GG4_direct\n" +
 			"pack()\n" +
 			"Structure GG4_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG4\"\n" +
 			"   4   undefined4   4   gg41   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4";
+			"Length: 8 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -5029,14 +5032,14 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"Structure GG4 {\n" +
 			"   0   GG4_direct   16      \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG4/GG4_direct\n" +
 			"pack()\n" +
 			"Structure GG4_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG4\"\n" +
 			"   8   undefined4   4   gg41   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8";
+			"Length: 16 Alignment: 8";
 
 		//@formatter:on
 		return expected;
@@ -5106,27 +5109,27 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   I_direct   20      \"\"\n" +
 			"   20   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 4\n" +
+			"Length: 24 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -5134,7 +5137,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I/BaseClass_H\"\n" +
 			"   16   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4";
+			"Length: 20 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -5208,27 +5211,27 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   0   I_direct   40      \"\"\n" +
 			"   40   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 48   Actual Alignment = 8\n" +
+			"Length: 48 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -5236,7 +5239,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I/BaseClass_H\"\n" +
 			"   32   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8";
+			"Length: 40 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -5311,33 +5314,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   20   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   24   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 28   Actual Alignment = 4\n" +
+			"Length: 28 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -5345,7 +5348,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I1/BaseClass_H\"\n" +
 			"   16   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4";
+			"Length: 20 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -5424,33 +5427,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   44   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 48   Actual Alignment = 8\n" +
+			"Length: 48 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -5458,7 +5461,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I1/BaseClass_H\"\n" +
 			"   32   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8";
+			"Length: 40 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -5534,33 +5537,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   20   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   24   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 28   Actual Alignment = 4\n" +
+			"Length: 28 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -5568,7 +5571,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I2/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4";
+			"Length: 20 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -5648,33 +5651,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   44   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 48   Actual Alignment = 8\n" +
+			"Length: 48 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -5682,7 +5685,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I2/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8";
+			"Length: 40 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -5758,33 +5761,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   20   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   24   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 28   Actual Alignment = 4\n" +
+			"Length: 28 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -5792,7 +5795,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I3/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4";
+			"Length: 20 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -5871,33 +5874,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   44   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 48   Actual Alignment = 8\n" +
+			"Length: 48 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -5905,7 +5908,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I3/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8";
+			"Length: 40 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -5972,33 +5975,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   12   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   16   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I4/I4_direct\n" +
 			"pack()\n" +
 			"Structure I4_direct {\n" +
 			"   0   G1_direct   8      \"/I4/BaseClass_G1\"\n" +
 			"   8   undefined4   4   i41   \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4";
+			"Length: 12 Alignment: 4";
 
 		//@formatter:on
 		return expected;
@@ -6067,33 +6070,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   24   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   28   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 32   Actual Alignment = 8\n" +
+			"Length: 32 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I4/I4_direct\n" +
 			"pack()\n" +
 			"Structure I4_direct {\n" +
 			"   0   G1_direct   16      \"/I4/BaseClass_G1\"\n" +
 			"   16   undefined4   4   i41   \"\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8";
+			"Length: 24 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -6160,33 +6163,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   12   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   16   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I5/I5_direct\n" +
 			"pack()\n" +
 			"Structure I5_direct {\n" +
 			"   0   G1_direct   8      \"/I5/BaseClass_G1\"\n" +
 			"   8   undefined4   4   i51   \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4";
+			"Length: 12 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -6206,33 +6209,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   12   C_direct   4      \"((Speculative Placement) Virtual Base C)\"\n" +
 			"   16   E_direct   4      \"((Speculative Placement) Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I5/I5_direct\n" +
 			"pack()\n" +
 			"Structure I5_direct {\n" +
 			"   0   G1_direct   8      \"/I5/BaseClass_G1\"\n" +
 			"   8   undefined4   4   i51   \"\"\n" +
 			"}\n" +
-			"Size = 12   Actual Alignment = 4";
+			"Length: 12 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -6297,33 +6300,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   24   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   28   C_direct   4      \"(Virtual Base C)\"\n" +
 			"}\n" +
-			"Size = 32   Actual Alignment = 8\n" +
+			"Length: 32 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I5/I5_direct\n" +
 			"pack()\n" +
 			"Structure I5_direct {\n" +
 			"   0   G1_direct   16      \"/I5/BaseClass_G1\"\n" +
 			"   16   undefined4   4   i51   \"\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8";
+			"Length: 24 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -6343,33 +6346,33 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   24   C_direct   4      \"((Speculative Placement) Virtual Base C)\"\n" +
 			"   28   E_direct   4      \"((Speculative Placement) Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 32   Actual Alignment = 8\n" +
+			"Length: 32 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I5/I5_direct\n" +
 			"pack()\n" +
 			"Structure I5_direct {\n" +
 			"   0   G1_direct   16      \"/I5/BaseClass_G1\"\n" +
 			"   16   undefined4   4   i51   \"\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8";
+			"Length: 24 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -6464,47 +6467,47 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   44   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   48   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 52   Actual Alignment = 4\n" +
+			"Length: 52 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -6512,7 +6515,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I1/BaseClass_H\"\n" +
 			"   16   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -6520,7 +6523,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I2/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/J1/J1_direct\n" +
 			"pack()\n" +
 			"Structure J1_direct {\n" +
@@ -6528,7 +6531,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   20   I2_direct   20      \"/J1/BaseClass_I2\"\n" +
 			"   40   undefined4   4   j11   \"\"\n" +
 			"}\n" +
-			"Size = 44   Actual Alignment = 4";
+			"Length: 44 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -6636,47 +6639,47 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   88   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   92   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 96   Actual Alignment = 8\n" +
+			"Length: 96 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -6684,7 +6687,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I1/BaseClass_H\"\n" +
 			"   32   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -6692,7 +6695,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I2/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/J1/J1_direct\n" +
 			"pack()\n" +
 			"Structure J1_direct {\n" +
@@ -6700,7 +6703,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   I2_direct   40      \"/J1/BaseClass_I2\"\n" +
 			"   80   undefined4   4   j11   \"\"\n" +
 			"}\n" +
-			"Size = 88   Actual Alignment = 8";
+			"Length: 88 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -6799,47 +6802,47 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   44   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   48   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 52   Actual Alignment = 4\n" +
+			"Length: 52 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -6847,7 +6850,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I1/BaseClass_H\"\n" +
 			"   16   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -6855,7 +6858,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I2/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/J2/J2_direct\n" +
 			"pack()\n" +
 			"Structure J2_direct {\n" +
@@ -6863,7 +6866,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   20   I1_direct   20      \"/J2/BaseClass_I1\"\n" +
 			"   40   undefined4   4   j21   \"\"\n" +
 			"}\n" +
-			"Size = 44   Actual Alignment = 4";
+			"Length: 44 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -6971,47 +6974,47 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   88   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   92   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 96   Actual Alignment = 8\n" +
+			"Length: 96 Alignment: 8\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -7019,7 +7022,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I1/BaseClass_H\"\n" +
 			"   32   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -7027,7 +7030,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I2/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/J2/J2_direct\n" +
 			"pack()\n" +
 			"Structure J2_direct {\n" +
@@ -7035,7 +7038,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   I1_direct   40      \"/J2/BaseClass_I1\"\n" +
 			"   80   undefined4   4   j21   \"\"\n" +
 			"}\n" +
-			"Size = 88   Actual Alignment = 8";
+			"Length: 88 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -7139,54 +7142,54 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   52   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   56   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 60   Actual Alignment = 4\n" +
+			"Length: 60 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -7194,7 +7197,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I1/BaseClass_H\"\n" +
 			"   16   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -7202,7 +7205,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I2/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/J3/J3_direct\n" +
 			"pack()\n" +
 			"Structure J3_direct {\n" +
@@ -7211,7 +7214,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   A_direct   8      \"/J3/BaseClass_A\"\n" +
 			"   48   undefined4   4   j31   \"\"\n" +
 			"}\n" +
-			"Size = 52   Actual Alignment = 4";
+			"Length: 52 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -7324,54 +7327,54 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   96   C_direct   4      \"(Virtual Base C)\"\n" +
 			"   100   E_direct   4      \"(Virtual Base E)\"\n" +
 			"}\n" +
-			"Size = 104   Actual Alignment = 8\n" +
+			"Length: 104 Alignment: 8\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I1/I1_direct\n" +
 			"pack()\n" +
 			"Structure I1_direct {\n" +
@@ -7379,7 +7382,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I1/BaseClass_H\"\n" +
 			"   32   undefined4   4   i11   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/I2/I2_direct\n" +
 			"pack()\n" +
 			"Structure I2_direct {\n" +
@@ -7387,7 +7390,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I2/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i21   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/J3/J3_direct\n" +
 			"pack()\n" +
 			"Structure J3_direct {\n" +
@@ -7396,7 +7399,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   80   A_direct   8      \"/J3/BaseClass_A\"\n" +
 			"   88   undefined4   4   j31   \"\"\n" +
 			"}\n" +
-			"Size = 96   Actual Alignment = 8";
+			"Length: 96 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -7541,87 +7544,87 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   76   GG2_direct   8      \"(Virtual Base GG2)\"\n" +
 			"   84   GG3_direct   8      \"(Virtual Base GG3)\"\n" +
 			"}\n" +
-			"Size = 92   Actual Alignment = 4\n" +
+			"Length: 92 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   4   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   4   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   4   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -7629,7 +7632,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I/BaseClass_H\"\n" +
 			"   16   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -7637,7 +7640,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I3/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/J4/J4_direct\n" +
 			"pack()\n" +
 			"Structure J4_direct {\n" +
@@ -7647,7 +7650,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   48   A_direct   8      \"/J4/BaseClass_A\"\n" +
 			"   56   undefined4   4   j41   \"\"\n" +
 			"}\n" +
-			"Size = 60   Actual Alignment = 4";
+			"Length: 60 Alignment: 4";
 		//@formatter:on
 		return expected;
 	}
@@ -7808,87 +7811,87 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   128   GG2_direct   16      \"(Virtual Base GG2)\"\n" +
 			"   144   GG3_direct   16      \"(Virtual Base GG3)\"\n" +
 			"}\n" +
-			"Size = 160   Actual Alignment = 8\n" +
+			"Length: 160 Alignment: 8\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   8   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   8   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   8   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -7896,7 +7899,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I/BaseClass_H\"\n" +
 			"   32   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -7904,7 +7907,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I3/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/J4/J4_direct\n" +
 			"pack()\n" +
 			"Structure J4_direct {\n" +
@@ -7914,7 +7917,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   96   A_direct   8      \"/J4/BaseClass_A\"\n" +
 			"   104   undefined4   4   j41   \"\"\n" +
 			"}\n" +
-			"Size = 112   Actual Alignment = 8";
+			"Length: 112 Alignment: 8";
 		//@formatter:on
 		return expected;
 	}
@@ -8061,87 +8064,87 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   84   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   88   CC1_direct   4      \"(Virtual Base CC1)\"\n" +
 			"}\n" +
-			"Size = 92   Actual Alignment = 4\n" +
+			"Length: 92 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G\"\n" +
 			"   4   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   4   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   4   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   4   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   4   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H\"\n" +
 			"   4   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   4   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -8149,7 +8152,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H_direct   8      \"/I/BaseClass_H\"\n" +
 			"   16   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -8157,7 +8160,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   H1_direct   8      \"/I3/BaseClass_H1\"\n" +
 			"   16   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 20   Actual Alignment = 4\n" +
+			"Length: 20 Alignment: 4\n" +
 			"/J5/J5_direct\n" +
 			"pack()\n" +
 			"Structure J5_direct {\n" +
@@ -8167,7 +8170,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   48   A_direct   8      \"/J5/BaseClass_A\"\n" +
 			"   56   undefined4   4   j51   \"\"\n" +
 			"}\n" +
-			"Size = 60   Actual Alignment = 4";
+			"Length: 60 Alignment: 4";
 
 		//@formatter:on
 		return expected;
@@ -8336,87 +8339,87 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   156   E_direct   4      \"(Virtual Base E)\"\n" +
 			"   160   CC1_direct   4      \"(Virtual Base CC1)\"\n" +
 			"}\n" +
-			"Size = 168   Actual Alignment = 8\n" +
+			"Length: 168 Alignment: 8\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/C/C_direct\n" +
 			"pack()\n" +
 			"Structure C_direct {\n" +
 			"   0   undefined4   4   c1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC1/CC1_direct\n" +
 			"pack()\n" +
 			"Structure CC1_direct {\n" +
 			"   0   undefined4   4   cc11   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/E/E_direct\n" +
 			"pack()\n" +
 			"Structure E_direct {\n" +
 			"   0   undefined4   4   e1   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/G/G_direct\n" +
 			"pack()\n" +
 			"Structure G_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G\"\n" +
 			"   8   undefined4   4   g1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/G1/G1_direct\n" +
 			"pack()\n" +
 			"Structure G1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for G1\"\n" +
 			"   8   undefined4   4   g11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG1/GG1_direct\n" +
 			"pack()\n" +
 			"Structure GG1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG1\"\n" +
 			"   8   undefined4   4   gg11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG2/GG2_direct\n" +
 			"pack()\n" +
 			"Structure GG2_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG2\"\n" +
 			"   8   undefined4   4   gg21   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   8   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H/H_direct\n" +
 			"pack()\n" +
 			"Structure H_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H\"\n" +
 			"   8   undefined4   4   h1   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/H1/H1_direct\n" +
 			"pack()\n" +
 			"Structure H1_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for H1\"\n" +
 			"   8   undefined4   4   h11   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/I/I_direct\n" +
 			"pack()\n" +
 			"Structure I_direct {\n" +
@@ -8424,7 +8427,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H_direct   16      \"/I/BaseClass_H\"\n" +
 			"   32   undefined4   4   i1   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/I3/I3_direct\n" +
 			"pack()\n" +
 			"Structure I3_direct {\n" +
@@ -8432,7 +8435,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   16   H1_direct   16      \"/I3/BaseClass_H1\"\n" +
 			"   32   undefined4   4   i31   \"\"\n" +
 			"}\n" +
-			"Size = 40   Actual Alignment = 8\n" +
+			"Length: 40 Alignment: 8\n" +
 			"/J5/J5_direct\n" +
 			"pack()\n" +
 			"Structure J5_direct {\n" +
@@ -8442,7 +8445,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   96   A_direct   8      \"/J5/BaseClass_A\"\n" +
 			"   104   undefined4   4   j51   \"\"\n" +
 			"}\n" +
-			"Size = 112   Actual Alignment = 8";
+			"Length: 112 Alignment: 8";
 
 		//@formatter:on
 		return expected;
@@ -8538,34 +8541,34 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   24   CC2_direct   4      \"(Virtual Base (empty) CC3)(Virtual Base CC2)\"\n" +
 			"   28   GG3_direct   8      \"(Virtual Base GG3)\"\n" +
 			"}\n" +
-			"Size = 36   Actual Alignment = 4\n" +
+			"Length: 36 Alignment: 4\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   4   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/GG4/GG4_direct\n" +
 			"pack()\n" +
 			"Structure GG4_direct {\n" +
 			"   0   int *   4   {vbptr}   \"{vbptr} for GG4\"\n" +
 			"   4   undefined4   4   gg41   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/J6/J6_direct\n" +
 			"pack()\n" +
 			"Structure J6_direct {\n" +
@@ -8573,7 +8576,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   int *   4   {vbptr}   \"{vbptr} for J6\"\n" +
 			"   12   undefined4   4   j61   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 4";
+			"Length: 16 Alignment: 4";
 
 		//@formatter:on
 		return expected;
@@ -8674,34 +8677,34 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   40   CC2_direct   4      \"(Virtual Base (empty) CC3)(Virtual Base CC2)\"\n" +
 			"   48   GG3_direct   16      \"(Virtual Base GG3)\"\n" +
 			"}\n" +
-			"Size = 64   Actual Alignment = 8\n" +
+			"Length: 64 Alignment: 8\n" +
 			"/A/A_direct\n" +
 			"pack()\n" +
 			"Structure A_direct {\n" +
 			"   0   undefined1   1   c   \"\"\n" +
 			"   4   undefined4   4   i   \"\"\n" +
 			"}\n" +
-			"Size = 8   Actual Alignment = 4\n" +
+			"Length: 8 Alignment: 4\n" +
 			"/CC2/CC2_direct\n" +
 			"pack()\n" +
 			"Structure CC2_direct {\n" +
 			"   0   undefined4   4   cc21   \"\"\n" +
 			"}\n" +
-			"Size = 4   Actual Alignment = 4\n" +
+			"Length: 4 Alignment: 4\n" +
 			"/GG3/GG3_direct\n" +
 			"pack()\n" +
 			"Structure GG3_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG3\"\n" +
 			"   8   undefined4   4   gg31   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/GG4/GG4_direct\n" +
 			"pack()\n" +
 			"Structure GG4_direct {\n" +
 			"   0   int *   8   {vbptr}   \"{vbptr} for GG4\"\n" +
 			"   8   undefined4   4   gg41   \"\"\n" +
 			"}\n" +
-			"Size = 16   Actual Alignment = 8\n" +
+			"Length: 16 Alignment: 8\n" +
 			"/J6/J6_direct\n" +
 			"pack()\n" +
 			"Structure J6_direct {\n" +
@@ -8709,7 +8712,7 @@ public class CppCompositeTypeTest extends AbstractGenericTest {
 			"   8   int *   8   {vbptr}   \"{vbptr} for J6\"\n" +
 			"   16   undefined4   4   j61   \"\"\n" +
 			"}\n" +
-			"Size = 24   Actual Alignment = 8";
+			"Length: 24 Alignment: 8";
 
 		//@formatter:on
 		return expected;

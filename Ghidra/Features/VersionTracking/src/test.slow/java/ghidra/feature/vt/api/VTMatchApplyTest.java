@@ -69,7 +69,6 @@ public class VTMatchApplyTest extends AbstractGhidraHeadedIntegrationTest {
 	private ProgramDB destinationProgram;
 	private VTPlugin plugin;
 
-	// TODO: debug
 	private DomainObjectListenerRecorder eventRecorder = new DomainObjectListenerRecorder();
 
 	@Before
@@ -94,9 +93,8 @@ public class VTMatchApplyTest extends AbstractGhidraHeadedIntegrationTest {
 		plugin = getPlugin(tool, VTPlugin.class);
 		controller = new VTControllerImpl(plugin);
 
-		session =
-			VTSessionDB.createVTSession(testName.getMethodName() + " - Test Match Set Manager",
-				sourceProgram, destinationProgram, this);
+		session = new VTSessionDB(testName.getMethodName() + " - Test Match Set Manager",
+			sourceProgram, destinationProgram, this);
 
 		runSwing(() -> controller.openVersionTrackingSession(session));
 

@@ -17,8 +17,7 @@ package ghidra.app.util.importer;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 
 import generic.stl.Pair;
@@ -718,9 +717,16 @@ public final class AutoImporter {
 		Msg.info(AutoImporter.class, "Using Loader: " + loadSpec.getLoader().getName());
 		Msg.info(AutoImporter.class,
 			"Using Language/Compiler: " + loadSpec.getLanguageCompilerSpec());
+		Msg.info(AutoImporter.class, "Using Library Search Path: " +
+			Arrays.toString(LibrarySearchPathManager.getLibraryPaths()));
 		LoadResults<? extends DomainObject> loadResults = loadSpec.getLoader()
 				.load(provider, importName, project, projectFolderPath, loadSpec, loaderOptions,
 					messageLog, consumer, monitor);
+
+		// Optionally echo loader message log to application.log
+		if (!Loader.loggingDisabled && messageLog.hasMessages()) {
+			Msg.info(AutoImporter.class, "Additional info:\n" + messageLog.toString());
+		}
 
 		// Filter out and release non-Programs
 		List<Loaded<Program>> loadedPrograms = new ArrayList<>();

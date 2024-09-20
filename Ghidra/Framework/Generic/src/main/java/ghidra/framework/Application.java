@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,6 +29,7 @@ import util.CollectionUtils;
 import utilities.util.FileUtilities;
 import utilities.util.reflection.ReflectionUtilities;
 import utility.application.ApplicationLayout;
+import utility.application.ApplicationUtilities;
 import utility.module.ModuleUtilities;
 
 /**
@@ -43,7 +44,7 @@ import utility.module.ModuleUtilities;
  * <pre>
  *   ApplicationLayout layout = new GhidraApplicationLayout();
  *   ApplicationConfiguration configuration = new GhidraApplicationConfiguration();
- *   Application.initalizeApplication(layout, configuration);
+ *   Application.initializeApplication(layout, configuration);
  * </pre>
  */
 public class Application {
@@ -72,14 +73,6 @@ public class Application {
 	}
 
 	private void initialize() {
-
-		// Create application's user directories
-		try {
-			layout.createUserDirs();
-		}
-		catch (IOException e) {
-			throw new AssertException(e.getMessage());
-		}
 
 		// Set headless property
 		String isHeadless = Boolean.toString(configuration.isHeadless());
@@ -481,13 +474,13 @@ public class Application {
 				exactFilename);
 		}
 
-		// Allow win_x86_32 to be used for win_x86_64 as fallback
-		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_X86_64) {
-			file = getModuleFile(module, "build/os/" + Platform.WIN_X86_32.getDirectoryName(),
+		// Allow win_x86_64 to be used for win_arm_64 as fallback (requires Windows emulation)
+		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_ARM_64) {
+			file = getModuleFile(module, "build/os/" + Platform.WIN_X86_64.getDirectoryName(),
 				exactFilename);
 		}
-		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_X86_64) {
-			file = getModuleFile(module, "os/" + Platform.WIN_X86_32.getDirectoryName(),
+		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_ARM_64) {
+			file = getModuleFile(module, "os/" + Platform.WIN_X86_64.getDirectoryName(),
 				exactFilename);
 		}
 
@@ -527,12 +520,12 @@ public class Application {
 			file = findModuleFile("os/" + Platform.CURRENT_PLATFORM.getDirectoryName(), path);
 		}
 
-		// Allow win_x86_32 to be used for win_x86_64 as fallback
-		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_X86_64) {
-			file = findModuleFile("build/os/" + Platform.WIN_X86_32.getDirectoryName(), path);
+		// Allow win_x86_64 to be used for win_arm_64 as fallback (requires Windows emulation)
+		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_ARM_64) {
+			file = findModuleFile("build/os/" + Platform.WIN_X86_64.getDirectoryName(), path);
 		}
-		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_X86_64) {
-			file = findModuleFile("os/" + Platform.WIN_X86_32.getDirectoryName(), path);
+		if (file == null && Platform.CURRENT_PLATFORM == Platform.WIN_ARM_64) {
+			file = findModuleFile("os/" + Platform.WIN_X86_64.getDirectoryName(), path);
 		}
 
 		// Allow mac_x86_64 to be used for mac_arm_64 as fallback (requires macOS Rosetta 2)
@@ -667,7 +660,6 @@ public class Application {
 
 	/**
 	 * Returns the temporary directory specific to the user and the application.
-	 * Directory has name of &lt;username&gt;-&lt;appname&gt;
 	 * This directory may be removed at system reboot or during periodic
 	 * system cleanup of unused temp files.
 	 * This directory is specific to the application name but not the version.
@@ -677,15 +669,22 @@ public class Application {
 	 * @return temp directory
 	 */
 	public static File getUserTempDirectory() {
-		checkAppInitialized();
-		return app.layout.getUserTempDir();
+		try {
+			// 'app' will be null when the application has not been initialized yet.  In this case,
+			// we provide the default user temp directory.
+			return app != null ? app.layout.getUserTempDir()
+					: ApplicationUtilities.getDefaultUserTempDir("ghidra");
+		}
+		catch (IOException e) {
+			throw new AssertException(e);
+		}
 	}
 
 	/**
 	 * Returns the cache directory specific to the user and the application.
 	 * The intention is for directory contents to be preserved, however the
 	 * specific location is platform specific and contents may be removed when
-	 * not in use and may in fact be the same directory the user temp directory.
+	 * not in use.
 	 * This directory is specific to the application name but not the version.
 	 * Resources stored within this directory should utilize some
 	 * form of access locking and/or unique naming.
@@ -694,6 +693,24 @@ public class Application {
 	public static File getUserCacheDirectory() {
 		checkAppInitialized();
 		return app.layout.getUserCacheDir();
+	}
+
+	/**
+	 * Creates a new empty file in the Application's temp directory, using the given prefix and 
+	 * suffix strings to generate its name.  
+	 * 
+	 * @param prefix The prefix string to be used in generating the file's name; must be at least 
+	 *   three characters long
+	 * @param suffix The suffix string to be used in generating the file's name; may be 
+	 *   {@code null}, in which case the suffix {@code ".tmp"} will be used
+	 * @return A {@link File} denoting a newly-created empty file
+	 * @throws IllegalArgumentException If the {@code prefix} argument contains fewer than three 
+	 *   characters
+	 * @throws IOException If a file could not be created
+	 * @see File#createTempFile(String, String, File)
+	 */
+	public static File createTempFile(String prefix, String suffix) throws IOException {
+		return File.createTempFile(prefix, suffix, getUserTempDirectory());
 	}
 
 	/**

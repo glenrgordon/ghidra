@@ -67,6 +67,7 @@ public final class BuiltInDataTypeManager extends StandAloneDataTypeManager {
 	private BuiltInDataTypeManager() {
 		super(BUILT_IN_DATA_TYPES_NAME);
 		initialize();
+		setImmutable();
 	}
 
 	@Override
@@ -96,6 +97,16 @@ public final class BuiltInDataTypeManager extends StandAloneDataTypeManager {
 			throw new UnsupportedOperationException();
 		}
 		super.endTransaction(transactionID, commit);
+	}
+
+	@Override
+	public synchronized boolean canUndo() {
+		return false;
+	}
+
+	@Override
+	public synchronized boolean canRedo() {
+		return false;
 	}
 
 	@Override

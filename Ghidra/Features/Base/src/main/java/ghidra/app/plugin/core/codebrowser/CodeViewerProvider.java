@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,7 +24,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.*;
 
-import javax.swing.*;
+import javax.swing.Icon;
+import javax.swing.JComponent;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -37,12 +38,15 @@ import docking.widgets.fieldpanel.FieldPanel;
 import docking.widgets.fieldpanel.HoverHandler;
 import docking.widgets.fieldpanel.internal.FieldPanelCoordinator;
 import docking.widgets.fieldpanel.support.*;
+import docking.widgets.tab.GTabPanel;
 import generic.theme.GIcon;
 import ghidra.app.context.ListingActionContext;
-import ghidra.app.nav.*;
+import ghidra.app.nav.ListingPanelContainer;
+import ghidra.app.nav.LocationMemento;
 import ghidra.app.plugin.core.clipboard.CodeBrowserClipboardProvider;
 import ghidra.app.plugin.core.codebrowser.actions.*;
 import ghidra.app.plugin.core.codebrowser.hover.ListingHoverService;
+import ghidra.app.plugin.core.progmgr.ProgramTabActionContext;
 import ghidra.app.services.*;
 import ghidra.app.util.*;
 import ghidra.app.util.viewer.field.ListingField;
@@ -79,7 +83,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 
 	private static final String DIVIDER_LOCATION = "DividerLocation";
 
-	private ImageIcon navigatableIcon;
 	private Map<Program, ListingHighlightProvider> programHighlighterMap = new HashMap<>();
 	private ProgramHighlighterProvider highlighterAdapter;
 
@@ -102,7 +105,10 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 	private CoordinatedListingPanelListener coordinatedListingPanelListener;
 	private FormatManager formatMgr;
 	private FieldPanelCoordinator coordinator;
-
+	private ProgramSelectionListener liveProgramSelectionListener = (selection, trigger) -> {
+		liveSelection = selection;
+		updateSubTitle();
+	};
 	private FocusingMouseListener focusingMouseListener;
 
 	private CodeBrowserClipboardProvider codeViewerClipboardProvider;
@@ -113,6 +119,7 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 	private CloneCodeViewerAction cloneCodeViewerAction;
 
 	private ProgramSelection currentSelection;
+	private ProgramSelection liveSelection;
 	private ProgramSelection currentHighlight;
 	private String currentStringSelection;
 
@@ -160,11 +167,13 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 		createActions();
 		listingPanel.setProgramLocationListener(this);
 		listingPanel.setProgramSelectionListener(this);
+		listingPanel.setLiveProgramSelectionListener(liveProgramSelectionListener);
 		listingPanel.setStringSelectionListener(this);
 		listingPanel.addIndexMapChangeListener(this);
 
 		codeViewerClipboardProvider = newClipboardProvider();
 		tool.addPopupActionProvider(this);
+		setDefaultFocusComponent(listingPanel.getFieldPanel());
 	}
 
 	protected CodeBrowserClipboardProvider newClipboardProvider() {
@@ -297,6 +306,17 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 			}
 			return new OtherPanelContext(this, program);
 		}
+
+		JComponent northPanel = decorationPanel.getNorthPanel();
+		if (northPanel != null && northPanel.isAncestorOf((Component) source)) {
+			if (northPanel instanceof GTabPanel tabPanel) {
+				Program tabValue = (Program) tabPanel.getValueFor(event);
+				if (tabValue != null) {
+					return new ProgramTabActionContext(this, tabValue, tabPanel);
+				}
+			}
+		}
+
 		return createContext(getContextForMarginPanels(listingPanel, event));
 	}
 
@@ -326,11 +346,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 	}
 
 	@Override
-	public void dragCanceled(DragSourceDropEvent event) {
-		// nothing to do
-	}
-
-	@Override
 	public int getDragAction() {
 		return dragAction;
 	}
@@ -356,11 +371,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 	}
 
 	@Override
-	public void move() {
-		// nothing to do
-	}
-
-	@Override
 	public void add(Object obj, DropTargetDropEvent event, DataFlavor f) {
 		Point p = event.getLocation();
 		ProgramLocation loc = listingPanel.getProgramLocation(p);
@@ -368,11 +378,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 		if (loc != null && curDropProvider != null) {
 			curDropProvider.add(context, obj, f);
 		}
-	}
-
-	@Override
-	public void dragUnderFeedback(boolean ok, DropTargetDragEvent e) {
-		// nothing to do
 	}
 
 	@Override
@@ -414,11 +419,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 		if (otherPanel != null) {
 			otherPanel.getFieldPanel().repaint();
 		}
-	}
-
-	@Override
-	public void undoDragUnderFeedback() {
-		// nothing to do
 	}
 
 	protected void doSetProgram(Program newProgram) {
@@ -547,11 +547,18 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 
 	private void doSetSelection(ProgramSelection selection) {
 
+		liveSelection = null;
 		currentSelection = selection;
 		codeViewerClipboardProvider.setSelection(currentSelection);
 		listingPanel.setSelection(currentSelection);
 		plugin.selectionChanged(this, currentSelection);
 		contextChanged();
+		updateSubTitle();
+	}
+
+	private void updateSubTitle() {
+
+		ProgramSelection selection = liveSelection != null ? liveSelection : currentSelection;
 		String selectionInfo = null;
 		if (!selection.isEmpty()) {
 			long n = selection.getNumAddresses();
@@ -846,19 +853,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 	}
 
 	@Override
-	public Icon getIcon() {
-		if (isConnected()) {
-			return super.getIcon();
-		}
-
-		if (navigatableIcon == null) {
-			Icon primaryIcon = super.getIcon();
-			navigatableIcon = NavigatableIconFactory.createSnapshotOverlayIcon(primaryIcon);
-		}
-		return navigatableIcon;
-	}
-
-	@Override
 	public Icon getNavigatableIcon() {
 		return getIcon();
 	}
@@ -896,11 +890,6 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 		}
 		setLocation(location);
 		return true;
-	}
-
-	@Override
-	public void requestFocus() {
-		listingPanel.getFieldPanel().requestFocus();
 	}
 
 	@Override
@@ -1115,11 +1104,10 @@ public class CodeViewerProvider extends NavigatableComponentProviderAdapter
 		public Highlight[] createHighlights(String text, ListingField field, int cursorTextOffset) {
 
 			List<Highlight> list = new ArrayList<>();
-			ListingHighlightProvider currentExternalHighligter =
-				programHighlighterMap.get(program);
+			ListingHighlightProvider currentExternalHighligter = programHighlighterMap.get(program);
 			if (currentExternalHighligter != null) {
-				Highlight[] highlights = currentExternalHighligter.createHighlights(text, field,
-					cursorTextOffset);
+				Highlight[] highlights =
+					currentExternalHighligter.createHighlights(text, field, cursorTextOffset);
 				for (Highlight highlight : highlights) {
 					list.add(highlight);
 				}

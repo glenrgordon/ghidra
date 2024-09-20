@@ -30,7 +30,6 @@ import ghidra.formats.gfilesystem.*;
 import ghidra.framework.main.AppInfo;
 import ghidra.framework.model.*;
 import ghidra.framework.store.local.LocalFileSystem;
-import ghidra.plugin.importer.ProgramMappingService;
 import ghidra.plugins.importer.batch.*;
 import ghidra.plugins.importer.batch.BatchGroup.BatchLoadConfig;
 import ghidra.program.model.listing.Program;
@@ -168,7 +167,7 @@ public class ImportBatchTask extends Task {
 
 				Msg.info(this, "Imported " + destInfo.first + "/ " + destInfo.second + ", " +
 					totalAppsImported + " of " + totalEnabledApps);
-				if (messageLog.hasMessages()) {
+				if (!Loader.loggingDisabled && messageLog.hasMessages()) {
 					Msg.info(this, "Additional info:\n" + messageLog.toString());
 				}
 			}
@@ -205,8 +204,6 @@ public class ImportBatchTask extends Task {
 						totalObjsImported == 0 ? ProgramManager.OPEN_CURRENT
 								: ProgramManager.OPEN_VISIBLE);
 				}
-
-				ProgramMappingService.createAssociation(appInfo.getFSRL(), program);
 			}
 			totalObjsImported++;
 		}

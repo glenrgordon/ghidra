@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,6 +24,7 @@ import generic.theme.GThemeDefaults.Colors;
 import generic.theme.GThemeDefaults.Colors.Messages;
 import ghidra.app.services.DataTypeManagerService;
 import ghidra.app.util.cparser.CPP.PreProcessor;
+import ghidra.framework.Application;
 import ghidra.framework.plugintool.ServiceProvider;
 import ghidra.framework.store.LockException;
 import ghidra.program.model.data.*;
@@ -259,7 +260,7 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param args arguments for parsing, "-D<defn>=", "-I<includepath>"
+	 * @param args arguments for parsing, {@code -D<defn>=, -I<includepath>}
 	 * 
 	 * @param dataFileName name of data type archive file (include the .gdt extension)
 	 * 
@@ -296,8 +297,9 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param includePaths paths to include files, instead of using "-I<includepath>" in args
-	 * @param args arguments for parsing, "-D<defn>=", ( "-I<includepath>" use includePaths parm instead)
+	 * @param includePaths paths to include files, instead of using {@code -I<includepath>} in args
+	 * @param args arguments for parsing, {@code -D<defn>=}, ( {@code -I<includepath>} use 
+	 *        includePaths parm instead)
 	 * 
 	 * @param dataFileName name of data type archive file (include the .gdt extension)
 	 * 
@@ -337,8 +339,8 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param includePaths path to include files, could also be in args with "-I<includepath>"
-	 * @param args arguments for parsing, "-D<defn>=", "-I<includepath>"
+	 * @param includePaths path to include files, could also be in args with {@code -I<includepath>}
+	 * @param args arguments for parsing, {@code -D<defn>=, -I<includepath>}
 	 * 
 	 * @param dataFileName name of data type archive file (include the .gdt extension)
 	 * 
@@ -390,11 +392,12 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param args arguments for parsing, "-D<defn>=", ( "-I<includepath>" use includePaths parm instead)
+	 * @param args arguments for parsing, {@code -D<defn>=}, ({@code -I<includepath>} use 
+	 *        includePaths parm instead)
 	 * 
 	 * @param existingDTMgr datatypes will be populated into this provided DTMgr, can pass Program or File DTMgr
 	 * 
-	 * @param languageId language identication to use for data type organization definitions (int, long, ptr size)
+	 * @param languageId language identification to use for data type organization definitions (int, long, ptr size)
 	 * @param compileSpecId compiler specification to use for parsing
 	 * 
 	 * @param monitor  used to cancel or provide results
@@ -430,12 +433,12 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param includePaths paths to include files, instead of using "-I<includepath>" in args
-	 * @param args arguments for parsing, "-D<defn>=", ( "-I<includepath>" use includePaths parm instead)
+	 * @param includePaths paths to include files, instead of using {@code -I<includepath>} in args
+	 * @param args arguments for parsing, {@code -D<defn>=}, ( {@code -I<includepath>} use includePaths parm instead)
 	 * 
 	 * @param existingDTMgr datatypes will be populated into this provided DTMgr, can pass Program or File DTMgr
 	 * 
-	 * @param languageId language identication to use for data type organization definitions (int, long, ptr size)
+	 * @param languageId language identification to use for data type organization definitions (int, long, ptr size)
 	 * @param compileSpecId compiler specification to use for parsing
 	 * 
 	 * @param monitor  used to cancel or provide results
@@ -507,8 +510,8 @@ public class CParserUtils {
 	 * 
 	 * @param filenames names of files in order to parse, could include strings with
 	 *        "#" at start, which are ignored as comments
-	 * @param includePaths paths to include files, instead of using "-I<includepath>" in args
-	 * @param args arguments for parsing, "-D<defn>=", ( "-I<includepath>" use includePaths parm instead)
+	 * @param includePaths paths to include files, instead of using {@code -I<includepath>} in args
+	 * @param args arguments for parsing, {@code -D<defn>=}, ( {@code -I<includepath>} use includePaths parm instead)
 	 * 
 	 * @param dtMgr datatypes will be populated into this provided DTMgr, can pass Program or File DTMgr
 	 * 
@@ -535,7 +538,7 @@ public class CParserUtils {
 		String fName = dtMgr.getName();
 		
 		// make a path to tmpdir with name of data type manager
-		String path = System.getProperty("java.io.tmpdir") + File.pathSeparator + fName;
+		String path = new File(Application.getUserTempDirectory(), fName).getAbsolutePath();
 		// if file data type manager, use path to .gdt file
 		if (dtMgr instanceof FileDataTypeManager) {
 			path = ((FileDataTypeManager) dtMgr).getPath();

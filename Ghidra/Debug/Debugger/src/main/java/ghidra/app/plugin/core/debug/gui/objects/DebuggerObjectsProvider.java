@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
@@ -63,6 +64,7 @@ import ghidra.dbg.target.TargetMethod.TargetParameterMap;
 import ghidra.dbg.target.TargetSteppable.TargetStepKind;
 import ghidra.dbg.util.DebuggerCallbackReorderer;
 import ghidra.dbg.util.PathUtils;
+import ghidra.debug.api.ValStr;
 import ghidra.debug.api.model.DebuggerMemoryMapper;
 import ghidra.debug.api.model.TraceRecorder;
 import ghidra.debug.api.tracemgr.DebuggerCoordinates;
@@ -351,7 +353,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 		if (pane != null) {
 			if (currentModel != null) {
 				currentModel.fetchModelRoot().thenAccept(this::refresh).exceptionally(ex -> {
-					plugin.objectError("Error refreshing model root");
+					plugin.objectError("Error refreshing model root", ex);
 					return null;
 				});
 			}
@@ -554,7 +556,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 					table.setColumns();
 					// TODO: What with attrs?
 				}).exceptionally(ex -> {
-					plugin.objectError("Failed to fetch attributes");
+					plugin.objectError("Failed to fetch attributes", ex);
 					return null;
 				});
 			}
@@ -569,7 +571,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 	public void addTargetToMap(ObjectContainer container) {
 		DebuggerObjectsProvider provider = container.getProvider();
 		if (!this.equals(provider)) {
-			plugin.objectError("TargetMap corrupted");
+			plugin.objectError("TargetMap corrupted", null);
 		}
 		TargetObject targetObject = container.getTargetObject();
 		if (targetObject != null && !container.isLink()) {
@@ -1333,8 +1335,8 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 	*/
 
 	protected <T extends TargetObject> void performAction(ActionContext context,
-			boolean fallbackRoot, Class<T> cls,
-			Function<T, CompletableFuture<Void>> func, String errorMsg) {
+			boolean fallbackRoot, Class<T> cls, Function<T, CompletableFuture<Void>> func,
+			String errorMsg) {
 		TargetObject obj = getObjectFromContext(context);
 		if (obj == null && fallbackRoot) {
 			obj = root.getTargetObject();
@@ -1367,13 +1369,14 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 				boolean prompt = p;
 			};
 			return AsyncUtils.loop(TypeSpec.VOID, (loop) -> {
-				Map<String, ?> args = launchOffer.getLauncherArgs(launcher, locals.prompt);
+				Map<String, ValStr<?>> args = launchOffer.getLauncherArgs(launcher, locals.prompt);
 				if (args == null) {
 					// Cancelled
 					loop.exit();
 				}
 				else {
-					launcher.launch(args).thenAccept(loop::exit).exceptionally(ex -> {
+					Map<String, ?> a = ValStr.toPlainMap(args);
+					launcher.launch(a).thenAccept(loop::exit).exceptionally(ex -> {
 						loop.repeat();
 						return null;
 					});
@@ -1428,7 +1431,7 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 				}
 				return;
 			}
-			Map<String, ?> args = methodDialog.promptArguments(parameters);
+			Map<String, ?> args = methodDialog.promptArguments(parameters, Map.of(), Map.of());
 			if (args != null) {
 				String script = (String) args.get("Script");
 				if (script != null && !script.isEmpty()) {
@@ -1485,8 +1488,8 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 		ProgramLocation currentLocation = listingService.getCurrentLocation();
 		ProgramSelection currentSelection = listingService.getCurrentSelection();
 
-		GhidraState state = new GhidraState(tool, project, currentProgram,
-			currentLocation, currentSelection, null);
+		GhidraState state =
+			new GhidraState(tool, project, currentProgram, currentLocation, currentSelection, null);
 
 		PrintWriter writer = consoleService.getStdOut();
 		TaskMonitor monitor = TaskMonitor.DUMMY;
@@ -1623,7 +1626,8 @@ public class DebuggerObjectsProvider extends ComponentProviderAdapter
 			if (configParameters.isEmpty()) {
 				return AsyncUtils.nil();
 			}
-			Map<String, ?> args = configDialog.promptArguments(configParameters);
+			Map<String, ?> args =
+				configDialog.promptArguments(configParameters, Map.of(), Map.of());
 			if (args == null) {
 				// User cancelled
 				return AsyncUtils.nil();

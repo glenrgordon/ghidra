@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 package ghidra.app.util.pdb.pdbapplicator;
 
 import ghidra.app.util.bin.format.pdb2.pdbreader.PdbException;
+import ghidra.app.util.bin.format.pdb2.pdbreader.RecordNumber;
 import ghidra.app.util.bin.format.pdb2.pdbreader.type.AbstractMsType;
 import ghidra.app.util.bin.format.pdb2.pdbreader.type.PrimitiveMsType;
 import ghidra.program.model.data.DataType;
@@ -24,22 +25,20 @@ import ghidra.util.exception.CancelledException;
 /**
  * Applier for {@link PrimitiveMsType} types.
  */
-public class PrimitiveTypeApplier extends MsTypeApplier {
+public class PrimitiveTypeApplier extends MsDataTypeApplier {
 
 	// Intended for: PrimitiveMsType
 	/**
-	 * Constructor for primitive type applier, for transforming a primitive into a
-	 * Ghidra DataType.
-	 * @param applicator {@link DefaultPdbApplicator} for which this class is working.
+	 * Constructor for primitive type applier, for transforming a primitive into a Ghidra DataType
+	 * @param applicator {@link DefaultPdbApplicator} for which this class is working
 	 */
 	public PrimitiveTypeApplier(DefaultPdbApplicator applicator) {
 		super(applicator);
 	}
 
 	@Override
-	DataType apply(AbstractMsType type, FixupContext fixupContext, boolean breakCycle)
-			throws PdbException, CancelledException {
-		return applyPrimitiveMsType((PrimitiveMsType) type);
+	boolean apply(AbstractMsType type) throws PdbException, CancelledException {
+		return (applyPrimitiveMsType((PrimitiveMsType) type) != null);
 	}
 
 	boolean isNoType(AbstractMsType type) {
@@ -59,7 +58,9 @@ public class PrimitiveTypeApplier extends MsTypeApplier {
 //		}
 
 		int indexNumber = type.getNumber();
-		DataType existingDt = applicator.getDataType(indexNumber);
+		RecordNumber recordNumber = RecordNumber.typeRecordNumber(indexNumber);
+		DataType existingDt = applicator.getDataType(recordNumber);
+
 		if (existingDt != null) {
 			return existingDt;
 		}
@@ -423,6 +424,50 @@ public class PrimitiveTypeApplier extends MsTypeApplier {
 			case 0x077b:
 				primitiveDataType = primitiveApplicator.get128PointerType(type,
 					primitiveApplicator.getUnicode32Type());
+				break;
+
+			//=======================================
+			// 8-bit char8_t type from C++20 standard
+			// Note that std::is_same_v<unsigned char, char8_t> is suppose to return false
+			//=======================================
+			// char8_t
+			case 0x007c:
+				primitiveDataType = primitiveApplicator.getChar8Type();
+				break;
+			// 16-bit pointer to a char8_t
+			case 0x017c:
+				primitiveDataType = primitiveApplicator.get16NearPointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 16:16 far pointer to a char8_t
+			case 0x027c:
+				primitiveDataType = primitiveApplicator.get1616FarPointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 16:16 huge pointer to a char8_t
+			case 0x037c:
+				primitiveDataType = primitiveApplicator.get1616HugePointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 32-bit pointer to a char8_t
+			case 0x047c:
+				primitiveDataType = primitiveApplicator.get32PointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 16:32 pointer to a char8_t
+			case 0x057c:
+				primitiveDataType = primitiveApplicator.get1632PointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 64-bit pointer to a char8_t
+			case 0x067c:
+				primitiveDataType = primitiveApplicator.get64PointerType(type,
+					primitiveApplicator.getChar8Type());
+				break;
+			// 128-bit near pointer to a char8_t (LLVM doc on 0x0700)
+			case 0x077c:
+				primitiveDataType = primitiveApplicator.get128PointerType(type,
+					primitiveApplicator.getChar8Type());
 				break;
 
 			//=======================================
@@ -2062,8 +2107,11 @@ public class PrimitiveTypeApplier extends MsTypeApplier {
 
 		}
 
+		// Doing a direct and immediate resolve (not scheduling... the type would never get into
+		//  the processing queue because primitive type numbers are not found in the sequential
+		//  set of record numbers, but they are referred to by non-primitive types).
 		primitiveDataType = applicator.resolve(primitiveDataType);
-		applicator.putDataType(indexNumber, primitiveDataType);
+		applicator.putDataType(recordNumber, primitiveDataType);
 
 		return primitiveDataType;
 	}

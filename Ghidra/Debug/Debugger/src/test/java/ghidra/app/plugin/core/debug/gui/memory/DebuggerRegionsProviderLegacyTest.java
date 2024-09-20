@@ -15,8 +15,7 @@
  */
 package ghidra.app.plugin.core.debug.gui.memory;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.*;
 
 import java.util.*;
 
@@ -242,7 +241,7 @@ public class DebuggerRegionsProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 	@Test
 	public void testActionMapRegions() throws Exception {
-		assertFalse(provider.actionMapRegions.isEnabled());
+		assertDisabled(provider, provider.actionMapRegions);
 
 		createAndOpenTrace();
 		createAndOpenProgramFromTrace();
@@ -254,7 +253,7 @@ public class DebuggerRegionsProviderLegacyTest extends AbstractGhidraHeadedDebug
 		waitForSwing();
 
 		// Still
-		assertFalse(provider.actionMapRegions.isEnabled());
+		assertDisabled(provider, provider.actionMapRegions);
 
 		addBlocks();
 		try (Transaction tx = program.openTransaction("Change name")) {
@@ -384,7 +383,8 @@ public class DebuggerRegionsProviderLegacyTest extends AbstractGhidraHeadedDebug
 		assertEquals(region, row.getRegion());
 		assertFalse(tb.trace.getProgramView().getMemory().isEmpty());
 
-		listing.setSelection(new ProgramSelection(tb.set(tb.range(0x00401234, 0x00404321))));
+		runSwing(() -> listing
+				.setSelection(new ProgramSelection(tb.set(tb.range(0x00401234, 0x00404321)))));
 		waitForPass(() -> assertEquals(tb.set(tb.range(0x00401234, 0x00404321)),
 			new AddressSet(listing.getSelection())));
 

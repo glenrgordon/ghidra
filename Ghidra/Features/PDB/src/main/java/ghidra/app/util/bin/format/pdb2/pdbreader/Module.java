@@ -125,10 +125,9 @@ public class Module {
 	 * Returns an MsSymbolIterator for the symbols of this module
 	 * @return the iterator
 	 * @throws CancelledException upon user cancellation
-	 * @throws IOException upon error reading stream
 	 * @throws PdbException upon invalid cvSignature
 	 */
-	public MsSymbolIterator iterator() throws CancelledException, IOException, PdbException {
+	public MsSymbolIterator getSymbolIterator() throws CancelledException, PdbException {
 		int startingOffset = pdb.getDebugInfo().getSymbolRecords().getCvSigLength(streamNumber);
 		int lengthSymbols = moduleInformation.getSizeLocalSymbolsDebugInformation();
 		return new MsSymbolIterator(pdb, streamNumber, startingOffset, lengthSymbols);
@@ -329,7 +328,7 @@ public class Module {
 
 	private void dumpSymbols(Writer writer) throws IOException, CancelledException, PdbException {
 		writer.write("Symbols-----------------------------------------------------");
-		MsSymbolIterator symbolIter = iterator();
+		MsSymbolIterator symbolIter = getSymbolIterator();
 		while (symbolIter.hasNext()) {
 			pdb.checkCancelled();
 			AbstractMsSymbol symbol = symbolIter.next();
@@ -346,7 +345,7 @@ public class Module {
 		writer.write("C11Lines----------------------------------------------------\n");
 		C11Lines c11lines = getLineInformation();
 		if (c11lines != null) {
-			writer.write(c11lines.dump());
+			c11lines.dump(writer, pdb.getMonitor());
 		}
 		writer.write("End C11Lines------------------------------------------------\n");
 	}

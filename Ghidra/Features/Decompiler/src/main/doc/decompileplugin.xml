@@ -1326,7 +1326,7 @@
     <informalexample>
       <itemizedlist spacing='compact'>
 	<listitem>Processor family</listitem>
-	<listitem>Endianess</listitem>
+	<listitem>Endianness</listitem>
 	<listitem>Size of the address bus</listitem>
 	<listitem>Processor variant</listitem>
 	<listitem>Compiler producing the Program</listitem>
@@ -4370,7 +4370,8 @@
   <title>Middle-Click</title>
   <para>
     Highlights every occurrence of a variable, constant, or operator represented by the selected
-    token, within the Decompiler window.
+    token, within the Decompiler window.   There are actions available from the popup menu and from
+    the keyboard to navigate to each highlighted token.
   </para>
 </sect2>
 
@@ -4770,6 +4771,17 @@
   </para>
 </sect2>
 
+<sect2 id="GoToMiddleMouseHighlight">
+  <title>Go To Next/Previous Highlight</title>
+  <para>
+    These actions are available from the popup menu and keyboard.   Only tokens highlighted from the
+    middle-mouse will be navigated.  <emphasis role="bold">Shift-Comma</emphasis> will go to the 
+    previous highlighted token.   <emphasis role="bold">Shift-Period</emphasis> will go to the
+    next highlighted token.   These key bindings can be changed via the
+    <link xlink:href="help/topics/Tool/ToolOptions_Dialog.htm#KeyBindings_Option">Tool Options Dialog</link>.
+  </para>
+</sect2>
+
 <sect2 id="ActionHighlight">
   <title>Highlight</title>
   <para>
@@ -4936,6 +4948,19 @@
     parameter information by setting the function's prototype directly (see the
     <xref linkend="ActionCommitParams"/> command).  In this situation, the "Override Signature"
     command is still possible, but it will bring up a confirmation dialog.
+  </para>
+</sect2>
+
+<sect2 id="ActionEditOverride">
+  <title>Edit Signature Override</title>
+  <para>
+    Edit the existing overriding function prototype to the called function under the cursor.
+  </para>
+  <para>
+	This action can only be triggered at call sites with an existing signature override. As with the Override 
+	Signature command, users must select either the token representing the called function's name or the 
+	tokens representing the function pointer at the call site. The action brings up a dialog where the user 
+  	can edit the current overriding function prototype. 
   </para>
 </sect2>
 

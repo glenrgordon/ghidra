@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ import docking.widgets.checkbox.GCheckBox;
 import docking.widgets.combobox.GComboBox;
 import docking.widgets.label.GIconLabel;
 import docking.widgets.label.GLabel;
-import docking.widgets.list.GListCellRenderer;
+import docking.widgets.list.GComboBoxCellRenderer;
 import ghidra.util.HelpLocation;
 import ghidra.util.layout.*;
 
@@ -53,7 +53,7 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 	private InvertPanel invertPanel;
 	private PathPanel pathPanel;
 	private MultiTermPanel multiTermPanel;
-	private JLayer<?> multiTermDisabledPanel;
+	private JLayer<?> multiTermDisabledLayer;
 
 	public FilterOptionsEditorDialog(FilterOptions filterOptions) {
 		super("Text Filter Options");
@@ -65,7 +65,7 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 		multiTermPanel.setEvalMode(filterOptions.getMultitermEvaluationMode());
 		multiTermPanel.setDelimiter(filterOptions.getDelimitingCharacter());
 
-		updatedEnablementForNonRegularExpressionOptions(
+		enableStandardOptions(
 			filterStrategyPanel.getFilterStrategy() != TextFilterStrategy.REGULAR_EXPRESSION);
 
 		multiTermPanel.setMultitermEnabled(filterOptions.isMultiterm());
@@ -110,17 +110,18 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 		multiTermPanel = new MultiTermPanel();
 		panel.add(multiTermPanel);
 
-		multiTermDisabledPanel = DisabledComponentLayerFactory.getDisabledLayer(multiTermPanel);
-		panel.add(multiTermDisabledPanel);
+		multiTermDisabledLayer = DisabledComponentLayerFactory.getDisabledLayer(multiTermPanel);
+		panel.add(multiTermDisabledLayer);
 
 		return panel;
 	}
 
-	protected void updatedEnablementForNonRegularExpressionOptions(boolean b) {
-		booleanPanel.setCaseSensitiveCBEnabled(b);
-		booleanPanel.setGlobbingCBEnabled(b);
-
-		multiTermDisabledPanel.setEnabled(b);
+	// standard options are those that don't apply to regexes
+	private void enableStandardOptions(boolean enable) {
+		booleanPanel.setCaseSensitiveCBEnabled(enable);
+		booleanPanel.setGlobbingCBEnabled(enable);
+		multiTermPanel.setEnabled(enable);
+		multiTermDisabledLayer.setEnabled(enable);
 	}
 
 	/**
@@ -151,8 +152,8 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			setLayout(new PairLayout(2, 2));
 			setBorder(BorderFactory.createTitledBorder("Text Filter Strategy"));
 			ButtonGroup buttonGroup = new ButtonGroup();
-			GRadioButton startsWithButton = new GRadioButton("Starts With");
 			GRadioButton containsButton = new GRadioButton("Contains");
+			GRadioButton startsWithButton = new GRadioButton("Starts With");
 			GRadioButton matchesExactlyButton = new GRadioButton("Matches Exactly");
 			GRadioButton regularExpressionButton = new GRadioButton("Regular Expression");
 
@@ -165,27 +166,27 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			regularExpressionButton.setToolTipText(
 				"The filter will match all entries that match a regular expression generated from the filter text.");
 
-			buttonGroup.add(startsWithButton);
 			buttonGroup.add(containsButton);
+			buttonGroup.add(startsWithButton);
 			buttonGroup.add(matchesExactlyButton);
 			buttonGroup.add(regularExpressionButton);
 
 			startsWithButton.addActionListener(ev -> {
 				filterStrategy = TextFilterStrategy.STARTS_WITH;
-				updatedEnablementForNonRegularExpressionOptions(true);
+				enableStandardOptions(true);
 			});
 
 			containsButton.addActionListener(ev -> {
 				filterStrategy = TextFilterStrategy.CONTAINS;
-				updatedEnablementForNonRegularExpressionOptions(true);
+				enableStandardOptions(true);
 			});
 			matchesExactlyButton.addActionListener(ev -> {
 				filterStrategy = TextFilterStrategy.MATCHES_EXACTLY;
-				updatedEnablementForNonRegularExpressionOptions(true);
+				enableStandardOptions(true);
 			});
 			regularExpressionButton.addActionListener(ev -> {
 				filterStrategy = TextFilterStrategy.REGULAR_EXPRESSION;
-				updatedEnablementForNonRegularExpressionOptions(false);
+				enableStandardOptions(false);
 			});
 
 			switch (initialFilterOptions.getTextFilterStrategy()) {
@@ -267,8 +268,8 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			}
 
 			globbingCheckbox = new GCheckBox("Allow Globbing");
-			globbingCheckbox.setToolTipText(
-				"Toggles whether globbing chars (?*) are literal or wildcards");
+			globbingCheckbox
+					.setToolTipText("Toggles whether globbing chars (?*) are literal or wildcards");
 			if (initialFilterOptions.isGlobbingAllowed()) {
 				globbingCheckbox.setSelected(true);
 			}
@@ -330,9 +331,9 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			setBorder(BorderFactory.createEmptyBorder(5, 4, 10, 4));
 
 			pathCheckbox = new GCheckBox("Use Path");
-			pathCheckbox.setToolTipText("<html>" +
-				"Allows filtering on node paths, for example '*/folder/node' or " +
-				"'*folder1*folder2*node'");
+			pathCheckbox.setToolTipText(
+				"<html>" + "Allows filtering on node paths, for example '*/folder/node' or " +
+					"'*folder1*folder2*node'");
 			if (initialFilterOptions.shouldUsePath()) {
 				pathCheckbox.setSelected(true);
 			}
@@ -372,6 +373,20 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			return evalMode;
 		}
 
+		@Override
+		public void setEnabled(boolean enable) {
+			super.setEnabled(enable);
+			enableCheckbox.setEnabled(enable);
+
+			// When we disable this options panel, uncheck the panel so that its internal options
+			// are disabled as well. When we become enabled, the user is required to recheck the
+			// box.
+			if (!enable) {
+				enableCheckbox.setSelected(false);
+				setOptionsEnabled(false);
+			}
+		}
+
 		/**
 		 * Sets the evaluation mode to what is given. This is done by activating the
 		 * appropriate radio button associated with that mode.
@@ -397,6 +412,10 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 
 		public void setOptionsEnabled(boolean enabled) {
 			optionsPaneDisableLayer.setEnabled(enabled);
+			delimiterCharacterCB.setEnabled(enabled);
+			for (JRadioButton button : modeButtons) {
+				button.setEnabled(enabled);
+			}
 		}
 
 		public boolean isMultitermEnabled() {
@@ -437,8 +456,8 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 
 			// Delimiter Row
 			JLabel delimiterCharacterFieldName = new GLabel("Delimiter:");
-			delimiterCharacterFieldName.setToolTipText(
-				"Set the character used to separate filter terms.");
+			delimiterCharacterFieldName
+					.setToolTipText("Set the character used to separate filter terms.");
 
 			delimiterCharacterCB = new GComboBox<>(FilterOptions.VALID_MULTITERM_DELIMITERS_ARRAY);
 			delimiterCharacterCB.setRenderer(new DelimiterListCellRenderer());
@@ -480,7 +499,7 @@ public class FilterOptionsEditorDialog extends DialogComponentProvider {
 			add(optionsPaneDisableLayer);
 		}
 
-		private class DelimiterListCellRenderer extends GListCellRenderer<String> {
+		private class DelimiterListCellRenderer extends GComboBoxCellRenderer<String> {
 
 			public DelimiterListCellRenderer() {
 				setHTMLRenderingEnabled(true);

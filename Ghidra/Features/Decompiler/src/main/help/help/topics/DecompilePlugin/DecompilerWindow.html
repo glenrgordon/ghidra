@@ -533,8 +533,10 @@
   
   <p>
     Highlights every occurrence of a variable, constant, or operator represented by the selected
-    token, within the Decompiler window.
+    token, within the Decompiler window.   There are actions available from the popup menu and from
+    the keyboard to navigate to each highlighted token.
   </p>
+
 </div>
 
 </div>
@@ -960,6 +962,19 @@
 
 <div class="sect2">
 <div class="titlepage"><div><div><h3 class="title">
+<a name="GoToMiddleMouseHighlight"></a>Go To Next/Previous Highlight</h3></div></div></div>
+  
+  <p>
+  	These actions are available from the popup menu and keyboard.   Only tokens highlighted from the
+    middle-mouse will be navigated.   <span class="bold"><strong>Shift-Comma</strong></span> will 
+    go to the previous highlighted token.    <span class="bold"><strong>Shift-Period</strong></span>
+    will go to the next highlighted token.   These key bindings can be changed via the
+    <a class="ulink" href="help/topics/Tool/ToolOptions_Dialog.htm#KeyBindings_Option" target="_top">Tool Options Dialog</a>.
+  </p>
+</div>
+
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
 <a name="ActionHighlight"></a>Highlight</h3></div></div></div>
   
   <p>
@@ -1108,6 +1123,21 @@
     parameter information by setting the function's prototype directly (see the
     <a class="xref" href="DecompilerWindow.html#ActionCommitParams" title="Commit Params/Return">Commit Params/Return</a> command).  In this situation, the "Override Signature"
     command is still possible, but it will bring up a confirmation dialog.
+  </p>
+</div>
+
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="ActionEditOverride"></a>Edit Signature Override</h3></div></div></div>
+  
+  <p>
+    Edit the overriding function prototype applied previously to the called function under the cursor.
+  </p>
+  <p>
+  	This action can only be triggered at call sites with an existing signature override. As with the Override 
+  	Signature command, users must select either the token representing the called function's name or the 
+  	tokens representing the function pointer at the call site. The action brings up a dialog where the user 
+  	can edit the current overriding function prototype. 
   </p>
 </div>
 

@@ -1,17 +1,17 @@
 ## ###
-#  IP: GHIDRA
-# 
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#  
-#       http://www.apache.org/licenses/LICENSE-2.0
-#  
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+# IP: GHIDRA
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 ##
 from collections import namedtuple
 import bisect
@@ -28,6 +28,8 @@ def _compute_gdb_ver():
     top = blurb.split('\n')[0]
     full = top.split(' ')[-1]
     major, minor = full.split('.')[:2]
+    if '-' in minor:
+        minor = minor[:minor.find('-')]
     return GdbVersion(full, int(major), int(minor))
 
 
@@ -57,6 +59,7 @@ GNU_DEBUGDATA_PREFIX = ".gnu_debugdata for "
 class Module(namedtuple('BaseModule', ['name', 'base', 'max', 'sections'])):
     pass
 
+
 class Index:
     def __init__(self, regions):
         self.regions = {}
@@ -64,6 +67,7 @@ class Index:
         for r in regions:
             self.regions[r.start] = r
             self.bases.append(r.start)
+
     def compute_base(self, address):
         index = bisect.bisect_right(self.bases, address) - 1
         if index == -1:
@@ -77,6 +81,7 @@ class Index:
                 return address
             else:
                 return region.start
+
 
 class Section(namedtuple('BaseSection', ['name', 'start', 'end', 'offset', 'attrs'])):
     def better(self, other):
@@ -103,8 +108,6 @@ class ModuleInfoReader(object):
         if mat is None:
             return None
         n = mat['name']
-        if n.startswith(GNU_DEBUGDATA_PREFIX):
-            return None
         return None if mat is None else mat['name']
 
     def section_from_line(self, line):
@@ -135,7 +138,7 @@ class ModuleInfoReader(object):
         for line in out.split('\n'):
             n = self.name_from_line(line)
             if n is not None:
-                if name is not None:
+                if name is not None and not name.startswith(GNU_DEBUGDATA_PREFIX):
                     modules[name] = self.finish_module(name, sections, index)
                 name = n
                 sections = {}
@@ -148,7 +151,7 @@ class ModuleInfoReader(object):
                 if s.name in sections:
                     s = s.better(sections[s.name])
                 sections[s.name] = s
-        if name is not None:
+        if name is not None and not name.startswith(GNU_DEBUGDATA_PREFIX):
             modules[name] = self.finish_module(name, sections, index)
         return modules
 
@@ -242,6 +245,14 @@ class RegionInfoReader(object):
         sizeptr = int(gdb.parse_and_eval('sizeof(void*)')) * 8
         return Region(0, 1 << sizeptr, 0, None, 'full memory')
 
+    def have_changed(self, regions):
+        if len(regions) == 1 and regions[0].objfile == 'full memory':
+            return False, None
+        new_regions = self.get_regions()
+        if new_regions == regions:
+            return False, None
+        return True, new_regions
+
 
 class RegionInfoReaderV8(RegionInfoReader):
     cmd = REGIONS_CMD
@@ -289,7 +300,36 @@ class BreakpointLocationInfoReaderV8(object):
         pass
 
     def get_locations(self, breakpoint):
+        inf = gdb.selected_inferior()
+        thread_groups = [inf.num]
+        if breakpoint.location is not None and breakpoint.location.startswith("*0x"):
+            address = int(breakpoint.location[1:], 16)
+            loc = BreakpointLocation(
+                address, breakpoint.enabled, thread_groups)
+            return [loc]
+        return []
+
+
+class BreakpointLocationInfoReaderV9(object):
+    def breakpoint_from_line(self, line):
         pass
+
+    def location_from_line(self, line):
+        pass
+
+    def get_locations(self, breakpoint):
+        inf = gdb.selected_inferior()
+        thread_groups = [inf.num]
+        if breakpoint.location is None:
+            return []
+        try:
+            address = gdb.parse_and_eval(breakpoint.location).address
+            loc = BreakpointLocation(
+                address, breakpoint.enabled, thread_groups)
+            return [loc]
+        except Exception as e:
+            print(f"Error parsing bpt location = {breakpoint.location}")
+        return []
 
 
 class BreakpointLocationInfoReaderV13(object):
@@ -298,13 +338,79 @@ class BreakpointLocationInfoReaderV13(object):
 
 
 def _choose_breakpoint_location_info_reader():
-    if 8 <= GDB_VERSION.major < 13:
-        return BreakpointLocationInfoReaderV8()
-    elif GDB_VERSION.major >= 13:
+    if GDB_VERSION.major >= 13:
         return BreakpointLocationInfoReaderV13()
+    if GDB_VERSION.major >= 9:
+        return BreakpointLocationInfoReaderV9()
+    if GDB_VERSION.major >= 8:
+        return BreakpointLocationInfoReaderV8()
     else:
         raise gdb.GdbError(
             "GDB version not recognized by ghidragdb: " + GDB_VERSION.full)
 
 
 BREAKPOINT_LOCATION_INFO_READER = _choose_breakpoint_location_info_reader()
+
+
+def set_bool_param_by_api(name, value):
+    gdb.set_parameter(name, value)
+
+
+def set_bool_param_by_cmd(name, value):
+    val = 'on' if value else 'off'
+    gdb.execute(f'set {name} {val}')
+
+
+def choose_set_parameter():
+    if GDB_VERSION.major >= 13:
+        return set_bool_param_by_api
+    else:
+        return set_bool_param_by_cmd
+
+
+set_bool_param = choose_set_parameter()
+
+
+def get_level(frame):
+    if hasattr(frame, "level"):
+        return frame.level()
+    else:
+        level = -1
+        f = frame
+        while f is not None:
+            level += 1
+            f = f.newer()
+        return level
+
+
+class RegisterDesc(namedtuple('BaseRegisterDesc', ['name'])):
+    pass
+
+
+def get_register_descs(arch, group='all'):
+    if hasattr(arch, "registers"):
+        try:
+            return arch.registers(group)
+        except ValueError:  # No such group, or version too old
+            return arch.registers()
+    else:
+        descs = []
+        try:
+            regset = gdb.execute(
+                f"info registers {group}", to_string=True).strip().split('\n')
+        except Exception as e:
+            regset = gdb.execute(
+                f"info registers", to_string=True).strip().split('\n')
+        for line in regset:
+            if not line.startswith(" "):
+                tokens = line.strip().split()
+                descs.append(RegisterDesc(tokens[0]))
+        return descs
+
+
+def selected_frame():
+    try:
+        return gdb.selected_frame()
+    except Exception as e:
+        print("No selected frame")
+        return None

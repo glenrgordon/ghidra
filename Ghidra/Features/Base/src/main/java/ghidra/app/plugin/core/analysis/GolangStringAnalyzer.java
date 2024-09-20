@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -50,8 +50,8 @@ import ghidra.util.task.UnknownProgressWrappingTaskMonitor;
  * <p>
  * The string struct is found in a couple of different ways:
  * <ul>
- * 	<li>References from an instruction (see markupStaticStructRefsInFunction)
- *  <li>Iterating through data segments and making educated guesses (see markupDataSegmentStructs)
+ * 	<li>References from an instruction (see markupStaticStructRefsInFunction)</li>
+ *  <li>Iterating through data segments and making educated guesses (see markupDataSegmentStructs)</li>
  * </ul>
  * Some char[] data is only referenced from Golang string structs that exist temporarily
  * in registers after being set by an instruction that statically references the char[] data,
@@ -63,9 +63,8 @@ import ghidra.util.task.UnknownProgressWrappingTaskMonitor;
  * elements that the slice points to.
  */
 public class GolangStringAnalyzer extends AbstractAnalyzer {
-	private final static String NAME = "Golang String Analyzer";
-	private final static String DESCRIPTION =
-		"Finds and labels Go string structures that have been referenced from a function.";
+	private final static String NAME = "Golang Strings";
+	private final static String DESCRIPTION = "Finds and labels Golang string structures.";
 
 	private GolangStringAnalyzerOptions analyzerOptions = new GolangStringAnalyzerOptions();
 	private GoRttiMapper goBinary;
@@ -99,7 +98,7 @@ public class GolangStringAnalyzer extends AbstractAnalyzer {
 
 		goBinary = GoRttiMapper.getSharedGoBinary(program, monitor);
 		if (goBinary == null) {
-			Msg.error(this, "Golang analyzer error: unable to get GoRttiMapper");
+			Msg.error(this, "Golang string analyzer error: unable to get GoRttiMapper");
 			return false;
 		}
 		markupSession = goBinary.createMarkupSession(monitor);

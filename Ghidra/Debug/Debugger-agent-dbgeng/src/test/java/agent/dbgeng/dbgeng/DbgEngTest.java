@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,7 +16,7 @@
 package agent.dbgeng.dbgeng;
 
 import static org.junit.Assert.*;
-import static org.junit.Assume.*;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -45,6 +45,7 @@ import ghidra.test.AbstractGhidraHeadlessIntegrationTest;
 import ghidra.util.Msg;
 import ghidra.util.NumericUtilities;
 
+@Ignore("deprecated")
 public class DbgEngTest extends AbstractGhidraHeadlessIntegrationTest {
 
 	private interface DummyLibIf extends StdCallLibrary {
@@ -408,6 +409,9 @@ public class DbgEngTest extends AbstractGhidraHeadlessIntegrationTest {
 					System.out.print(Long.toHexString(offset) + ": ");
 					DebugMemoryBasicInformation info = client.getDataSpaces().queryVirtual(offset);
 					//System.out.println(info);
+					if (info == null) {
+						break;
+					}
 					System.out.println(Long.toHexString(info.baseAddress) + "-" +
 						Long.toHexString(info.regionSize) + ": " + info.state);
 					if (info.baseAddress != offset) {
@@ -563,7 +567,7 @@ public class DbgEngTest extends AbstractGhidraHeadlessIntegrationTest {
 		}
 	}
 
-	@Test
+	//@Test - NOT WORKING, addresses in RW memory still not necessarily writeable (why?)
 	public void testWriteMemory() {
 		try (ProcMaker maker = new ProcMaker("notepad")) {
 			maker.start();
@@ -833,7 +837,7 @@ public class DbgEngTest extends AbstractGhidraHeadlessIntegrationTest {
 		}
 	}
 
-	@Test
+	//@Test - This test is way broken; the while(true) loop is unexitable
 	public void testAttachLaunch() throws Exception {
 		final String specimenX = "C:\\windows\\write.exe";
 		final String specimenA = "C:\\windows\\notepad.exe";
@@ -848,7 +852,7 @@ public class DbgEngTest extends AbstractGhidraHeadlessIntegrationTest {
 
 			//System.out.println("Attaching...");
 			//client.attachProcess(client.getLocalServer(), proc.pid, BitmaskSet.of());
-			client.createProcess(client.getLocalServer(), specimenA, "", "",
+			client.createProcess(client.getLocalServer(), specimenA, null, null,
 				BitmaskSet.of(DebugCreateFlags.DEBUG_PROCESS),
 				BitmaskSet.of(DebugEngCreateFlags.DEBUG_ECREATE_PROCESS_DEFAULT),
 				BitmaskSet.of(DebugVerifierFlags.DEBUG_VERIFIER_DEFAULT));

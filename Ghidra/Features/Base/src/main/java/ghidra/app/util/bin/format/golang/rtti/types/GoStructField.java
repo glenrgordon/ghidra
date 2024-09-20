@@ -24,7 +24,7 @@ import ghidra.app.util.bin.format.golang.structmapping.*;
 /**
  * Structure used to define a field in a {@link GoStructType struct type}.
  */
-@StructureMapping(structureName = "runtime.structfield")
+@StructureMapping(structureName = {"runtime.structfield", "internal/abi.StructField"})
 public class GoStructField {
 
 	@ContextField
@@ -42,10 +42,10 @@ public class GoStructField {
 	@MarkupReference("getType")
 	private long typ;	// direct ptr to GoType
 
-	@FieldMapping(optional = true) //<=1.18
+	@FieldMapping(presentWhen = "-1.18")
 	private long offsetAnon;	// offsetAnon >> 1 == actual offset, bit 0 = embedded flag
 
-	@FieldMapping(optional = true) //>=1.19 
+	@FieldMapping(presentWhen = "1.19+")
 	private long offset;
 
 	/**

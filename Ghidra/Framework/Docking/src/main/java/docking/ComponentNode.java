@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,13 +20,14 @@ import java.awt.event.*;
 import java.util.*;
 
 import javax.swing.*;
-import javax.swing.event.ChangeListener;
 
 import org.jdom.Element;
 
+import docking.actions.KeyBindingUtils;
 import docking.widgets.OptionDialog;
 import docking.widgets.tabbedpane.DockingTabRenderer;
-import ghidra.util.*;
+import ghidra.util.HelpLocation;
+import ghidra.util.Msg;
 import ghidra.util.exception.AssertException;
 import help.HelpService;
 import utilities.util.reflection.ReflectionUtilities;
@@ -42,48 +43,34 @@ class ComponentNode extends Node {
 	private JComponent comp;
 	private boolean isDisposed;
 
-	// keep track of top ComponentWindowingPlaceholder
-	private ChangeListener tabbedPaneChangeListener = e -> {
-		Component selectedComponent = ((JTabbedPane) comp).getSelectedComponent();
-		for (ComponentPlaceholder placeholder : windowPlaceholders) {
-			if (placeholder.getComponent() == selectedComponent) {
-				top = placeholder;
-				break;
-			}
-		}
-		Swing.runLater(() -> {
-			if (top != null) {
-				top.requestFocus();
-			}
-		});
-	};
-
 	/**
 	 * Constructs a new component node with the given docking windows manager.
-	 * @param mgr the docking windows manager that this node belongs to.
+	 * @param windowManager the docking windows manager that this node belongs to.
 	 */
-	ComponentNode(DockingWindowManager mgr) {
-		super(mgr);
+	ComponentNode(DockingWindowManager windowManager) {
+		super(windowManager);
 		windowPlaceholders = new ArrayList<>();
 	}
 
 	/**
 	 * Constructs a new component node from the given xml element.
-	 * @param elem the xml element describing the configuration of this node.
-	 * @param mgr the docking windows manager
+	 * @param element the xml element describing the configuration of this node.
+	 * @param windowManager the docking windows manager
 	 * @param parent the parent node for this node.
 	 * @param restoredPlaceholders the list into which any restored placeholders will be placed
 	 */
-	ComponentNode(Element elem, DockingWindowManager mgr, Node parent,
+	ComponentNode(Element element, DockingWindowManager windowManager, Node parent,
 			List<ComponentPlaceholder> restoredPlaceholders) {
-		super(mgr);
+		super(windowManager);
 
 		this.parent = parent;
 		windowPlaceholders = new ArrayList<>();
 
-		int topIndex = Integer.parseInt(elem.getAttributeValue("TOP_INFO"));
+		int topIndex = Integer.parseInt(element.getAttributeValue("TOP_INFO"));
 
-		Iterator<?> it = elem.getChildren().iterator();
+		List<?> children = element.getChildren();
+		Iterator<?> it = children.iterator();
+
 		while (it.hasNext()) {
 			Element e = (Element) it.next();
 			String name = e.getAttributeValue("NAME");
@@ -114,6 +101,16 @@ class ComponentNode extends Node {
 		}
 		if (topIndex >= 0 && topIndex < windowPlaceholders.size()) {
 			top = windowPlaceholders.get(topIndex);
+		}
+	}
+
+	private void focusComponent(Component component) {
+		if (component == null) {
+			return;
+		}
+		ComponentPlaceholder placeholder = getPlaceHolderForComponent(component);
+		if (placeholder != null) {
+			placeholder.requestFocusWhenReady();
 		}
 	}
 
@@ -250,8 +247,7 @@ class ComponentNode extends Node {
 	JComponent getComponent() {
 
 		if (isDisposed) {
-			throw new AssertException(
-				"Attempted to reuse a disposed component window node");
+			throw new AssertException("Attempted to reuse a disposed component window node");
 		}
 
 		if (!invalid) {
@@ -259,7 +255,6 @@ class ComponentNode extends Node {
 		}
 
 		if (comp instanceof JTabbedPane) {
-			((JTabbedPane) comp).removeChangeListener(tabbedPaneChangeListener);
 			comp.removeAll();
 		}
 		comp = null;
@@ -287,42 +282,88 @@ class ComponentNode extends Node {
 			installRenameMenu(top, null);
 		}
 		else if (count > 1) {
-			JTabbedPane pane =
+			JTabbedPane tabbedPane =
 				new JTabbedPane(SwingConstants.BOTTOM, JTabbedPane.SCROLL_TAB_LAYOUT);
-			comp = pane;
-			int topIndex = 0;
-			for (int i = 0; i < count; i++) {
-				ComponentPlaceholder placeholder = activeComponents.get(i);
-				DockableComponent c = placeholder.getComponent();
-				c.setBorder(BorderFactory.createEmptyBorder());
-				String title = placeholder.getTitle();
-				String tabText = placeholder.getTabText();
+			setupFocusUpdateListeners(tabbedPane);
+			comp = tabbedPane;
 
-				final DockableComponent component = placeholder.getComponent();
-				pane.add(component, title);
+			int activeIndex = addComponentsToTabbedPane(activeComponents, tabbedPane);
 
-				DockingTabRenderer tabRenderer =
-					createTabRenderer(pane, placeholder, title, tabText, component);
-
-				c.installDragDropTarget(pane);
-
-				pane.setTabComponentAt(i, tabRenderer);
-				Icon icon = placeholder.getIcon();
-				if (icon != null) {
-					tabRenderer.setIcon(icon);
-				}
-
-				if (placeholder == top) {
-					topIndex = i;
-				}
-			}
-			DockableComponent activeComp = (DockableComponent) pane.getComponentAt(topIndex);
+			DockableComponent activeComp =
+				(DockableComponent) tabbedPane.getComponentAt(activeIndex);
 			top = activeComp.getComponentWindowingPlaceholder();
-			pane.setSelectedComponent(activeComp);
-			pane.addChangeListener(tabbedPaneChangeListener);
+			tabbedPane.setSelectedComponent(activeComp);
 		}
 		invalid = false;
 		return comp;
+	}
+
+	private int addComponentsToTabbedPane(List<ComponentPlaceholder> activeComponents,
+			JTabbedPane tabbedPane) {
+		int count = activeComponents.size();
+		int activeIndex = 0;
+		for (int i = 0; i < count; i++) {
+			ComponentPlaceholder placeholder = activeComponents.get(i);
+			DockableComponent c = placeholder.getComponent();
+			c.setBorder(BorderFactory.createEmptyBorder());
+			String title = placeholder.getTitle();
+			String tabText = placeholder.getTabText();
+
+			final DockableComponent component = placeholder.getComponent();
+			tabbedPane.add(component, title);
+
+			DockingTabRenderer tabRenderer =
+				createTabRenderer(tabbedPane, placeholder, title, tabText, component);
+
+			c.installDragDropTarget(tabbedPane);
+
+			tabbedPane.setTabComponentAt(i, tabRenderer);
+			Icon icon = placeholder.getIcon();
+			if (icon != null) {
+				tabRenderer.setIcon(icon);
+			}
+
+			if (placeholder == top) {
+				activeIndex = i;
+			}
+		}
+		return activeIndex;
+	}
+
+	private void setupFocusUpdateListeners(JTabbedPane tabbedPane) {
+		registerActionToTransferFocusToTabbedComponent(tabbedPane);
+		tabbedPane.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				int index = tabbedPane.indexAtLocation(e.getX(), e.getY());
+				if (index >= 0) {
+					Component selectedComponent = tabbedPane.getComponentAt(index);
+					focusComponent(selectedComponent);
+				}
+			}
+		});
+	}
+
+	/**
+	 * Registers a keybinding that allows the user to press the space bar to transfer focus to the 
+	 * component inside of the current tab of the tabbed pane. When using keyboard navigation, the 
+	 * tabbed pane will place focus on its tabs, not on the components in the tabs.  Adding the 
+	 * space bar trigger makes keyboard navigation easier by giving the user a method to focus the 
+	 * component represented by the tab.
+	 * @param tabbedPane the JTabbedPane 
+	 */
+	private void registerActionToTransferFocusToTabbedComponent(JTabbedPane tabbedPane) {
+		Action focusAction = new AbstractAction("Focus") {
+			@Override
+			public void actionPerformed(ActionEvent ev) {
+				Component selectedComponent = tabbedPane.getSelectedComponent();
+				focusComponent(selectedComponent);
+			}
+		};
+
+		KeyBindingUtils.registerAction(tabbedPane, KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0),
+			focusAction, JComponent.WHEN_FOCUSED);
+
 	}
 
 	private DockingTabRenderer createTabRenderer(JTabbedPane pane, ComponentPlaceholder placeholder,
@@ -599,13 +640,13 @@ class ComponentNode extends Node {
 					return; // cancelled
 				}
 
-				// If the user changes the name, then we want to replace all of the
-				// parts of the title with that name.  We skip the subtitle, as that 
-				// doesn't make sense in that case.
-				provider.setTitle(newName);   // title on window
-				provider.setSubTitle("");     // part after the title
-				provider.setTabText(newName); // text on the tab
-				placeholder.update();
+				// If the user changes the name, then we want to replace all of the parts of the 
+				// title with that name.  We do not supply a custom subtitle, as that doesn't make 
+				// sense in this case, but we clear it so the user's title is the only thing 
+				// visible.  This means that providers can still update the subtitle later.
+				provider.setCustomTitle(newName);   // title on window
+				provider.setSubTitle("");           // part after the title
+				provider.setCustomTabText(newName); // text on the tab
 			}
 		}
 	}

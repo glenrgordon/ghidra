@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,6 +23,7 @@ import db.Field;
 import ghidra.docking.settings.Settings;
 import ghidra.program.database.DBObjectCache;
 import ghidra.program.model.data.*;
+import ghidra.program.model.data.DataTypeConflictHandler.ConflictResult;
 import ghidra.program.model.mem.MemBuffer;
 import ghidra.util.Msg;
 
@@ -158,16 +159,6 @@ class UnionDB extends CompositeDB implements UnionInternal {
 		return null;
 	}
 
-	private void removeComponent(long compKey) {
-		try {
-			componentAdapter.removeRecord(compKey);
-			dataMgr.getSettingsAdapter().removeAllSettingsRecords(compKey);
-		}
-		catch (IOException e) {
-			dataMgr.dbError(e);
-		}
-	}
-
 	@Override
 	public DataTypeComponent insert(int ordinal, DataType dataType, int length, String name,
 			String comment) throws IllegalArgumentException {
@@ -233,12 +224,15 @@ class UnionDB extends CompositeDB implements UnionInternal {
 
 			DataTypeComponentDB dtc = components.remove(ordinal);
 			dtc.getDataType().removeParent(this);
-			removeComponent(dtc.getKey());
+			removeComponentRecord(dtc.getKey());
 			shiftOrdinals(ordinal, -1);
 
 			if (!repack(false, true)) {
 				dataMgr.dataTypeChanged(this, false);
 			}
+		}
+		catch (IOException e) {
+			dataMgr.dbError(e);
 		}
 		finally {
 			lock.release();
@@ -247,7 +241,13 @@ class UnionDB extends CompositeDB implements UnionInternal {
 
 	@Override
 	public void delete(Set<Integer> ordinals) {
+
 		if (ordinals.isEmpty()) {
+			return;
+		}
+
+		if (ordinals.size() == 1) {
+			ordinals.forEach(ordinal -> delete(ordinal));
 			return;
 		}
 
@@ -265,7 +265,9 @@ class UnionDB extends CompositeDB implements UnionInternal {
 			for (DataTypeComponentDB dtc : components) {
 				int ordinal = dtc.getOrdinal();
 				if (ordinals.contains(ordinal)) {
-					// component removed
+					// component removed - delete record
+					dtc.getDataType().removeParent(this);
+					removeComponentRecord(dtc.getKey());
 					--ordinalAdjustment;
 				}
 				else {
@@ -284,9 +286,23 @@ class UnionDB extends CompositeDB implements UnionInternal {
 				}
 			}
 			else {
-				unionLength = newLength;
-				notifySizeChanged(false);
+				boolean sizeChanged = (unionLength != newLength);
+				if (sizeChanged) {
+					unionLength = newLength;
+					record.setIntValue(CompositeDBAdapter.COMPOSITE_LENGTH_COL, unionLength);
+				}
+				compositeAdapter.updateRecord(record, true);
+
+				if (sizeChanged) {
+					notifySizeChanged(false);
+				}
+				else {
+					dataMgr.dataTypeChanged(this, false);
+				}
 			}
+		}
+		catch (IOException e) {
+			dataMgr.dbError(e);
 		}
 		finally {
 			lock.release();
@@ -312,7 +328,7 @@ class UnionDB extends CompositeDB implements UnionInternal {
 		}
 		finally {
 			if (isResolveCacheOwner) {
-				dataMgr.flushResolveQueue(true);
+				dataMgr.processResolveQueue(true);
 			}
 			lock.release();
 		}
@@ -331,7 +347,7 @@ class UnionDB extends CompositeDB implements UnionInternal {
 
 		for (DataTypeComponentDB dtc : components) {
 			dtc.getDataType().removeParent(this);
-			removeComponent(dtc.getKey());
+			removeComponentRecord(dtc.getKey());
 		}
 		components.clear();
 		unionAlignment = -1;
@@ -707,7 +723,7 @@ class UnionDB extends CompositeDB implements UnionInternal {
 				if (removeBitFieldComponent || dtc.getDataType() == dt) {
 					dt.removeParent(this);
 					components.remove(i);
-					removeComponent(dtc.getKey());
+					removeComponentRecord(dtc.getKey());
 					shiftOrdinals(i, -1);
 					changed = true;
 				}
@@ -716,18 +732,20 @@ class UnionDB extends CompositeDB implements UnionInternal {
 				dataMgr.dataTypeChanged(this, false);
 			}
 		}
+		catch (IOException e) {
+			dataMgr.dbError(e);
+		}
 		finally {
 			lock.release();
 		}
 	}
 
 	@Override
-	public boolean isEquivalent(DataType dataType) {
-
+	protected boolean isEquivalent(DataType dataType, DataTypeConflictHandler handler) {
 		if (dataType == this) {
 			return true;
 		}
-		if (!(dataType instanceof UnionInternal)) {
+		if (!(dataType instanceof UnionInternal union)) {
 			return false;
 		}
 
@@ -746,7 +764,14 @@ class UnionDB extends CompositeDB implements UnionInternal {
 
 		try {
 			isEquivalent = false;
-			UnionInternal union = (UnionInternal) dataType;
+
+			if (handler != null &&
+				ConflictResult.USE_EXISTING == handler.resolveConflict(union, this)) {
+				// treat this type as equivalent if existing type will be used
+				isEquivalent = true;
+				return true;
+			}
+
 			if (getStoredPackingValue() != union.getStoredPackingValue() ||
 				getStoredMinimumAlignment() != union.getStoredMinimumAlignment()) {
 				// rely on component match instead of checking length 
@@ -758,8 +783,11 @@ class UnionDB extends CompositeDB implements UnionInternal {
 			if (myComps.length != otherComps.length) {
 				return false;
 			}
+			if (handler != null) {
+				handler = handler.getSubsequentHandler();
+			}
 			for (int i = 0; i < myComps.length; i++) {
-				if (!myComps[i].isEquivalent(otherComps[i])) {
+				if (!DataTypeComponentDB.isEquivalent(myComps[i], otherComps[i], handler)) {
 					return false;
 				}
 			}
@@ -769,6 +797,11 @@ class UnionDB extends CompositeDB implements UnionInternal {
 			dataMgr.putCachedEquivalence(this, dataType, isEquivalent);
 		}
 		return true;
+	}
+
+	@Override
+	public boolean isEquivalent(DataType dt) {
+		return isEquivalent(dt, null);
 	}
 
 	private void shiftOrdinals(int ordinal, int deltaOrdinal) {
@@ -838,7 +871,7 @@ class UnionDB extends CompositeDB implements UnionInternal {
 				if (remove) {
 					oldDt.removeParent(this);
 					components.remove(i);
-					removeComponent(dtc.getKey());
+					removeComponentRecord(dtc.getKey());
 					shiftOrdinals(i, -1);
 					changed = true;
 				}

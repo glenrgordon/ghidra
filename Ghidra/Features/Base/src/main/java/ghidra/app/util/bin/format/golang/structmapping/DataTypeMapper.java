@@ -21,7 +21,7 @@ import java.util.*;
 import generic.jar.ResourceFile;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.MemoryByteProvider;
-import ghidra.app.util.bin.format.dwarf4.next.DWARFDataTypeConflictHandler;
+import ghidra.app.util.bin.format.dwarf.DWARFDataTypeConflictHandler;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.data.*;
 import ghidra.program.model.listing.Program;
@@ -31,11 +31,11 @@ import ghidra.util.task.TaskMonitor;
 /**
  * Information about {@link StructureMapping} classes and their metadata.
  * <p>
- * To use the full might and majesty of StructureMapping(tm), a DataTypeMapper must be created. It
+ * To use the full might and majesty of StructureMapping&trade;, a DataTypeMapper must be created. It
  * must be able to {@link #addArchiveSearchCategoryPath(CategoryPath...) find} 
  * ({@link #addProgramSearchCategoryPath(CategoryPath...) more find}) the Ghidra structure data
- * types being used, and it must {@link #registerStructure(Class) know} about all classes that are
- * going to participate during deserialization and markup.
+ * types being used, and it must {@link #registerStructure(Class, DataTypeMapperContext) know} about
+ * all classes that are going to participate during deserialization and markup.
  * <p>
  * Structure mapped classes can receive a reference to the specific DataTypeMapper type that 
  * created them by declaring a {@code DataTypeMapper} field, and tagging it with 
@@ -166,35 +166,48 @@ public class DataTypeMapper implements AutoCloseable {
 	 * @param <T> structure mapped class type
 	 * @param clazz class that represents a structure, marked with {@link StructureMapping} 
 	 * annotation
+	 * @param context {@link DataTypeMapperContext}
 	 * @throws IOException if the class's Ghidra structure data type could not be found
 	 */
-	public <T> void registerStructure(Class<T> clazz) throws IOException {
-		Structure structDT = null;
-		String structName = StructureMappingInfo.getStructureDataTypeNameForClass(clazz);
-		if (structName != null && !structName.isBlank()) {
-			structDT = getType(structName, Structure.class);
-		}
-		if (!StructureReader.class.isAssignableFrom(clazz) && structDT == null) {
-			if (structName == null || structName.isBlank()) {
-				structName = "<missing>";
+	public <T> void registerStructure(Class<T> clazz, DataTypeMapperContext context)
+			throws IOException {
+		StructureMapping sma = clazz.getAnnotation(StructureMapping.class);
+		List<String> structNames = sma != null ? Arrays.asList(sma.structureName()) : List.of();
+		Structure structDT = getType(structNames, Structure.class);
+		if (structDT == null) {
+			String dtName = structNames.isEmpty() ? "<missing>" : String.join("|", structNames);
+			if (!StructureReader.class.isAssignableFrom(clazz)) {
+				throw new IOException("Missing struct definition for class %s, structure name: [%s]"
+						.formatted(clazz.getSimpleName(), dtName));
 			}
-			throw new IOException(
-				"Missing struct definition %s - %s".formatted(clazz.getSimpleName(), structName));
+			if (structNames.size() != 1) {
+				throw new IOException(
+					"Bad StructMapping,StructureReader definition for class %s, structure name: [%s]"
+							.formatted(clazz.getSimpleName(), dtName));
+			}
 		}
 
-		StructureMappingInfo<T> structMappingInfo = StructureMappingInfo.fromClass(clazz, structDT);
-		mappingInfo.put(clazz, structMappingInfo);
+		try {
+			StructureMappingInfo<T> structMappingInfo =
+				StructureMappingInfo.fromClass(clazz, structDT, context);
+			mappingInfo.put(clazz, structMappingInfo);
+		}
+		catch (IllegalArgumentException e) {
+			throw new IOException(e.getMessage());
+		}
 	}
 
 	/**
 	 * Registers the specified {@link StructureMapping structure mapping} classes.
 	 *  
 	 * @param classes list of classes to register
+	 * @param context {@link DataTypeMapperContext}
 	 * @throws IOException if a class's Ghidra structure data type could not be found
 	 */
-	public void registerStructures(List<Class<?>> classes) throws IOException {
+	public void registerStructures(List<Class<?>> classes, DataTypeMapperContext context)
+			throws IOException {
 		for (Class<?> clazz : classes) {
-			registerStructure(clazz);
+			registerStructure(clazz, context);
 		}
 	}
 
@@ -204,7 +217,7 @@ public class DataTypeMapper implements AutoCloseable {
 	 * @param <T> structure mapped class type
 	 * @param clazz the class
 	 * @return {@link StructureMappingInfo} for the specified class, or null if the class was
-	 * not previously {@link #registerStructure(Class) registered}
+	 * not previously {@link #registerStructure(Class, DataTypeMapperContext) registered}
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> StructureMappingInfo<T> getStructureMappingInfo(Class<T> clazz) {
@@ -219,7 +232,7 @@ public class DataTypeMapper implements AutoCloseable {
 	 * @param structureInstance an instance of a previously registered 
 	 * {@link StructureMapping structure mapping} class, or null
 	 * @return {@link StructureMappingInfo} for the instance, or null if the class was
-	 * not previously {@link #registerStructure(Class) registered}
+	 * not previously {@link #registerStructure(Class, DataTypeMapperContext) registered}
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> StructureMappingInfo<T> getStructureMappingInfo(T structureInstance) {
@@ -282,7 +295,32 @@ public class DataTypeMapper implements AutoCloseable {
 	}
 
 	/**
-	 * Returns a named {@link DataType}, searching the registered 
+	 * Returns a named {@link DataType}, searching the registered
+	 * {@link #addProgramSearchCategoryPath(CategoryPath...) program}
+	 * and {@link #addArchiveSearchCategoryPath(CategoryPath...) archive} category paths.
+	 * <p>
+	 * DataTypes that were found in the attached archive gdt manager will be copied into the
+	 * program's data type manager before being returned.
+	 *
+	 * @param <T> DataType or derived type
+	 * @param names list containing the data type name and any alternates
+	 * @param clazz expected DataType class
+	 * @return DataType or null if not found
+	 */
+	public <T extends DataType> T getType(List<String> names, Class<T> clazz) {
+		for (String dtName : names) {
+			if (dtName != null && !dtName.isBlank()) {
+				T result = getType(dtName, clazz);
+				if (result != null) {
+					return result;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns a named {@link DataType}, searching the registered
 	 * {@link #addProgramSearchCategoryPath(CategoryPath...) program}
 	 * and {@link #addArchiveSearchCategoryPath(CategoryPath...) archive} category paths.
 	 * <p>
@@ -510,5 +548,4 @@ public class DataTypeMapper implements AutoCloseable {
 		}
 		return new StructureContext<>(this, smi, null);
 	}
-
 }

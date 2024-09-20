@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,6 +68,11 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 	private ByteViewerHighlighter highlightProvider = new ByteViewerHighlighter();
 	private int highlightButton = MouseEvent.BUTTON2;
 
+	private FieldSelectionListener liveSelectionListener = (selection, trigger) -> {
+		ByteBlockSelection sel = processFieldSelection(selection);
+		panel.updateLiveSelection(ByteViewerComponent.this, sel);
+	};
+
 	/**
 	 * Constructor
 	 *
@@ -89,6 +94,7 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 		this.layoutModel = layoutModel;
 
 		setName(model.getName());
+		getAccessibleContext().setAccessibleName("Byte Viewer " + model.getName());
 		initialize();
 
 		// specialized line coloring
@@ -102,11 +108,20 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 		ByteBlockInfo info = indexMap.getBlockInfo(fieldLoc.getIndex(), fieldLoc.getFieldNum());
 		if (info != null) {
 			String modelName = model.getName();
-			return modelName + " format at " +
-				info.getBlock().getLocationRepresentation(info.getOffset()) + ", value = " +
-				field.getText();
+			String location = getAccessibleLocationInfo(info.getBlock(), info.getOffset());
+			return modelName + " format at " + location;
 		}
 		return null;
+	}
+
+	private String getAccessibleLocationInfo(ByteBlock block, BigInteger offset) {
+		if (block instanceof MemoryByteBlock memBlock) {
+			// location represents an address, remove leading zeros to make screen reading concise
+			Address address = memBlock.getAddress(offset);
+			return address.toString(address.getAddressSpace().showSpaceName(), 1);
+		}
+		// otherwise use generic location representation
+		return block.getLocationRepresentation(offset);
 	}
 
 	@Override
@@ -196,12 +211,12 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 		if (blockSet == null || doingRefresh) {
 			return;
 		}
+
 		ByteBlockSelection sel = processFieldSelection(selection);
 
 		// notify panel to update other components
 		panel.updateSelection(this, sel);
 		setViewerSelection(sel);
-
 	}
 
 	/**
@@ -329,12 +344,10 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 		return null;
 	}
 
-	/**
-	 * Add listeners.
-	 */
 	void addListeners() {
 		addFieldLocationListener(this);
 		addFieldSelectionListener(this);
+		addLiveFieldSelectionListener(liveSelectionListener);
 		addFieldInputListener(this);
 		addFieldMouseListener(this);
 	}
@@ -902,9 +915,8 @@ public class ByteViewerComponent extends FieldPanel implements FieldMouseListene
 
 	ByteField getField(BigInteger index, int fieldNum) {
 		if (indexMap != null) {
-			int fieldOffset = indexMap.getFieldOffset(index, fieldNum, fieldFactories);
 			if (fieldNum < fieldFactories.length) {
-				return (ByteField) fieldFactories[fieldOffset].getField(index);
+				return (ByteField) fieldFactories[fieldNum].getField(index);
 			}
 		}
 		return null;

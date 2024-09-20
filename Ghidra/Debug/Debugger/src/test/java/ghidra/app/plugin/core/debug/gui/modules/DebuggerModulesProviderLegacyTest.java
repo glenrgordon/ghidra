@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,7 +32,6 @@ import ghidra.app.plugin.core.debug.gui.*;
 import ghidra.app.plugin.core.debug.gui.DebuggerBlockChooserDialog.MemoryBlockRow;
 import ghidra.app.plugin.core.debug.gui.DebuggerResources.AbstractImportFromFileSystemAction;
 import ghidra.app.plugin.core.debug.gui.DebuggerResources.AbstractSelectAddressesAction;
-import ghidra.app.plugin.core.debug.gui.action.AutoMapSpec;
 import ghidra.app.plugin.core.debug.gui.action.NoneAutoMapSpec;
 import ghidra.app.plugin.core.debug.gui.listing.DebuggerListingPlugin;
 import ghidra.app.plugin.core.debug.gui.listing.DebuggerListingProvider;
@@ -40,7 +39,9 @@ import ghidra.app.plugin.core.debug.gui.modules.DebuggerModuleMapProposalDialog.
 import ghidra.app.plugin.core.debug.gui.modules.DebuggerModulesProvider.MapModulesAction;
 import ghidra.app.plugin.core.debug.gui.modules.DebuggerModulesProvider.MapSectionsAction;
 import ghidra.app.plugin.core.debug.gui.modules.DebuggerSectionMapProposalDialog.SectionMapTableColumns;
+import ghidra.app.plugin.core.debug.service.tracemgr.DebuggerTraceManagerServiceTestAccess;
 import ghidra.app.services.DebuggerListingService;
+import ghidra.debug.api.action.AutoMapSpec;
 import ghidra.debug.api.modules.ModuleMapProposal.ModuleMapEntry;
 import ghidra.debug.api.modules.SectionMapProposal.SectionMapEntry;
 import ghidra.framework.main.DataTreeDialog;
@@ -302,6 +303,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 	@Test
 	public void testActivatingNoTraceEmptiesProvider() throws Exception {
+		DebuggerTraceManagerServiceTestAccess.setEnsureActiveTrace(traceManager, false);
 		createAndOpenTrace();
 
 		addModules();
@@ -371,7 +373,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 	@Test
 	public void testActionMapModules() throws Exception {
-		assertFalse(modulesProvider.actionMapModules.isEnabled());
+		assertDisabled(modulesProvider, modulesProvider.actionMapModules);
 
 		createAndOpenTrace();
 		createAndOpenProgramFromTrace();
@@ -383,7 +385,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 		waitForSwing();
 
 		// Still
-		assertFalse(modulesProvider.actionMapModules.isEnabled());
+		assertDisabled(modulesProvider, modulesProvider.actionMapModules);
 
 		try (Transaction tx = program.openTransaction("Change name")) {
 			program.setImageBase(addr(program, 0x00400000), true);
@@ -397,7 +399,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 		modulesProvider.setSelectedModules(Set.of(modExe));
 		waitForSwing();
-		assertTrue(modulesProvider.actionMapModules.isEnabled());
+		assertEnabled(modulesProvider, modulesProvider.actionMapModules);
 
 		performEnabledAction(modulesProvider, modulesProvider.actionMapModules, false);
 
@@ -439,7 +441,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 	@Test
 	public void testActionMapSections() throws Exception {
-		assertFalse(modulesProvider.actionMapSections.isEnabled());
+		assertDisabled(modulesProvider, modulesProvider.actionMapSections);
 
 		createAndOpenTrace();
 		createAndOpenProgramFromTrace();
@@ -451,7 +453,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 		waitForSwing();
 
 		// Still
-		assertFalse(modulesProvider.actionMapSections.isEnabled());
+		assertDisabled(modulesProvider, modulesProvider.actionMapSections);
 
 		MemoryBlock block = addBlock();
 		try (Transaction tx = program.openTransaction("Change name")) {
@@ -463,7 +465,7 @@ public class DebuggerModulesProviderLegacyTest extends AbstractGhidraHeadedDebug
 
 		modulesProvider.setSelectedSections(Set.of(secExeText));
 		waitForSwing();
-		assertTrue(modulesProvider.actionMapSections.isEnabled());
+		assertEnabled(modulesProvider, modulesProvider.actionMapSections);
 
 		performEnabledAction(modulesProvider, modulesProvider.actionMapSections, false);
 

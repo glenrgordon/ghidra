@@ -18,8 +18,8 @@ package ghidra.program.model.data;
 import java.io.File;
 import java.io.IOException;
 
-import db.DBConstants;
 import generic.jar.ResourceFile;
+import ghidra.framework.data.OpenMode;
 import ghidra.framework.store.db.PackedDBHandle;
 import ghidra.framework.store.db.PackedDatabase;
 import ghidra.program.model.lang.CompilerSpec;
@@ -61,18 +61,21 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 	 * with a warning condition, architecture-specific data may not be available or up-to-date.
 	 * 
 	 * @param packedDbfile file to load or create based upon openMode
-	 * @param openMode one of the DBConstants: CREATE, READ_ONLY or UPDATE
+	 * @param openMode CREATE, READ_ONLY or UPDATE
 	 * @param monitor the progress monitor
 	 * @throws IOException if an IO error occurs
 	 * @throws CancelledException if task cancelled
 	 */
-	private FileDataTypeManager(ResourceFile packedDbfile, int openMode, TaskMonitor monitor)
+	private FileDataTypeManager(ResourceFile packedDbfile, OpenMode openMode, TaskMonitor monitor)
 			throws IOException, CancelledException {
 		super(validateFilename(packedDbfile), openMode, monitor);
 		file = packedDbfile;
 		name = getRootName(file.getName());
 		packedDB = ((PackedDBHandle) dbHandle).getPackedDatabase();
 		logWarning();
+		if (openMode == OpenMode.IMMUTABLE) {
+			setImmutable();
+		}
 	}
 
 	private static ResourceFile validateFilename(ResourceFile packedDbfile) {
@@ -90,7 +93,7 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 	 */
 	public static FileDataTypeManager createFileArchive(File packedDbfile) throws IOException {
 		try {
-			return new FileDataTypeManager(new ResourceFile(packedDbfile), DBConstants.CREATE,
+			return new FileDataTypeManager(new ResourceFile(packedDbfile), OpenMode.CREATE,
 				TaskMonitor.DUMMY);
 		}
 		catch (CancelledException e) {
@@ -137,7 +140,7 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 	 */
 	public static FileDataTypeManager openFileArchive(ResourceFile packedDbfile,
 			boolean openForUpdate) throws IOException {
-		int mode = openForUpdate ? DBConstants.UPDATE : DBConstants.READ_ONLY;
+		OpenMode mode = openForUpdate ? OpenMode.UPDATE : OpenMode.IMMUTABLE;
 		try {
 			return new FileDataTypeManager(packedDbfile, mode, TaskMonitor.DUMMY);
 		}
@@ -152,8 +155,8 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 	 * match another existing archive database.
 	 * @param saveFile the file to save
 	 * @param newUniversalId the new id to use
-	 * @throws DuplicateFileException 
-	 * @throws IOException 
+	 * @throws DuplicateFileException if save file already exists
+	 * @throws IOException if IO error occurs
 	 */
 	public void saveAs(File saveFile, UniversalID newUniversalId)
 			throws DuplicateFileException, IOException {
@@ -170,11 +173,16 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 		catch (CancelledException e) {
 			// Cancel can't happen because we are using a dummy monitor
 		}
+		finally {
+			clearUndo();
+		}
 	}
 
 	/**
 	 * Saves the data type manager to the given file
 	 * @param saveFile the file to save
+	 * @throws DuplicateFileException if save file already exists
+	 * @throws IOException if IO error occurs
 	 */
 	public void saveAs(File saveFile) throws DuplicateFileException, IOException {
 		ResourceFile resourceSaveFile = new ResourceFile(saveFile);
@@ -188,10 +196,14 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 		catch (CancelledException e) {
 			// Cancel can't happen because we are using a dummy monitor
 		}
+		finally {
+			clearUndo();
+		}
 	}
 
 	/**
 	 * Save the category to source file.
+	 * @throws IOException if IO error occurs
 	 */
 	public void save() throws IOException {
 
@@ -204,6 +216,9 @@ public class FileDataTypeManager extends StandAloneDataTypeManager
 		}
 		catch (CancelledException e) {
 			// Cancel can't happen because we are using a dummy monitor
+		}
+		finally {
+			clearUndo();
 		}
 	}
 
