@@ -33,6 +33,7 @@ import javax.swing.text.AttributeSet;
 import docking.DockingUtils;
 import docking.util.GraphicsUtils;
 import docking.widgets.EventTrigger;
+import docking.widgets.fieldpanel.AccessibleFieldPanelDelegate.AccessibleLayout;
 import docking.widgets.fieldpanel.field.Field;
 import docking.widgets.fieldpanel.internal.*;
 import docking.widgets.fieldpanel.internal.PaintContext;
@@ -99,14 +100,6 @@ public class FieldPanel extends JPanel
 		model.addLayoutModelListener(this);
 		layoutHandler = new AnchoredLayoutHandler(model, getHeight());
 		layouts = layoutHandler.positionLayoutsAroundAnchor(BigInteger.ZERO, 0);
-
-		// initialize the focus traversal keys to control Tab to free up the tab key for internal
-		// field panel use. This is the same behavior that text components use.
-		KeyStroke ks = KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
-		setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Set.of(ks));
-		ks = KeyStroke.getKeyStroke(KeyEvent.VK_TAB,
-			InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
-		setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, Set.of(ks));
 
 		addKeyListener(new FieldPanelKeyAdapter());
 		addMouseListener(new FieldPanelMouseAdapter());
@@ -1465,6 +1458,10 @@ public class FieldPanel extends JPanel
 			delegate = new AccessibleFieldPanelDelegate(layouts, this, FieldPanel.this);
 		}
 
+		public void focusGained() {
+			delegate.focusGained();
+		}
+		
 		public void cursorChanged(FieldLocation newCursorLoc, EventTrigger trigger) {
 			delegate.setCaret(newCursorLoc, trigger);
 		}
@@ -1503,13 +1500,13 @@ public class FieldPanel extends JPanel
 
 		@Override
 		public int getAccessibleChildrenCount() {
-			return delegate.getFieldCount();
+			return delegate.getAccessibleLayoutCount();
 		}
 
 		@Override
 		public Accessible getAccessibleChild(int i) {
-			AccessibleField field = delegate.getAccessibleField(i);
-			return field;
+			AccessibleLayout layout = delegate.getAccessibleLayout(i);
+			return layout;
 		}
 
 		@Override
@@ -1804,6 +1801,7 @@ public class FieldPanel extends JPanel
 			paintContext.setCursorFocused(true);
 			cursorHandler.focusGained();
 			repaint();
+			accessibleFieldPanel.focusGained();
 		}
 
 		@Override
@@ -1811,7 +1809,6 @@ public class FieldPanel extends JPanel
 			inFocus = false;
 			paintContext.setCursorFocused(false);
 			cursorHandler.focusLost();
-
 			// this prevents issues when some keybindings trigger new dialogs while selecting
 			selectionHandler.endSelectionSequence();
 			repaint();
