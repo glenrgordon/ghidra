@@ -1461,7 +1461,7 @@ public class FieldPanel extends JPanel
 		public void focusGained() {
 			delegate.focusGained();
 		}
-		
+
 		public void cursorChanged(FieldLocation newCursorLoc, EventTrigger trigger) {
 			delegate.setCaret(newCursorLoc, trigger);
 		}
@@ -1720,6 +1720,8 @@ public class FieldPanel extends JPanel
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, shift), new DownKeyAction());
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, shift), new LeftKeyAction());
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, shift), new RightKeyAction());
+			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, control), new LeftKeyAction());
+			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, control), new RightKeyAction());
 
 			//
 			// Tab Keys
@@ -1967,12 +1969,22 @@ public class FieldPanel extends JPanel
 		}
 
 		void vkLeft(KeyEvent e) {
-			cursorHandler.doCursorLeft(EventTrigger.GUI_ACTION);
+			if (DockingUtils.isControlModifier(e)) {
+				cursorHandler.doCursorWordLeft(EventTrigger.GUI_ACTION);
+			}
+			else {
+				cursorHandler.doCursorLeft(EventTrigger.GUI_ACTION);
+			}
 			selectionHandler.updateSelectionSequence(cursorPosition);
 		}
 
 		void vkRight(KeyEvent e) {
-			cursorHandler.doCursorRight(EventTrigger.GUI_ACTION);
+			if (DockingUtils.isControlModifier(e)) {
+				cursorHandler.doCursorWordRight(EventTrigger.GUI_ACTION);
+			}
+			else {
+				cursorHandler.doCursorRight(EventTrigger.GUI_ACTION);
+			}
 			selectionHandler.updateSelectionSequence(cursorPosition);
 		}
 
@@ -2405,6 +2417,74 @@ public class FieldPanel extends JPanel
 			notifyCursorChanged(trigger);
 		}
 
+		private void doCursorWordLeft(EventTrigger trigger) {
+			if (!cursorOn) {
+				return;
+			}
+			scrollToCursor();
+			Layout layout = findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout != null) {
+				int wordStartsFound = isAtStartOfWord() ? 1 : 0;
+				int result = layout.cursorLeft(cursorPosition);
+				while (result >= 0) {
+					wordStartsFound += isAtStartOfWord() ? 1 : 0;
+					if (wordStartsFound == 2)
+						break;
+					result = layout.cursorLeft(cursorPosition);
+				}
+				if (result < 0) {
+					wordStartsFound = 0;
+					lastX = Integer.MAX_VALUE;
+					if (doCursorUp(trigger)) {
+						result = layout.cursorLeft(cursorPosition);
+						while (result >= 0) {
+							wordStartsFound += isAtStartOfWord() ? 1 : 0;
+							if (wordStartsFound == 2)
+								break;
+							result = layout.cursorLeft(cursorPosition);
+						}
+					}
+					else {
+						doCursorHome(trigger);
+					}
+				}
+				else {
+					currentField = layout.getField(cursorPosition.fieldNum);
+					lastX = result;
+				}
+
+			}
+			scrollToCursor();
+			repaint();
+			notifyCursorChanged(trigger);
+		}
+
+		private void doCursorWordRight(EventTrigger trigger) {
+			if (!cursorOn) {
+				return;
+			}
+			scrollToCursor();
+			Layout layout = findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout != null) {
+				int result = layout.cursorRight(cursorPosition);
+				while (result >= 0 && !isAtStartOfWord())
+					result = layout.cursorRight(cursorPosition);
+				if (result < 0) {
+					lastX = 0;
+					if (!doCursorDown(trigger)) {
+						doCursorEnd(trigger);
+					}
+				}
+				else {
+					currentField = layout.getField(cursorPosition.fieldNum);
+					lastX = result;
+				}
+			}
+			scrollToCursor();
+			repaint();
+			notifyCursorChanged(trigger);
+		}
+
 		private void doCursorHome(EventTrigger trigger) {
 			if (!cursorOn) {
 				return;
@@ -2492,6 +2572,24 @@ public class FieldPanel extends JPanel
 						cursorPosition.row, cursorPosition.col, currentField);
 				}
 			}
+		}
+
+		private boolean isAlphanumeric(char ch) {
+			return Character.isAlphabetic(ch) || Character.isDigit(ch);
+		}
+
+		private boolean isAtStartOfWord() {
+			Field field = getCurrentField();
+			if (field == null)
+				return false;
+			String text = field.getText();
+			if (text == null)
+				return false;
+			int offset = field.screenLocationToTextOffset(cursorPosition.row, cursorPosition.col);
+			return offset == 0 ||
+				(offset > 0 && offset < text.length() &&
+					!isAlphanumeric(text.charAt(offset - 1)) &&
+					isAlphanumeric(text.charAt(offset)));
 		}
 	}
 }

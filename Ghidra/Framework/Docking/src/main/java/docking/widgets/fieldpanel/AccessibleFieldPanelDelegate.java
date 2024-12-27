@@ -21,6 +21,7 @@ import java.awt.IllegalComponentStateException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.math.BigInteger;
+import java.text.BreakIterator;
 import java.util.*;
 
 import javax.accessibility.*;
@@ -92,7 +93,8 @@ public class AccessibleFieldPanelDelegate {
 		accessibleLayouts = new ArrayList<>(layouts.size());
 		int positionInParent = 0;
 		for (AnchoredLayout layout : layouts) {
-			AccessibleLayout accessibleLayout = new AccessibleLayout(layout, positionInParent++,totalFieldCount);
+			AccessibleLayout accessibleLayout =
+				new AccessibleLayout(layout, positionInParent++, totalFieldCount);
 			accessibleLayouts.add(accessibleLayout);
 			totalFieldCount += layout.getNumFields();
 		}
@@ -113,11 +115,13 @@ public class AccessibleFieldPanelDelegate {
 		if (accessibleLayout == null || !isSameLayout(cursorLoc, newCursorLoc)) {
 			AccessibleLayout oldLayout = accessibleLayout;
 			accessibleLayout = getAccessibleLayout(newCursorLoc.getIndex());
-			if (trigger == EventTrigger.GUI_ACTION) {
-				context.firePropertyChange(ACCESSIBLE_ACTIVE_DESCENDANT_PROPERTY, oldLayout,accessibleLayout);
-			}
-			cursorLoc = newCursorLoc;
+			context.firePropertyChange(ACCESSIBLE_ACTIVE_DESCENDANT_PROPERTY, oldLayout,
+				accessibleLayout);
 		}
+		if (accessibleLayout != null) {
+			accessibleLayout.setCaret(cursorLoc, newCursorLoc);
+		}
+		cursorLoc = newCursorLoc;
 	}
 
 	/**
@@ -130,6 +134,15 @@ public class AccessibleFieldPanelDelegate {
 	public void setSelection(FieldSelection currentSelection, EventTrigger trigger) {
 		this.currentSelection = currentSelection;
 		updateCurrentFieldSelectedState(trigger);
+		if (context != null) {
+			if (currentSelection.isEmpty()) {
+				context.firePropertyChange("AccessibleNotification", null, "Selection cleared");
+			}
+			else {
+				context.firePropertyChange("AccessibleNotification", null, "Selection Changed");
+			}
+
+		}
 	}
 
 	public void focusGained() {
@@ -248,10 +261,10 @@ public class AccessibleFieldPanelDelegate {
 		if (accessibleLayouts == null) {
 			return null;
 		}
-			int result = Collections.binarySearch(accessibleLayouts, index,
-				Comparator.comparing(
-			o -> o instanceof AccessibleLayout lh ? lh.getIndex() : (BigInteger) o,
-			BigInteger::compareTo));
+		int result = Collections.binarySearch(accessibleLayouts, index,
+			Comparator.comparing(
+				o -> o instanceof AccessibleLayout lh ? lh.getIndex() : (BigInteger) o,
+				BigInteger::compareTo));
 
 		if (result < 0) {
 			return null;
@@ -509,6 +522,17 @@ public class AccessibleFieldPanelDelegate {
 			return layout.getIndex();
 		}
 
+		public void setCaret(FieldLocation oldCursorLoc, FieldLocation newCursorLoc) {
+			int oldOffset = -1;
+			if (oldCursorLoc != null &&
+				oldCursorLoc.getIndex() == newCursorLoc.getIndex()) {
+				oldOffset =
+					toSimulatedOffset(oldCursorLoc.fieldNum, oldCursorLoc.row, oldCursorLoc.col);
+			}
+			this.firePropertyChange(ACCESSIBLE_CARET_PROPERTY, oldOffset,
+				toSimulatedOffset(newCursorLoc.fieldNum, newCursorLoc.row, newCursorLoc.col));
+		}
+
 		@Override
 		public AccessibleComponent getAccessibleComponent() {
 			return panel.getAccessibleContext().getAccessibleComponent();
@@ -609,7 +633,6 @@ public class AccessibleFieldPanelDelegate {
 			switch (part) {
 				case AccessibleText.CHARACTER: {
 					int offset = field.screenLocationToTextOffset(location.row, location.col);
-
 					if (offset >= text.length())
 						return null;
 					return new AccessibleTextSequence(index, index + 1,
@@ -617,12 +640,9 @@ public class AccessibleFieldPanelDelegate {
 				}
 
 				case AccessibleText.WORD: {
-					int simulatedStartOffset =
-						toSimulatedOffset(location.fieldNum, location.row, 0);
-					int simulatedEndOffset = simulatedStartOffset + field.getNumCols(location.row);
-					return new AccessibleTextSequence(simulatedStartOffset, simulatedEndOffset,
-						text);
+					return getWordSequence(field, location, text);
 				}
+				case AccessibleExtendedText.ATTRIBUTE_RUN:
 				case AccessibleExtendedText.LINE: {
 					int firstFieldNum = layout.getBeginRowFieldNum(location.fieldNum);
 					Field firstField = layout.getField(firstFieldNum);
@@ -776,7 +796,7 @@ public class AccessibleFieldPanelDelegate {
 						accumulatedLength += col;
 						return accumulatedLength;
 					}
-					accumulatedLength += field.getNumCols(rowIdx)+1;
+					accumulatedLength += field.getNumCols(rowIdx) + 1;
 				}
 			}
 			return accumulatedLength;
@@ -800,7 +820,7 @@ public class AccessibleFieldPanelDelegate {
 						return new FieldLocation(layout.getIndex(), fieldIdx, rowIdx,
 							offset - accumulatedLength);
 					}
-					accumulatedLength += field.getNumCols(rowIdx)+1;
+					accumulatedLength += field.getNumCols(rowIdx) + 1;
 				}
 			}
 			return new FieldLocation(layout.getIndex(), fieldCount - 1, lastValidRowIdx, 99);
@@ -859,6 +879,41 @@ public class AccessibleFieldPanelDelegate {
 		public Locale getLocale() throws IllegalComponentStateException {
 			// TODO Auto-generated method stub
 			return null;
+		}
+
+		AccessibleTextSequence getWordSequence(Field field, FieldLocation location,
+				String fieldText) {
+			if (field.getNumCols(location.row) == 0) {
+				return null;
+			}
+			final int rowStartOffset = field.screenLocationToTextOffset(location.row, 0);
+			final int rowLength = field.getNumCols(location.row);
+			String text = fieldText.substring(rowStartOffset,
+				Math.min(rowStartOffset + rowLength, fieldText.length()));
+			final int offset =
+				field.screenLocationToTextOffset(location.row, location.col) - rowStartOffset;
+			if (offset >= rowLength ||
+				offset >= text.length() ||
+				Character.isWhitespace(text.charAt(offset))) {
+				return new AccessibleTextSequence(offset, offset + 1, " ");
+			}
+
+			int wordStart = offset;
+			int wordEnd = offset + 1;
+			BreakIterator iterator = BreakIterator.getWordInstance(panel.getLocale());
+			iterator.setText(text);
+			if (!iterator.isBoundary(offset)) {
+				wordStart = iterator.preceding(offset);
+				if (wordStart == BreakIterator.DONE)
+					wordStart = 0;
+			}
+			wordEnd = iterator.following(wordStart);
+			if (wordEnd == BreakIterator.DONE)
+				wordEnd = text.length();
+			return new AccessibleTextSequence(
+				toSimulatedOffset(location.fieldNum, location.row, wordStart),
+				toSimulatedOffset(location.fieldNum, location.row, wordEnd),
+				text.substring(wordStart, wordEnd));
 		}
 	}
 }
