@@ -17,6 +17,7 @@ package docking.widgets;
 
 import java.awt.*;
 
+import javax.accessibility.AccessibleContext;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -78,7 +79,7 @@ public class MultiLineLabel extends JPanel {
 		this.margin_width = margin_width;
 		this.margin_height = margin_height;
 		this.alignment = alignment;
-
+		getAccessibleContext().setAccessibleName(label);
 	}
 
 	/**
@@ -161,6 +162,8 @@ public class MultiLineLabel extends JPanel {
 		num_lines = text.length;
 		measure();
 		repaint();
+		AccessibleContext ctx =getAccessibleContext();
+		ctx.setAccessibleName(String.join(" ",text));
 	}
 
 	/**
