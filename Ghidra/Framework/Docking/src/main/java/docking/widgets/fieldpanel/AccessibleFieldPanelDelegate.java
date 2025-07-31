@@ -100,6 +100,7 @@ public class AccessibleFieldPanelDelegate {
 		}
 		fieldsCache = new AccessibleField[totalFieldCount];
 		context.firePropertyChange(ACCESSIBLE_INVALIDATE_CHILDREN, null, panel);
+		accessibleLayout = null;
 		if (cursorLoc != null) {
 			setCaret(cursorLoc, EventTrigger.GUI_ACTION);
 		}

@@ -252,6 +252,7 @@ public class ConsoleTextPane extends JTextPane implements OptionsChangeListener 
 		}
 
 		try {
+			getAccessibleContext().firePropertyChange("AccessibleNotification","ConsoleTextPane",message.toString());
 			Document document = getDocument();
 			int overage = document.getLength() + message.length() - maximumCharacterLimit;
 			if (overage <= 0) {
