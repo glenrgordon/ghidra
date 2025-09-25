@@ -33,6 +33,7 @@ import javax.swing.text.AttributeSet;
 import docking.DockingUtils;
 import docking.util.GraphicsUtils;
 import docking.widgets.EventTrigger;
+import docking.widgets.fieldpanel.AccessibleFieldPanelDelegate.AccessibleLayout;
 import docking.widgets.fieldpanel.field.Field;
 import docking.widgets.fieldpanel.internal.*;
 import docking.widgets.fieldpanel.internal.PaintContext;
@@ -99,14 +100,6 @@ public class FieldPanel extends JPanel
 		model.addLayoutModelListener(this);
 		layoutHandler = new AnchoredLayoutHandler(model, getHeight());
 		layouts = layoutHandler.positionLayoutsAroundAnchor(BigInteger.ZERO, 0);
-
-		// initialize the focus traversal keys to control Tab to free up the tab key for internal
-		// field panel use. This is the same behavior that text components use.
-		KeyStroke ks = KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
-		setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Set.of(ks));
-		ks = KeyStroke.getKeyStroke(KeyEvent.VK_TAB,
-			InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
-		setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, Set.of(ks));
 
 		addKeyListener(new FieldPanelKeyAdapter());
 		addMouseListener(new FieldPanelMouseAdapter());
@@ -1472,6 +1465,10 @@ public class FieldPanel extends JPanel
 			delegate = new AccessibleFieldPanelDelegate(layouts, this, FieldPanel.this);
 		}
 
+		public void focusGained() {
+			delegate.focusGained();
+		}
+
 		public void cursorChanged(FieldLocation newCursorLoc, EventTrigger trigger) {
 			delegate.setCaret(newCursorLoc, trigger);
 		}
@@ -1510,13 +1507,13 @@ public class FieldPanel extends JPanel
 
 		@Override
 		public int getAccessibleChildrenCount() {
-			return delegate.getFieldCount();
+			return delegate.getAccessibleLayoutCount();
 		}
 
 		@Override
 		public Accessible getAccessibleChild(int i) {
-			AccessibleField field = delegate.getAccessibleField(i);
-			return field;
+			AccessibleLayout layout = delegate.getAccessibleLayout(i);
+			return layout;
 		}
 
 		@Override
@@ -1730,6 +1727,8 @@ public class FieldPanel extends JPanel
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, shift), new DownKeyAction());
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, shift), new LeftKeyAction());
 			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, shift), new RightKeyAction());
+			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, control), new LeftKeyAction());
+			actionMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, control), new RightKeyAction());
 
 			//
 			// Tab Keys
@@ -1811,6 +1810,7 @@ public class FieldPanel extends JPanel
 			paintContext.setCursorFocused(true);
 			cursorHandler.focusGained();
 			repaint();
+			accessibleFieldPanel.focusGained();
 		}
 
 		@Override
@@ -1818,7 +1818,6 @@ public class FieldPanel extends JPanel
 			inFocus = false;
 			paintContext.setCursorFocused(false);
 			cursorHandler.focusLost();
-
 			// this prevents issues when some keybindings trigger new dialogs while selecting
 			selectionHandler.endSelectionSequence();
 			repaint();
@@ -1977,12 +1976,22 @@ public class FieldPanel extends JPanel
 		}
 
 		void vkLeft(KeyEvent e) {
-			cursorHandler.doCursorLeft(EventTrigger.GUI_ACTION);
+			if (DockingUtils.isControlModifier(e)) {
+				cursorHandler.doCursorWordLeft(EventTrigger.GUI_ACTION);
+			}
+			else {
+				cursorHandler.doCursorLeft(EventTrigger.GUI_ACTION);
+			}
 			selectionHandler.updateSelectionSequence(cursorPosition);
 		}
 
 		void vkRight(KeyEvent e) {
-			cursorHandler.doCursorRight(EventTrigger.GUI_ACTION);
+			if (DockingUtils.isControlModifier(e)) {
+				cursorHandler.doCursorWordRight(EventTrigger.GUI_ACTION);
+			}
+			else {
+				cursorHandler.doCursorRight(EventTrigger.GUI_ACTION);
+			}
 			selectionHandler.updateSelectionSequence(cursorPosition);
 		}
 
@@ -2415,6 +2424,74 @@ public class FieldPanel extends JPanel
 			notifyCursorChanged(trigger);
 		}
 
+		private void doCursorWordLeft(EventTrigger trigger) {
+			if (!cursorOn) {
+				return;
+			}
+			scrollToCursor();
+			Layout layout = findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout != null) {
+				int wordStartsFound = isAtStartOfWord() ? 1 : 0;
+				int result = layout.cursorLeft(cursorPosition);
+				while (result >= 0) {
+					wordStartsFound += isAtStartOfWord() ? 1 : 0;
+					if (wordStartsFound == 2)
+						break;
+					result = layout.cursorLeft(cursorPosition);
+				}
+				if (result < 0) {
+					wordStartsFound = 0;
+					lastX = Integer.MAX_VALUE;
+					if (doCursorUp(trigger)) {
+						result = layout.cursorLeft(cursorPosition);
+						while (result >= 0) {
+							wordStartsFound += isAtStartOfWord() ? 1 : 0;
+							if (wordStartsFound == 2)
+								break;
+							result = layout.cursorLeft(cursorPosition);
+						}
+					}
+					else {
+						doCursorHome(trigger);
+					}
+				}
+				else {
+					currentField = layout.getField(cursorPosition.fieldNum);
+					lastX = result;
+				}
+
+			}
+			scrollToCursor();
+			repaint();
+			notifyCursorChanged(trigger);
+		}
+
+		private void doCursorWordRight(EventTrigger trigger) {
+			if (!cursorOn) {
+				return;
+			}
+			scrollToCursor();
+			Layout layout = findLayoutOnScreen(cursorPosition.getIndex());
+			if (layout != null) {
+				int result = layout.cursorRight(cursorPosition);
+				while (result >= 0 && !isAtStartOfWord())
+					result = layout.cursorRight(cursorPosition);
+				if (result < 0) {
+					lastX = 0;
+					if (!doCursorDown(trigger)) {
+						doCursorEnd(trigger);
+					}
+				}
+				else {
+					currentField = layout.getField(cursorPosition.fieldNum);
+					lastX = result;
+				}
+			}
+			scrollToCursor();
+			repaint();
+			notifyCursorChanged(trigger);
+		}
+
 		private void doCursorHome(EventTrigger trigger) {
 			if (!cursorOn) {
 				return;
@@ -2502,6 +2579,24 @@ public class FieldPanel extends JPanel
 						cursorPosition.row, cursorPosition.col, currentField);
 				}
 			}
+		}
+
+		private boolean isAlphanumeric(char ch) {
+			return Character.isAlphabetic(ch) || Character.isDigit(ch);
+		}
+
+		private boolean isAtStartOfWord() {
+			Field field = getCurrentField();
+			if (field == null)
+				return false;
+			String text = field.getText();
+			if (text == null)
+				return false;
+			int offset = field.screenLocationToTextOffset(cursorPosition.row, cursorPosition.col);
+			return offset == 0 ||
+				(offset > 0 && offset < text.length() &&
+					!isAlphanumeric(text.charAt(offset - 1)) &&
+					isAlphanumeric(text.charAt(offset)));
 		}
 	}
 }

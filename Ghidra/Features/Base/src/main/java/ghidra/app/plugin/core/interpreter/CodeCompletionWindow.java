@@ -263,6 +263,7 @@ public class CodeCompletionWindow extends JDialog {
 			if (CodeCompletion.isValid(completion)) {
 				jlist.setSelectedIndex(i);
 				jlist.ensureIndexIsVisible(i);
+				jlist.getAccessibleContext().firePropertyChange("AccessibleNotification","AutoComplete",completion.getDescription());
 				break;
 			}
 		}
@@ -282,6 +283,7 @@ public class CodeCompletionWindow extends JDialog {
 			if (CodeCompletion.isValid(completion)) {
 				jlist.setSelectedIndex(i);
 				jlist.ensureIndexIsVisible(i);
+				jlist.getAccessibleContext().firePropertyChange("AccessibleNotification","AutoComplete",completion.getDescription());
 				break;
 			}
 		}
