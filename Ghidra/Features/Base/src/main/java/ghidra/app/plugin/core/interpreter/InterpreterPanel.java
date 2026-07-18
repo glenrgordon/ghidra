@@ -117,11 +117,13 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 	private void build() {
 		outputTextPane = new JTextPane();
 		outputTextPane.setName("Interpreter Output Display");
+		outputTextPane.getAccessibleContext().setAccessibleName("Output");
 		outputScrollPane = new JScrollPane(outputTextPane);
 		outputScrollPane.setBorder(BorderFactory.createEmptyBorder());
 		promptTextPane = new JTextPane();
 		inputTextPane = new JTextPane();
 		inputTextPane.setName("Interpreter Input Field");
+		inputTextPane.getAccessibleContext().setAccessibleName("input");
 
 		outputTextPane.setBackground(BG_COLOR);
 		promptTextPane.setBackground(BG_COLOR);
@@ -133,7 +135,7 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 
 		history = new HistoryManagerImpl();
 
-		outputScrollPane.setFocusable(false);
+		// outputScrollPane.setFocusable(false);
 		promptTextPane.setFocusable(false);
 
 		outWriter = new InterpreterPrintWriter(TextType.STDOUT);
@@ -143,8 +145,8 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 		stdout = outWriter.asOutputStream();
 		stderr = errWriter.asOutputStream();
 
-		outputTextPane.setEditable(false);
-		promptTextPane.setEditable(false);
+		// outputTextPane.setEditable(false);
+		// promptTextPane.setEditable(false);
 
 		JPanel interior = new JPanel();
 		interior.setLayout(new BorderLayout());
@@ -228,7 +230,8 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 		FocusTraversalPolicy policy = new FocusTraversalPolicy() {
 			@Override
 			public Component getLastComponent(Container aContainer) {
-				return inputTextPane;
+				return outputTextPane;
+				// return inputTextPane;
 			}
 
 			@Override
@@ -251,9 +254,9 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 				return inputTextPane;
 			}
 		};
-		setFocusCycleRoot(true);
-		setFocusTraversalPolicy(policy);
-		setFocusTraversalPolicyProvider(true);
+		// setFocusCycleRoot(true);
+		// setFocusTraversalPolicy(policy);
+		// setFocusTraversalPolicyProvider(true);
 	}
 
 	private void completionWindowTriggered(CodeCompletionWindow completionWindow) {
@@ -439,6 +442,9 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 			StyledDocument document = outputTextPane.getStyledDocument();
 			renderer.renderString(document, text, attributes);
 			repositionScrollpane();
+			if (renderer != stdInRenderer && !text.isEmpty() &&
+					!text.startsWith(">>>"))
+				outputTextPane.getAccessibleContext().firePropertyChange("AccessibleNotification","NewText" ,text);
 		}
 		catch (BadLocationException e) {
 			// shouldn't happen
@@ -778,7 +784,7 @@ public class InterpreterPanel extends JPanel implements OptionsChangeListener {
 			}
 
 			// Send everything else down to the inputTextPane.
-			KeyBindingUtils.retargetEvent(inputTextPane, e);
+			// KeyBindingUtils.retargetEvent(inputTextPane, e);
 		}
 
 		@Override
